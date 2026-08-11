@@ -22,15 +22,38 @@ export default function Home() {
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
       {/* the mark, watching */}
-      <svg
+      <motion.svg
         viewBox="0 0 120 120"
-        className="pointer-events-none absolute left-1/2 top-1/2 h-[70vmin] w-[70vmin] -translate-x-1/2 -translate-y-1/2 opacity-[0.05]"
+        initial={{ opacity: 0, scale: 1.08 }}
+        animate={{ opacity: 0.11, scale: 1 }}
+        transition={{ duration: 2.4, ease: "easeOut" }}
+        className="pointer-events-none absolute left-1/2 top-1/2 h-[78vmin] w-[78vmin] -translate-x-1/2 -translate-y-1/2"
         aria-hidden
       >
-        <circle cx="60" cy="60" r="44" fill="none" stroke="#c1272d" strokeWidth="6" />
-        <path d="M44 48 L44 48 M76 48 L76 48" stroke="#c1272d" strokeWidth="13" strokeLinecap="round" />
-        <path d="M40 74 Q60 92 80 74" fill="none" stroke="#c1272d" strokeWidth="6" strokeLinecap="round" />
-      </svg>
+        <circle cx="60" cy="60" r="44" fill="none" stroke="#c1272d" strokeWidth="5" />
+        <path d="M44 48 L44 48 M76 48 L76 48" stroke="#c1272d" strokeWidth="12" strokeLinecap="round" />
+        <path d="M40 74 Q60 92 80 74" fill="none" stroke="#c1272d" strokeWidth="5" strokeLinecap="round" />
+      </motion.svg>
+
+      {/* registration marks — the frame turns empty space into composition */}
+      <div className="pointer-events-none absolute inset-5 sm:inset-8">
+        {(
+          [
+            "left-0 top-0 border-l-2 border-t-2",
+            "right-0 top-0 border-r-2 border-t-2",
+            "left-0 bottom-0 border-b-2 border-l-2",
+            "right-0 bottom-0 border-b-2 border-r-2",
+          ] as const
+        ).map((cls) => (
+          <motion.span
+            key={cls}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 1.5, duration: 0.8 }}
+            className={`absolute h-7 w-7 border-bone-dim/25 ${cls}`}
+          />
+        ))}
+      </div>
 
       <motion.p
         initial={{ opacity: 0 }}
@@ -85,6 +108,15 @@ export default function Home() {
         <Link href="/case/play" className="hover:text-bone">PLAY ON-CHAIN ↗</Link>
         <Link href="/about" className="hover:text-bone">HOW IT WORKS</Link>
       </motion.nav>
+
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ delay: 1.8 }}
+        className="absolute bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-[9px] tracking-file text-bone-dim/40"
+      >
+        INCO LIGHTNING · MEGAPOT · BASE SEPOLIA
+      </motion.p>
 
       <AnimatePresence>
         {booting && <BootScreen onReady={() => router.push("/story")} />}

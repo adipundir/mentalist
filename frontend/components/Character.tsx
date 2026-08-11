@@ -238,48 +238,70 @@ function AccessoryPart({ style, suit }: { style: Accessory; suit: string }) {
 }
 
 /**
- * The standing figure below the collar.
+ * The standing figure, from the collar down.
  *
- * Posture carries as much as the face at full height: a nervous suspect draws his arms in,
- * a smug one plants his feet. Kept to flat shapes so it reads at any size.
+ * This owns the *entire* body — shoulders, torso, shirt, tie, arms, legs. The
+ * head-and-shoulders drawing has its own collar for the portrait crop, and rendering both
+ * produced a cape over a second torso with two ties and hands floating at chest height. In
+ * full-body mode that collar is skipped and everything below the neck comes from here, so
+ * there is exactly one shoulder line and it meets the neck where it should.
+ *
+ * Proportions are deliberately cartoon: the head is about a quarter of total height, which
+ * is wrong anatomically and right for 1960s limited animation.
+ *
+ * Posture carries as much as the face at full height — a nervous suspect draws his arms in,
+ * a smug one plants his feet.
  */
 function Body({ spec, expression }: { spec: CharacterSpec; expression: Expression }) {
   const tense = expression === "nervous" || expression === "caught" || expression === "shocked";
   const open = expression === "smug" || expression === "sinister";
-  const armSwing = tense ? 6 : open ? -8 : 0;
+
+  const armIn = tense ? 5 : open ? -7 : 0; // arms tucked when anxious, loose when cocky
+  const stance = open ? 5 : 0; // feet planted wider
 
   return (
     <g strokeLinejoin="round" strokeLinecap="round">
-      {/* legs */}
+      {/* legs first, so the jacket hem overlaps the waist */}
       <path
-        d={`M40 168 L${open ? 32 : 37} 240 L${open ? 31 : 36} 250 L46 250 L47 168 Z`}
-        fill={spec.suit}
-        stroke={INK}
-        strokeWidth="2.6"
+        d={`M39 176 L${36 - stance} 232 L${35 - stance} 243 L48 243 L49 176 Z`}
+        fill={spec.suit} stroke={INK} strokeWidth="2.6"
       />
       <path
-        d={`M53 168 L${open ? 68 : 63} 240 L${open ? 69 : 64} 250 L54 250 L54 168 Z`}
-        fill={spec.suit}
-        stroke={INK}
-        strokeWidth="2.6"
+        d={`M51 176 L52 243 L${65 + stance} 243 L${64 + stance} 232 L61 176 Z`}
+        fill={spec.suit} stroke={INK} strokeWidth="2.6"
       />
-      {/* shoes */}
-      <path d={`M${open ? 27 : 32} 250 h20 v6 h-22 a3 3 0 0 1 2 -6 Z`} fill="#201915" stroke={INK} strokeWidth="2.2" />
-      <path d={`M${open ? 65 : 60} 250 h20 a3 3 0 0 1 2 6 h-22 Z`} fill="#201915" stroke={INK} strokeWidth="2.2" />
+      <path
+        d={`M${33 - stance} 241 h17 v7 h-19 a3.5 3.5 0 0 1 2 -7 Z`}
+        fill="#241c17" stroke={INK} strokeWidth="2.3"
+      />
+      <path
+        d={`M50 241 h${17 + stance} a3.5 3.5 0 0 1 2 7 h-19 Z`}
+        fill="#241c17" stroke={INK} strokeWidth="2.3"
+      />
 
-      {/* torso — jacket over shirt */}
-      <path d="M28 118 Q26 150 30 176 L64 176 Q68 150 66 118 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
-      <path d="M44 116 L50 132 L56 116 L56 172 L44 172 Z" fill={spec.shirt} stroke={INK} strokeWidth="2" />
-      <path d="M50 128 L54 140 L50 166 L46 140 Z" fill={spec.tie} stroke={INK} strokeWidth="1.8" />
+      {/* shirt and tie sit behind the jacket and show through the opening */}
+      <path d="M44 92 L50 126 L56 92 L56 152 L44 152 Z" fill={spec.shirt} stroke={INK} strokeWidth="2.2" />
+      <path d="M50 100 L54.5 114 L50 148 L45.5 114 Z" fill={spec.tie} stroke={INK} strokeWidth="2" />
 
-      {/* arms */}
-      <g transform={`rotate(${armSwing} 30 124)`}>
-        <path d="M28 118 Q16 142 18 172 L28 174 Q30 146 34 124 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
-        <circle cx="22" cy="178" r="6" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+      {/* the jacket is TWO lapel panels meeting at the button, not one slab — a single
+          closed shape buried the shirt and tie entirely */}
+      <path
+        d="M27 106 Q28 98 35 95 Q42 92 45 94 L50 124 L50 176 L33 176 Z"
+        fill={spec.suit} stroke={INK} strokeWidth="2.7"
+      />
+      <path
+        d="M73 106 Q72 98 65 95 Q58 92 55 94 L50 124 L50 176 L67 176 Z"
+        fill={spec.suit} stroke={INK} strokeWidth="2.7"
+      />
+
+      {/* arms swing clear of the torso so the silhouette reads as a person, not a slab */}
+      <g transform={`rotate(${armIn} 29 104)`}>
+        <path d="M27 104 Q18 130 19 158 L30 159 Q29 130 33 106 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <circle cx="24.5" cy="165" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
       </g>
-      <g transform={`rotate(${-armSwing} 66 124)`}>
-        <path d="M66 118 Q78 142 76 172 L66 174 Q64 146 60 124 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
-        <circle cx="72" cy="178" r="6" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+      <g transform={`rotate(${-armIn} 71 104)`}>
+        <path d="M73 104 Q82 130 81 158 L70 159 Q71 130 67 106 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <circle cx="75.5" cy="165" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
       </g>
     </g>
   );
@@ -341,7 +363,7 @@ export function Character({
 
   return (
     <svg
-      viewBox={fullBody ? "2 6 96 250" : "14 6 72 100"}
+      viewBox={fullBody ? "8 10 84 244" : "14 6 72 100"}
       className={className}
       style={{
         filter: cleared ? "grayscale(1)" : undefined,
@@ -351,21 +373,25 @@ export function Character({
       aria-hidden
     >
       <g transform={`rotate(${spec.tilt} 50 70)`}>
-        {fullBody && <Body spec={spec} expression={expression} />}
+        {fullBody ? (
+          <Body spec={spec} expression={expression} />
+        ) : (
+          <>
+            {/* portrait crop only: its own collar, so a bust reads as clothed */}
+            <path
+              d="M8 130 Q12 100 34 94 L50 100 L66 94 Q88 100 92 130 Z"
+              fill={spec.suit}
+              stroke={INK}
+              strokeWidth="2.5"
+              strokeLinejoin="round"
+            />
+            <path d="M38 96 L50 108 L62 96 L58 94 L50 102 L42 94 Z" fill={spec.shirt} stroke={INK} strokeWidth="2" />
+            <path d="M50 104 L54 112 L50 126 L46 112 Z" fill={spec.tie} stroke={INK} strokeWidth="2" strokeLinejoin="round" />
+          </>
+        )}
 
-        {/* shoulders + shirt + tie */}
-        <path
-          d="M8 130 Q12 100 34 94 L50 100 L66 94 Q88 100 92 130 Z"
-          fill={spec.suit}
-          stroke={INK}
-          strokeWidth="2.5"
-          strokeLinejoin="round"
-        />
-        <path d="M38 96 L50 108 L62 96 L58 94 L50 102 L42 94 Z" fill={spec.shirt} stroke={INK} strokeWidth="2" />
-        <path d="M50 104 L54 112 L50 126 L46 112 Z" fill={spec.tie} stroke={INK} strokeWidth="2" strokeLinejoin="round" />
-
-        {/* neck */}
-        <path d="M42 84 L42 98 Q50 103 58 98 L58 84 Z" fill={spec.skin} stroke={INK} strokeWidth="2.5" />
+        {/* neck — drawn after the body so the jaw sits in front of the collar */}
+        <path d="M42 82 L42 99 Q50 104 58 99 L58 82 Z" fill={spec.skin} stroke={INK} strokeWidth="2.5" />
 
         {/* ears */}
         <ellipse cx="23" cy="58" rx="5" ry="7" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
