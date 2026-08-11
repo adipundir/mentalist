@@ -25,21 +25,37 @@ export interface NarratorOptions {
 }
 
 /**
- * Voices, best first. These are the deep, unhurried English voices shipped by macOS,
- * Windows and Chrome; the list is a preference order, not a requirement — anything English
- * is acceptable and the platform default is the last resort.
+ * Voice preference, best first.
+ *
+ * The ranking matters more than any parameter tweak: modern platforms ship neural voices
+ * ("Premium", "Enhanced", "Natural", "Siri") alongside the old formant synthesisers, and
+ * the legacy ones are what people mean when they say text-to-speech sounds robotic. We hunt
+ * for a neural voice first and only fall back to the classic ones.
  */
 const PREFERRED = [
-  "Daniel", // macOS en-GB — the closest thing to a noir narrator built into a laptop
-  "Google UK English Male",
-  "Microsoft Guy Online (Natural) - English (United States)",
+  // macOS neural — genuinely good, and free on any recent Mac.
+  "Daniel (Premium)",
+  "Daniel (Enhanced)",
+  "Oliver (Premium)",
+  "Oliver (Enhanced)",
+  "Serena (Premium)",
+  "Arthur",       // Siri-family en-GB
+  "Jamie (Premium)",
+  "Alex (Enhanced)",
+  // Windows / Edge neural.
   "Microsoft Ryan Online (Natural) - English (United Kingdom)",
-  "Alex", // macOS en-US
+  "Microsoft Guy Online (Natural) - English (United States)",
+  "Microsoft Brian Online (Natural) - English (United States)",
+  // Chrome's bundled voices.
+  "Google UK English Male",
   "Google US English",
-  "Microsoft David Desktop - English (United States)",
-  "Rishi",
-  "Arthur",
+  // Legacy fallbacks — serviceable, not great.
+  "Daniel",
+  "Alex",
 ];
+
+/** Anything with these in the name is a neural voice and beats a legacy one. */
+const NEURAL_HINTS = ["premium", "enhanced", "natural", "neural", "siri"];
 
 let cached: SpeechSynthesisVoice | null = null;
 let muted = false;
@@ -79,10 +95,17 @@ export async function pickVoice(): Promise<SpeechSynthesisVoice | null> {
     const hit = voices.find((v) => v.name === name);
     if (hit) return (cached = hit);
   }
-  // Otherwise the first English voice, then whatever exists.
+
+  // Nothing from the list — take any English neural voice before any English legacy one.
+  const english = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+  const neural = english.find((v) =>
+    NEURAL_HINTS.some((h) => v.name.toLowerCase().includes(h)),
+  );
+
   cached =
-    voices.find((v) => v.lang?.startsWith("en-GB")) ??
-    voices.find((v) => v.lang?.startsWith("en")) ??
+    neural ??
+    english.find((v) => v.lang?.startsWith("en-GB")) ??
+    english[0] ??
     voices[0];
   return cached;
 }
@@ -117,19 +140,55 @@ export function stopNarration() {
  * Speak a line. Resolves when it finishes (or immediately if narration is off), so callers
  * can sequence beats without guessing at durations.
  */
-export function narrate(text: string, opts: NarratorOptions = {}): Promise<void> {
+export async function narrate(text: string, opts: NarratorOptions = {}): Promise<void> {
   const s = synth();
-  if (!s || muted || !text.trim()) return Promise.resolve();
+  if (!s || muted || !text.trim()) return;
 
   s.cancel(); // one narrator at a time
+
+  // Speak sentence by sentence rather than as one block.
+  //
+  // A single long utterance comes out metronomic — the engine holds one pitch and pace for
+  // the whole paragraph. Chunking lets each sentence start fresh, adds a real breath
+  // between them, and lets us vary pitch and rate a hair per sentence, which is most of
+  // the difference between "reading" and "reciting".
+  const sentences = text
+    .split(/(?<=[.!?—])\s+/)
+    .map((x) => x.trim())
+    .filter(Boolean);
+
+  for (let i = 0; i < sentences.length; i++) {
+    if (muted) return;
+    // Drift, not randomness: sentences trend slightly down in pitch across a paragraph,
+    // the way a person's voice does as they finish a thought.
+    const drift = -0.02 * (i / Math.max(1, sentences.length - 1));
+    const jitter = (Math.random() - 0.5) * 0.05;
+    await speakOne(sentences[i], {
+      ...opts,
+      pitch: (opts.pitch ?? 0.96) + drift + jitter,
+      rate: (opts.rate ?? 0.94) + (Math.random() - 0.5) * 0.05,
+    });
+    // A beat between sentences. Real speech has them; TTS does not unless you ask.
+    if (i < sentences.length - 1) await new Promise((r) => setTimeout(r, 210));
+  }
+}
+
+function speakOne(text: string, opts: NarratorOptions): Promise<void> {
+  const s = synth();
+  if (!s) return Promise.resolve();
 
   return new Promise<void>((resolve) => {
     void pickVoice().then((voice) => {
       const u = new SpeechSynthesisUtterance(stripForSpeech(text));
       if (voice) u.voice = voice;
-      // Slowed and dropped: the default cadence is a satnav, not a detective.
-      u.rate = opts.rate ?? 0.88;
-      u.pitch = opts.pitch ?? 0.82;
+      // Close to natural, and only *slightly* off it.
+      //
+      // The previous settings dropped pitch to 0.82, which is what was producing the
+      // robot: pitch-shifting a synthesised voice that far exposes every artefact in it.
+      // Anything below ~0.9 growls. Speed and a touch of variation do the character work
+      // instead.
+      u.rate = opts.rate ?? 0.94;
+      u.pitch = opts.pitch ?? 0.96;
       u.volume = opts.volume ?? 1;
 
       let settled = false;

@@ -21,8 +21,42 @@
 
 let ctx: AudioContext | null = null;
 let master: GainNode | null = null;
+let reverb: ConvolverNode | null = null;
+let reverbSend: GainNode | null = null;
 let muted = false;
 let tone: { stop: () => void } | null = null;
+
+/**
+ * A concrete room, as an impulse response.
+ *
+ * This is the single biggest thing separating "synthesised beeps" from "sounds recorded
+ * somewhere". Dry oscillators always read as fake because nothing in the physical world is
+ * dry; give every hit a tail that decays the way a hard-walled room does and the same
+ * synthesis suddenly sounds like it happened in front of a microphone.
+ *
+ * Built from exponentially-decaying noise with a slight stereo offset. Two seconds, mostly
+ * low-mid, which is what a small tiled interrogation room actually sounds like.
+ */
+function buildRoomImpulse(ac: AudioContext): AudioBuffer {
+  const len = Math.floor(ac.sampleRate * 1.9);
+  const buf = ac.createBuffer(2, len, ac.sampleRate);
+
+  for (let ch = 0; ch < 2; ch++) {
+    const d = buf.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < len; i++) {
+      const t = i / len;
+      // Early reflections, then a smooth exponential tail.
+      const decay = Math.pow(1 - t, 2.6);
+      const slap = i < ac.sampleRate * 0.02 ? 0 : 1;
+      const white = Math.random() * 2 - 1;
+      // A gentle lowpass on the tail — high frequencies die first in a real room.
+      lp += (white - lp) * 0.22;
+      d[i] = lp * decay * slap * (ch === 0 ? 1 : 0.92);
+    }
+  }
+  return buf;
+}
 
 function audio(): AudioContext | null {
   if (typeof window === "undefined" || muted) return null;
@@ -35,9 +69,30 @@ function audio(): AudioContext | null {
     master = ctx.createGain();
     master.gain.value = 0.9;
     master.connect(ctx.destination);
+
+    // Everything goes through the room, in parallel with the dry signal.
+    reverb = ctx.createConvolver();
+    reverb.buffer = buildRoomImpulse(ctx);
+    reverbSend = ctx.createGain();
+    reverbSend.gain.value = 0.34;
+    reverbSend.connect(reverb).connect(master);
   }
   if (ctx.state === "suspended") void ctx.resume();
   return ctx;
+}
+
+/**
+ * Connect a source to both the dry master and the room. `wet` scales how much of this
+ * particular sound goes into the space — a switch click wants a little, a brass stab wants
+ * a lot, because a loud sound excites a room more than a quiet one.
+ */
+function toBus(node: AudioNode, wet = 1) {
+  if (master) node.connect(master);
+  if (reverbSend && ctx && wet > 0) {
+    const send = ctx.createGain();
+    send.gain.value = wet;
+    node.connect(send).connect(reverbSend);
+  }
 }
 
 const bus = () => master ?? undefined;
@@ -139,7 +194,8 @@ export function knock(pitch = 1) {
   thump.frequency.setValueAtTime(150 * pitch, ac.currentTime);
   thump.frequency.exponentialRampToValueAtTime(58 * pitch, ac.currentTime + 0.09);
   const tg = env(ac, 0.16, 0.004, 0.1);
-  thump.connect(tg).connect(bus()!);
+  thump.connect(tg);
+  toBus(tg, 0.55);
   thump.start();
   thump.stop(ac.currentTime + 0.16);
 
@@ -149,7 +205,8 @@ export function knock(pitch = 1) {
   bp.frequency.value = 1700 * pitch;
   bp.Q.value = 1.2;
   const ng = env(ac, 0.05, 0.002, 0.05);
-  n.connect(bp).connect(ng).connect(bus()!);
+  n.connect(bp).connect(ng);
+  toBus(ng, 0.45);
   n.start();
   n.stop(ac.currentTime + 0.08);
 }
@@ -164,7 +221,8 @@ export function tick(freq = 220, duration = 0.05, gain = 0.05) {
   bp.frequency.value = freq * 9;
   bp.Q.value = 3;
   const g = env(ac, gain, 0.002, duration);
-  n.connect(bp).connect(g).connect(bus()!);
+  n.connect(bp).connect(g);
+  toBus(g, 0.3);
   n.start();
   n.stop(ac.currentTime + duration + 0.05);
 }
@@ -180,7 +238,8 @@ export function paper() {
   bp.frequency.exponentialRampToValueAtTime(900, ac.currentTime + 0.24);
   bp.Q.value = 0.8;
   const g = env(ac, 0.07, 0.01, 0.24);
-  n.connect(bp).connect(g).connect(bus()!);
+  n.connect(bp).connect(g);
+  toBus(g, 0.5);
   n.start();
   n.stop(ac.currentTime + 0.32);
 }
@@ -194,7 +253,8 @@ export function switchClick() {
   o.frequency.setValueAtTime(900, ac.currentTime);
   o.frequency.exponentialRampToValueAtTime(220, ac.currentTime + 0.04);
   const g = env(ac, 0.07, 0.001, 0.05);
-  o.connect(g).connect(bus()!);
+  o.connect(g);
+  toBus(g, 0.35);
   o.start();
   o.stop(ac.currentTime + 0.09);
 }
@@ -210,7 +270,8 @@ export function whoosh() {
   lp.frequency.exponentialRampToValueAtTime(1400, ac.currentTime + 0.22);
   lp.frequency.exponentialRampToValueAtTime(220, ac.currentTime + 0.55);
   const g = env(ac, 0.075, 0.14, 0.42);
-  n.connect(lp).connect(g).connect(bus()!);
+  n.connect(lp).connect(g);
+  toBus(g, 0.8);
   n.start();
   n.stop(ac.currentTime + 0.7);
 }
@@ -227,7 +288,8 @@ export function pluck(freq = 330) {
   lp.frequency.setValueAtTime(3200, ac.currentTime);
   lp.frequency.exponentialRampToValueAtTime(400, ac.currentTime + 0.4);
   const g = env(ac, 0.1, 0.003, 0.45);
-  o.connect(lp).connect(g).connect(bus()!);
+  o.connect(lp).connect(g);
+  toBus(g, 0.9);
   o.start();
   o.stop(ac.currentTime + 0.55);
 }
@@ -256,24 +318,55 @@ function brass(
 
   const lp = ac.createBiquadFilter();
   lp.type = "lowpass";
-  lp.Q.value = 2.5;
+  lp.Q.value = 1.4; // a gentler resonance — 2.5 whistled, and whistle reads as synth
   lp.frequency.setValueAtTime(sweepFrom, ac.currentTime);
   lp.frequency.exponentialRampToValueAtTime(sweepTo, ac.currentTime + decay * 0.8);
 
-  const g = env(ac, peak, 0.012, decay);
-  lp.connect(g).connect(bus()!);
+  const hp = ac.createBiquadFilter();
+  hp.type = "highpass";
+  hp.frequency.value = 55; // keep the reverb tail from turning to mud
+
+  // A slow, shallow vibrato. Real players cannot hold a dead-steady pitch, and the ear
+  // hears perfectly static pitch as machinery.
+  const lfo = ac.createOscillator();
+  const lfoGain = ac.createGain();
+  lfo.frequency.value = 4.6 + Math.random() * 1.4;
+  lfoGain.gain.value = 3.5;
+  lfo.connect(lfoGain);
+  lfo.start();
+  lfo.stop(ac.currentTime + decay + 0.2);
+
+  const g = env(ac, peak, 0.02, decay); // 12ms attack was a click; 20ms is a note
+  lp.connect(hp).connect(g);
+  toBus(g, 1);
 
   for (const f of freqs) {
     for (const d of [-detune, 0, detune]) {
       const o = ac.createOscillator();
       o.type = "sawtooth";
       o.frequency.value = f;
-      o.detune.value = d;
+      // Humanise: every voice is a few cents off and enters a few ms late, the way a
+      // section does. Perfectly aligned unisons are the sound of a synthesiser.
+      o.detune.value = d + (Math.random() * 6 - 3);
+      lfoGain.connect(o.detune);
       o.connect(lp);
-      o.start();
+      o.start(ac.currentTime + Math.random() * 0.012);
       o.stop(ac.currentTime + decay + 0.15);
     }
   }
+
+  // The breath before the note — a short filtered noise transient. This is most of what
+  // makes a brass patch sound blown rather than generated.
+  const air = noise(ac);
+  const airBp = ac.createBiquadFilter();
+  airBp.type = "bandpass";
+  airBp.frequency.value = 1100;
+  airBp.Q.value = 0.7;
+  const airG = env(ac, peak * 0.28, 0.006, 0.09);
+  air.connect(airBp).connect(airG);
+  toBus(airG, 0.6);
+  air.start();
+  air.stop(ac.currentTime + 0.16);
 }
 
 /** A YES — the answer that narrows the room. Ominous, not triumphant. */
@@ -301,7 +394,8 @@ export function stingSolved() {
     o.type = "sine";
     o.frequency.value = 329.6;
     const g = env(ac, 0.07, 0.02, 1.4);
-    o.connect(g).connect(bus()!);
+    o.connect(g);
+    toBus(g, 1);
     o.start();
     o.stop(ac.currentTime + 1.6);
   }, 240);
@@ -327,7 +421,8 @@ export function stingUnmask() {
   g.gain.setValueAtTime(0.0001, ac.currentTime);
   g.gain.exponentialRampToValueAtTime(0.1, ac.currentTime + 1.1);
   g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 1.5);
-  n.connect(lp).connect(g).connect(bus()!);
+  n.connect(lp).connect(g);
+  toBus(g, 1);
   n.start();
   n.stop(ac.currentTime + 1.7);
 }
@@ -341,7 +436,8 @@ export function stamp() {
   o.frequency.setValueAtTime(180, ac.currentTime);
   o.frequency.exponentialRampToValueAtTime(42, ac.currentTime + 0.13);
   const g = env(ac, 0.24, 0.003, 0.2);
-  o.connect(g).connect(bus()!);
+  o.connect(g);
+  toBus(g, 0.8);
   o.start();
   o.stop(ac.currentTime + 0.26);
 
@@ -350,7 +446,8 @@ export function stamp() {
   bp.type = "bandpass";
   bp.frequency.value = 2200;
   const ng = env(ac, 0.09, 0.002, 0.06);
-  n.connect(bp).connect(ng).connect(bus()!);
+  n.connect(bp).connect(ng);
+  toBus(ng, 0.6);
   n.start();
   n.stop(ac.currentTime + 0.1);
 }
@@ -394,7 +491,8 @@ export function drone(): Drone {
 
   low.connect(lp);
   high.connect(lp);
-  lp.connect(amp).connect(bus()!);
+  lp.connect(amp);
+  toBus(amp, 0.7);
   low.start();
   high.start();
 

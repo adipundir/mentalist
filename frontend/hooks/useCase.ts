@@ -132,7 +132,7 @@ export function useCase({
 
       const line = replyLine(result.answer, witness, turn);
       setSaying({ seat: witness, line, answer: result.answer });
-      void narrate(line, { rate: 0.95, pitch: result.answer ? 0.9 : 0.78 });
+      void narrate(line, { rate: 0.95, pitch: result.answer ? 1.0 : 0.92 });
       setMask(0);
     } catch (e) {
       drone.current?.stop();

@@ -34,10 +34,10 @@ export function Finale({ beats }: { beats: Beat[] }) {
         await narrate(
           b.text,
           b.kind === "jane"
-            ? { rate: 0.9, pitch: 0.95 }
+            ? { rate: 0.96, pitch: 1.02 }
             : b.kind === "redjohn"
-              ? { rate: 0.82, pitch: 0.62 }
-              : { rate: 0.86, pitch: 0.78 },
+              ? { rate: 0.88, pitch: 0.9 }
+              : { rate: 0.93, pitch: 0.96 },
         );
         await new Promise((r) => setTimeout(r, 320));
       }

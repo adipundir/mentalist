@@ -56,7 +56,7 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
       }
       sfx.knock(0.7);
       setDone(true);
-      void narrate("Everybody lies. The trick is working out which way.", { rate: 0.86 });
+      void narrate("Everybody lies. The trick is working out which way.", { rate: 0.92 });
       setTimeout(onReady, 2600);
     })();
   }, [onReady]);
