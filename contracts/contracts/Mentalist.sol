@@ -408,7 +408,7 @@ contract Mentalist {
     // ─────────────────────────────────────────── views
 
     /// @notice The encrypted answer to question `questionId`. Only the detective may decrypt it.
-    function testimony(uint256 caseId, uint16 questionId) external view returns (ebool) {
+    function getTestimony(uint256 caseId, uint16 questionId) external view returns (ebool) {
         return _testimony[caseId][questionId];
     }
 

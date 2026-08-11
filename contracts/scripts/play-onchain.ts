@@ -17,7 +17,7 @@ import * as dotenv from "dotenv";
 dotenv.config();
 
 const GAME = (process.env.MENTALIST_ADDRESS ??
-  "0x6ED2DF67Bf8FB2D84F8648ef741ef48ce39feF17") as Hex;
+  "0xE6D6F2c1a80102A3DE2749B8d7EE43AddA4C9221") as Hex;
 
 const ABI = [
   { type: "function", name: "openCase", stateMutability: "payable",

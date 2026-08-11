@@ -92,7 +92,7 @@ export const MENTALIST_ABI = [
   },
   {
     type: "function",
-    name: "testimony",
+    name: "getTestimony",
     stateMutability: "view",
     inputs: [
       { name: "caseId", type: "uint256" },

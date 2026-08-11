@@ -51,7 +51,7 @@ contract MentalistTest is IncoTest {
         game.interrogate(id, witness, mask);
         processAllOperations();
         Mentalist.Case memory c = game.getCase(id);
-        return _plain(game.testimony(id, uint16(c.questionsAsked) - 1));
+        return _plain(game.getTestimony(id, uint16(c.questionsAsked) - 1));
     }
 
     /// @dev Read the hidden layout so tests can assert against ground truth.
@@ -278,7 +278,7 @@ contract MentalistTest is IncoTest {
         game.interrogate(id, 0, 0x00F);
         processAllOperations();
 
-        ebool answer = game.testimony(id, 0);
+        ebool answer = game.getTestimony(id, 0);
 
         this.attestOrRevert(detective, answer); // must not revert
 

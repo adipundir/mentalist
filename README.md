@@ -38,9 +38,10 @@ server *is* the game.
 | **Play on-chain** | `/case/play` | Base Sepolia. Encrypted state, attested answers, real Megapot tickets. |
 
 The no-wallet demo is not a mock-up. It runs the same rules, the same dealer distribution
-and the same `answer = truth XOR liar[witness]` computation as the contract, over a latency
-profile sampled from real Base Sepolia + covalidator measurements. What you learn playing it
-transfers exactly.
+and the same `answer = truth XOR liar[witness]` computation as the contract, so the
+deduction you learn there transfers exactly. It is deliberately *faster* than the chain —
+see [measured latency](#measured-on-chain-latency) — because an eleven-second wait per
+question would lose a first-time player before the mechanic ever lands.
 
 ---
 
@@ -129,8 +130,8 @@ pnpm compile
 
 | | |
 |---|---|
-| `Mentalist` | [`0x6ED2DF67Bf8FB2D84F8648ef741ef48ce39feF17`](https://sepolia.basescan.org/address/0x6ED2DF67Bf8FB2D84F8648ef741ef48ce39feF17) |
-| `CaseRewards` | [`0x4b3250dad7C853fD34030910434846fCbe91e3bC`](https://sepolia.basescan.org/address/0x4b3250dad7C853fD34030910434846fCbe91e3bC) |
+| `Mentalist` | [`0xE6D6F2c1a80102A3DE2749B8d7EE43AddA4C9221`](https://sepolia.basescan.org/address/0xE6D6F2c1a80102A3DE2749B8d7EE43AddA4C9221) |
+| `CaseRewards` | [`0x0F8c0BF8dC939662B5bCB61F304dA6E47dC68726`](https://sepolia.basescan.org/address/0x0F8c0BF8dC939662B5bCB61F304dA6E47dC68726) |
 
 Put both into `frontend/.env.local` as `NEXT_PUBLIC_MENTALIST_ADDRESS` and
 `NEXT_PUBLIC_REWARDS_ADDRESS` (see `.env.example`). To redeploy:
