@@ -7,7 +7,7 @@ import { asBool } from "@inco/lightning/src/shared/TypeUtils.sol";
 
 /**
  * @title  Mentalist — a confidential deduction game
- * @notice Nine suspects. One is Red John. Some of them lie, and Red John always does.
+ * @notice Nine suspects. One is the Tyger. Some of them lie, and the Tyger always does.
  *         You interrogate witnesses with yes/no questions about subsets of the lineup.
  *
  *         The mechanic this game exists for is one line:
@@ -51,7 +51,7 @@ contract Mentalist {
         uint8 focusLeft;
         uint8 questionsAsked;
         uint8 accusedSeat;
-        uint8 turnAt; // 0 = disabled; else Red John turns a witness after this many questions
+        uint8 turnAt; // 0 = disabled; else the Tyger turns a witness after this many questions
         bool turned; // has the turncoat event fired
         bool solved;
         Status status;
@@ -64,7 +64,7 @@ contract Mentalist {
 
     mapping(uint256 => Case) public cases;
 
-    /// @dev caseId => seat => "is this suspect Red John". Never granted to anyone.
+    /// @dev caseId => seat => "is this suspect the Tyger". Never granted to anyone.
     mapping(uint256 => mapping(uint8 => ebool)) internal _guilt;
     /// @dev caseId => seat => "does this suspect lie". Never granted to anyone.
     mapping(uint256 => mapping(uint8 => ebool)) internal _liar;
@@ -73,6 +73,10 @@ contract Mentalist {
 
     /// @dev The handle settlement must attest over — the accused seat's guilt bit.
     mapping(uint256 => bytes32) public verdictHandle;
+
+    /// @dev The most recent case a detective opened. Used to force abandoned cases to
+    ///      resolve as losses — see `openCase`.
+    mapping(address => uint256) public latestCaseOf;
 
     mapping(address => uint32) public streak;
     mapping(address => uint32) public bestStreak;
@@ -101,7 +105,7 @@ contract Mentalist {
         bytes32 answerHandle
     );
 
-    /// @notice Red John got to the last witness you spoke to. Their honesty bit flipped.
+    /// @notice the Tyger got to the last witness you spoke to. Their honesty bit flipped.
     event WitnessTurned(uint256 indexed caseId, uint8 witness);
 
     /// @param guiltHandles every seat's guilt bit, revealed — the case is over
@@ -114,6 +118,9 @@ contract Mentalist {
         bytes32[] guiltHandles,
         bytes32[] liarHandles
     );
+
+    /// @notice A case left unresolved when its detective opened a new one. Scored as a loss.
+    event CaseAbandoned(uint256 indexed caseId, address indexed detective);
 
     event CaseClosed(
         uint256 indexed caseId,
@@ -149,7 +156,7 @@ contract Mentalist {
     // ─────────────────────────────────────────── the game
 
     /**
-     * @notice Deal a fresh case. The TEE places Red John and the liars; nobody — not the
+     * @notice Deal a fresh case. The TEE places the Tyger and the liars; nobody — not the
      *         player, not this contract's deployer, not an observer — learns the layout.
      */
     function openCase(
@@ -170,7 +177,23 @@ contract Mentalist {
         uint256 fee = quoteOpenFee(suspects);
         if (msg.value < fee) revert FeeNotCovered(fee, msg.value);
 
+        // Walking away from an unresolved case is a loss.
+        //
+        // Without this, the streak is worthless: settlement is player-initiated, so a
+        // detective who accused wrongly could simply never submit the attestation, leave
+        // the case hanging, and open a fresh one with their streak intact. Only winning
+        // cases would ever be settled and every leaderboard entry would be a lie. Opening
+        // a new case is therefore the moment the previous one is forced to resolve.
+        uint256 previous = latestCaseOf[msg.sender];
+        if (previous != 0 && cases[previous].status != Status.Closed) {
+            cases[previous].status = Status.Closed;
+            cases[previous].solved = false;
+            streak[msg.sender] = 0;
+            emit CaseAbandoned(previous, msg.sender);
+        }
+
         caseId = nextCaseId++;
+        latestCaseOf[msg.sender] = caseId;
 
         _deal(caseId, suspects, liars);
 
@@ -197,7 +220,7 @@ contract Mentalist {
     }
 
     /**
-     * @notice Place Red John and the liars for a fresh case.
+     * @notice Place the Tyger and the liars for a fresh case.
      *
      * @dev The randomness lives in a *permutation*, not in N separate draws: build a list
      *      whose contents are public knowledge (one guilty, the rest innocent) and shuffle
@@ -230,7 +253,7 @@ contract Mentalist {
 
         for (uint8 i = 0; i < suspects; i++) {
             ebool g = e.getEbool(guiltList, uint16(i));
-            // Red John always lies. One encrypted OR welds guilt to dishonesty — which is
+            // the Tyger always lies. One encrypted OR welds guilt to dishonesty — which is
             // also why the realised liar count is `liars` or `liars + 1`, denying the
             // player an exact parity check on the liar population.
             ebool l = e.or(e.getEbool(liarList, uint16(i)), g);
@@ -297,7 +320,7 @@ contract Mentalist {
         answerHandle = ebool.unwrap(answer);
         emit Interrogated(caseId, msg.sender, qid, witness, mask, cost, answerHandle);
 
-        // ── Red John reacts.
+        // ── the Tyger reacts.
         // On harder cases he reaches the witness you just used and turns them: their
         // honesty bit is negated *in place*. Encrypted state mutates, so intelligence you
         // gathered three moves ago silently goes stale. A zk commitment cannot do this —
@@ -312,7 +335,7 @@ contract Mentalist {
     }
 
     /**
-     * @notice Name Red John. Free, and it ends the case.
+     * @notice Name the Tyger. Free, and it ends the case.
      * @dev    Reveals every seat's guilt and honesty bit: the case is over, so full
      *         disclosure is the intended post-mortem rather than a leak. The frontend
      *         pulls all of them in a single `attestedReveal` batch and paints the board.
@@ -382,7 +405,7 @@ contract Mentalist {
         return _testimony[caseId][questionId];
     }
 
-    /// @notice Handle for "is seat `i` Red John". Publishing the *handle* discloses
+    /// @notice Handle for "is seat `i` the Tyger". Publishing the *handle* discloses
     ///         nothing — decryption requires an access grant, and this one is granted to
     ///         nobody until `accuse` reveals the board. The frontend needs it to paint the
     ///         post-mortem; tests need it to assert against ground truth.

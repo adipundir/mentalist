@@ -102,7 +102,7 @@ contract MentalistTest is IncoTest {
         uint256 id = _open(n, k, 6, 0);
         (uint8 killer, bool[] memory liar) = _layout(id, n);
 
-        assertTrue(killer != type(uint8).max, "there must be a Red John");
+        assertTrue(killer != type(uint8).max, "there must be a Tyger");
 
         uint8 guilty;
         uint8 liarCount;
@@ -111,8 +111,8 @@ contract MentalistTest is IncoTest {
             if (liar[i]) liarCount++;
         }
 
-        assertEq(guilty, 1, "exactly one Red John");
-        assertTrue(liar[killer], "Red John always lies");
+        assertEq(guilty, 1, "exactly one Tyger");
+        assertTrue(liar[killer], "the Tyger always lies");
         // Exactly-K is a property of the production elist dealer, not this harness (see
         // MentalistHarness). Here we only assert the layout is well-formed.
         assertTrue(liarCount >= 1 && liarCount <= n, "liar population is well formed");
@@ -129,7 +129,7 @@ contract MentalistTest is IncoTest {
             if (first == type(uint8).max) first = killer;
             else if (killer != first) differs = true;
         }
-        assertTrue(differs, "the shuffle must move Red John between cases");
+        assertTrue(differs, "the shuffle must move the Tyger between cases");
     }
 
     // ── the encrypted lie ──────────────────────────────────────
@@ -169,7 +169,7 @@ contract MentalistTest is IncoTest {
         for (uint8 w = 0; w < n; w++) {
             // "Are YOU the killer?" — a yes is only producible by an innocent who lies.
             if (_ask(id, w, uint16(1) << w)) {
-                assertTrue(w != killer, "Red John never confesses");
+                assertTrue(w != killer, "the Tyger never confesses");
             }
         }
     }
@@ -182,7 +182,7 @@ contract MentalistTest is IncoTest {
     ///         That surplus is not slack; it is what converts to Megapot tickets, so the
     ///         reward for playing well is denominated in lottery entries.
     ///
-    ///         Run over every seat Red John can occupy so the worst case is actually hit,
+    ///         Run over every seat the Tyger can occupy so the worst case is actually hit,
     ///         rather than whichever branch one random deal happened to take.
     function test_SixFocusAlwaysSolvesTheStandardCase() public {
         uint8 n = 9;
@@ -210,7 +210,7 @@ contract MentalistTest is IncoTest {
             if (spent > worstCaseSpend) worstCaseSpend = spent;
 
             assertEq(_popcount(candidates), 1, "the search isolates a single suspect");
-            assertEq(_lowestSetBit(candidates), killer, "and that suspect is Red John");
+            assertEq(_lowestSetBit(candidates), killer, "and that suspect is the Tyger");
         }
 
         assertLe(worstCaseSpend, 6, "6 Focus must cover the worst case");
@@ -314,7 +314,7 @@ contract MentalistTest is IncoTest {
 
     // ── the turncoat: mutable encrypted state ──────────────────
 
-    function test_RedJohnTurnsTheWitnessYouJustUsed() public {
+    function test_TheTygerTurnsTheWitnessYouJustUsed() public {
         uint8 n = 9;
         uint256 id = _open(n, 3, 8, 1); // he acts after the first question
         (, bool[] memory before) = _layout(id, n);
@@ -334,7 +334,7 @@ contract MentalistTest is IncoTest {
         _ask(id, 4, 0x00F);
         bool afterFirst = _plain(game.liarOf(id, 4));
         _ask(id, 4, 0x00F);
-        assertEq(_plain(game.liarOf(id, 4)), afterFirst, "Red John acts once per case");
+        assertEq(_plain(game.liarOf(id, 4)), afterFirst, "the Tyger acts once per case");
     }
 
     // ── settlement ─────────────────────────────────────────────
@@ -408,6 +408,71 @@ contract MentalistTest is IncoTest {
         vm.prank(detective);
         vm.expectRevert(Mentalist.WrongStatus.selector);
         game.interrogate(id, 0, 0x00F);
+    }
+
+    // ── streak integrity ───────────────────────────────────
+
+    /// @notice Settlement is player-initiated, so a detective who accused wrongly could
+    ///         simply never submit the attestation and keep an unbroken streak. Opening a
+    ///         new case must force the old one to resolve as a loss, or the leaderboard is
+    ///         fiction.
+    function test_AbandoningACaseBreaksTheStreak() public {
+        uint8 n = 9;
+
+        // Earn a streak of one, legitimately.
+        uint256 a = _open(n, 3, 6, 0);
+        (uint8 killerA, ) = _layout(a, n);
+        vm.prank(detective);
+        game.accuse(a, killerA);
+        processAllOperations();
+        _settle(a);
+        assertEq(game.streak(detective), 1);
+
+        // Accuse wrongly on the next case, then simply walk away without settling.
+        uint256 b = _open(n, 3, 6, 0);
+        (uint8 killerB, ) = _layout(b, n);
+        vm.prank(detective);
+        game.accuse(b, killerB == 0 ? 1 : 0);
+        processAllOperations();
+
+        // Opening a third case must close the abandoned one as a loss.
+        _open(n, 3, 6, 0);
+
+        Mentalist.Case memory abandoned = game.getCase(b);
+        assertTrue(abandoned.status == Mentalist.Status.Closed, "abandoned case is closed");
+        assertFalse(abandoned.solved, "and scored as a loss");
+        assertEq(game.streak(detective), 0, "the streak does not survive the dodge");
+    }
+
+    function test_AbandoningAnUnfinishedCaseAlsoCounts() public {
+        uint256 a = _open(9, 3, 6, 0);
+        (uint8 killerA, ) = _layout(a, 9);
+        vm.prank(detective);
+        game.accuse(a, killerA);
+        processAllOperations();
+        _settle(a);
+        assertEq(game.streak(detective), 1);
+
+        // Open a case, ask one question, then bail without ever accusing.
+        uint256 b = _open(9, 3, 6, 0);
+        _ask(b, 0, 0x00F);
+        _open(9, 3, 6, 0);
+
+        assertEq(game.streak(detective), 0, "quitting mid-case is a loss too");
+    }
+
+    function test_SettledCasesAreNotRetroactivelyPunished() public {
+        uint8 n = 9;
+        uint256 a = _open(n, 3, 6, 0);
+        (uint8 killerA, ) = _layout(a, n);
+        vm.prank(detective);
+        game.accuse(a, killerA);
+        processAllOperations();
+        _settle(a);
+
+        _open(n, 3, 6, 0); // properly closed, so opening the next case must not reset
+
+        assertEq(game.streak(detective), 1, "a settled win survives the next case opening");
     }
 
     // ── fees ───────────────────────────────────────────────────

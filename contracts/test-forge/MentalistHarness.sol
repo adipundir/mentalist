@@ -14,7 +14,7 @@ import { Mentalist } from "../contracts/Mentalist.sol";
  *         `newEList` + `shuffle` dealer cannot execute under `forge test`. This harness
  *         deals an equivalent layout using only mock-supported primitives:
  *
- *           - Red John is a single hidden index — `e.randBounded(n)` then `e.eq` per seat,
+ *           - the Tyger is a single hidden index — `e.randBounded(n)` then `e.eq` per seat,
  *             which is exactly uniform and is the idiomatic primitive for "which one of N".
  *           - Honesty is an independent draw per seat, then welded to guilt with `e.or`
  *             exactly as production does.
