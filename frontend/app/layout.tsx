@@ -24,9 +24,9 @@ const body = Crimson_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "MENTALIST — everyone lies, the Tyger always does",
+  title: "MENTALIST — everyone lies, Red John always does",
   description:
-    "A confidential deduction game on Base. The evidence is encrypted, testimony passes through a hidden honesty bit, and nobody — not even the deployer — knows who the Tyger is.",
+    "A confidential deduction game on Base. The evidence is encrypted, testimony passes through a hidden honesty bit, and nobody — not even the deployer — knows who Red John is.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

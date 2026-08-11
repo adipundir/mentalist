@@ -8,7 +8,7 @@
 
 export type Seat = number;
 
-/** A question: "witness, is the Tyger one of these people?" */
+/** A question: "witness, is Red John one of these people?" */
 export interface Question {
   id: number;
   witness: Seat;
@@ -24,10 +24,10 @@ export interface Testimony extends Question {
 
 export interface CaseConfig {
   suspects: number;
-  /** Base liar count. The Tyger is welded on top, so the realised count is `liars` or `liars + 1`. */
+  /** Base liar count. Red John is welded on top, so the realised count is `liars` or `liars + 1`. */
   liars: number;
   focus: number;
-  /** After this many questions the Tyger turns the witness you just used. 0 disables. */
+  /** After this many questions Red John turns the witness you just used. 0 disables. */
   turnAt: number;
   label: string;
   blurb: string;
@@ -87,7 +87,7 @@ export const CASES: CaseConfig[] = [
   {
     label: "The Blind Spot",
     blurb:
-      "The Tyger is watching you work. After your third read he gets to the witness you just used.",
+      "Red John is watching you work. After your third read he gets to the witness you just used.",
     suspects: 9,
     liars: 3,
     focus: 6,

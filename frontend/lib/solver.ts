@@ -25,9 +25,9 @@ export interface World {
 
 export interface Deductions {
   worlds: World[];
-  /** Seats that could still be the Tyger. */
+  /** Seats that could still be Red John. */
   candidates: number[];
-  /** seat → fraction of surviving worlds in which that seat is the Tyger. */
+  /** seat → fraction of surviving worlds in which that seat is Red John. */
   killerOdds: number[];
   /** seat → 'liar' | 'honest' | 'unknown', proven across every surviving world. */
   honesty: ("liar" | "honest" | "unknown")[];
@@ -38,9 +38,9 @@ export interface Deductions {
 /**
  * Every layout the dealer can produce.
  *
- * The contract shuffles a base set `B` of exactly `liars` seats, then welds the Tyger in:
+ * The contract shuffles a base set `B` of exactly `liars` seats, then welds Red John in:
  * `liar = B ∪ {killer}`. So a layout is reachable exactly when the killer lies and the
- * liar population is `liars` (the Tyger was already in `B`) or `liars + 1` (he wasn't).
+ * liar population is `liars` (Red John was already in `B`) or `liars + 1` (he wasn't).
  */
 export function enumerateWorlds(suspects: number, liars: number): World[] {
   const worlds: World[] = [];
@@ -51,7 +51,7 @@ export function enumerateWorlds(suspects: number, liars: number): World[] {
     if (count !== liars && count !== liars + 1) continue;
 
     for (let killer = 0; killer < suspects; killer++) {
-      // The Tyger always lies.
+      // Red John always lies.
       if (((liarMask >> killer) & 1) === 0) continue;
       worlds.push({ killer, liarMask });
     }
@@ -116,7 +116,7 @@ export function deduce(
 
 /**
  * How much a question is worth right now, in bits, against the current world set — the
- * expected reduction in entropy over *who the Tyger is*.
+ * expected reduction in entropy over *who Red John is*.
  *
  * This is what the hint system spends: it lets the UI show a player why a control question
  * on a fresh witness beats a fourth split from someone they already know.

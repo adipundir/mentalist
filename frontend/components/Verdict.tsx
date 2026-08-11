@@ -143,7 +143,7 @@ export function Verdict({
                     </span>
                     {isKiller && (
                       <span className="border border-blood-hot px-1 font-mono text-[8px] tracking-file text-blood-hot">
-                        THE TYGER
+                        RED JOHN
                       </span>
                     )}
                   </span>
@@ -221,6 +221,6 @@ function buildShare({
     ``,
     solved
       ? `${focusLeft} Focus left over — that's ${focusLeft} Megapot ticket${focusLeft === 1 ? "" : "s"}.`
-      : `Everyone lies. The Tyger always does.`,
+      : `Everyone lies. Red John always does.`,
   ].join("\n");
 }

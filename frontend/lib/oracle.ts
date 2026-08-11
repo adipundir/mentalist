@@ -28,7 +28,7 @@ export interface DealtCase {
 export interface AskResult {
   answer: boolean;
   cost: number;
-  /** Set when the Tyger flipped a witness's honesty as a consequence of this question. */
+  /** Set when Red John flipped a witness's honesty as a consequence of this question. */
   turnedWitness: number | null;
 }
 
@@ -92,7 +92,7 @@ export async function atLeast<T>(p: Promise<T>, ms: number): Promise<T> {
 
 /**
  * Deals the same distribution the contract does: a base liar set of exactly `liars` seats,
- * then the Tyger welded in with an OR. Mirrors `Mentalist._deal` so the demo is a faithful
+ * then Red John welded in with an OR. Mirrors `Mentalist._deal` so the demo is a faithful
  * model of the game and not merely a lookalike.
  */
 export function dealLocally(config: CaseConfig, seed: number): DealtCase {

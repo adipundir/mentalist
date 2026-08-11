@@ -43,7 +43,7 @@ export function Transcript({
           them.
           <br />
           <span className="text-bone-dim/50">
-            Everyone in this room might be lying to you. The Tyger certainly is.
+            Everyone in this room might be lying to you. Red John certainly is.
           </span>
         </p>
       ) : (
@@ -90,7 +90,7 @@ export function Transcript({
                     </div>
 
                     <p className="font-body text-[12px] leading-snug text-bone-dim">
-                      &ldquo;Is the Tyger one of{" "}
+                      &ldquo;Is Red John one of{" "}
                       {kind === "control" ? (
                         <span className="text-brass">all {n}</span>
                       ) : kind === "self" ? (

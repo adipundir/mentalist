@@ -18,8 +18,8 @@ export default function Home() {
       </h1>
 
       <p className="mt-4 max-w-[54ch] font-body text-[18px] leading-relaxed text-bone">
-        Nine suspects. One of them is the Tyger. Some of them lie —{" "}
-        <span className="text-blood-hot">and the Tyger always does</span>.
+        Nine suspects. One of them is Red John. Some of them lie —{" "}
+        <span className="text-blood-hot">and Red John always does</span>.
       </p>
 
       <p className="mt-4 max-w-[62ch] font-body text-[15px] leading-relaxed text-bone-dim">
@@ -27,12 +27,12 @@ export default function Home() {
         answer is computed inside an encrypted enclave and passed through that
         witness&rsquo;s hidden honesty bit before it reaches you. The chain sees the question.
         Only you see the answer. Nobody — not the other players, not the deployer, not an
-        observer — knows who the Tyger is until you name him.
+        observer — knows who Red John is until you name him.
       </p>
 
       <figure className="mt-8 border-l-2 border-blood pl-4">
         <pre className="overflow-x-auto font-mono text-[13px] leading-relaxed text-bone">
-          <code>{`ebool truth  = e.or(...);              // is the Tyger in this set?
+          <code>{`ebool truth  = e.or(...);              // is Red John in this set?
 ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</code>
         </pre>
         <figcaption className="mt-2 font-body text-[13px] italic text-bone-dim">
@@ -94,7 +94,7 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
           <span className="text-bone-dim">TEE-based confidential compute — not FHE, not zk</span>.
           &ldquo;Secret&rdquo; means the value is decrypted inside an Intel TDX enclave;
           &ldquo;provably fair&rdquo; means a covalidator attestation, not a zero-knowledge
-          proof. The claim that the deployer cannot know who the Tyger is rests on that
+          proof. The claim that the deployer cannot know who Red John is rests on that
           hardware assumption, and we would rather say so than oversell it.
         </p>
       </footer>

@@ -20,6 +20,8 @@ import { deduce } from "@/lib/solver";
 import { caseNumber, caseTitle, generateSuspects } from "@/lib/suspects";
 import { atLeast, type Oracle } from "@/lib/oracle";
 import * as sfx from "@/lib/sound";
+import { narrate, unlockNarrator } from "@/lib/narrator";
+import { replyLine } from "@/lib/script";
 import { Dossier, type SeatVerdict } from "./Dossier";
 import { Transcript } from "./Transcript";
 import { PhaseBanner } from "./PhaseBanner";
@@ -65,6 +67,8 @@ export function CaseBoard({
   const [accused, setAccused] = useState<number | null>(null);
   const [muted, setMutedState] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** Who is talking right now, and what they said — drives the speech bubble and the mouth. */
+  const [saying, setSaying] = useState<{ seat: number; line: string; answer: boolean } | null>(null);
 
   const droneRef = useRef<sfx.Drone | null>(null);
 
@@ -103,6 +107,7 @@ export function CaseBoard({
   const chooseWitness = useCallback(
     (seat: number) => {
       if (over || busy) return;
+      unlockNarrator();
       sfx.tick(320, 0.05, 0.045);
       setWitness((w) => (w === seat ? null : seat));
     },
@@ -127,6 +132,13 @@ export function CaseBoard({
         ...t,
         { id: t.length, witness, mask, cost: result.cost, answer: result.answer },
       ]);
+
+      // They answer out loud. The line is flavour; the YES/NO under it is the actual bit,
+      // so a player never has to parse prose to play.
+      const line = replyLine(result.answer, witness, testimony.length);
+      setSaying({ seat: witness, line, answer: result.answer });
+      void narrate(line, { rate: 0.95, pitch: result.answer ? 0.9 : 0.78 });
+      setTimeout(() => setSaying(null), 3400);
       setFocusLeft((f) => f - result.cost);
       if (result.turnedWitness !== null) {
         setTurned((t) => [...t, result.turnedWitness!]);
@@ -251,7 +263,7 @@ export function CaseBoard({
   }, [autoPlay, ready, over, oracle, n]);
 
   function verdictFor(seat: number): SeatVerdict {
-    if (truth) return seat === truth.killer ? "tyger" : "cleared";
+    if (truth) return seat === truth.killer ? "guilty" : "cleared";
     if (accused === seat) return "accused";
     return deductions.candidates.includes(seat) ? "live" : "cleared";
   }
@@ -311,11 +323,11 @@ export function CaseBoard({
         {config.turnAt > 0 && (
           <>
             {" "}
-            · the Tyger reaches a witness after your{" "}
+            · Red John reaches a witness after your{" "}
             <span className="text-blood-hot">{ordinal(config.turnAt)}</span> read
           </>
         )}{" "}
-        · and whoever the Tyger is, <span className="text-blood-hot">he always lies</span>.
+        · and whoever Red John is, <span className="text-blood-hot">he always lies</span>.
       </p>
 
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
@@ -325,6 +337,8 @@ export function CaseBoard({
             {suspects.map((s, i) => (
               <Dossier
                 key={s.seat}
+                saying={saying?.seat === s.seat ? { line: saying.line, answer: saying.answer } : null}
+                thinking={busy}
                 index={i}
                 suspect={s}
                 inQuestion={inMask(mask, s.seat)}
@@ -370,7 +384,7 @@ export function CaseBoard({
                   }}
                   disabled={over || busy}
                 >
-                  Ask about <em>everyone</em>. The Tyger is always in that set, so the answer is
+                  Ask about <em>everyone</em>. Red John is always in that set, so the answer is
                   purely whether this witness lies. A question you already know the answer to.
                 </Hint>
                 <Hint
@@ -385,7 +399,7 @@ export function CaseBoard({
                   }}
                   disabled={over || busy || witness === null}
                 >
-                  &ldquo;Are <em>you</em> the Tyger?&rdquo; A <span className="text-blood-hot">yes</span>{" "}
+                  &ldquo;Are <em>you</em> Red John?&rdquo; A <span className="text-blood-hot">yes</span>{" "}
                   can only come from an innocent who lies — it exposes them and clears them at once.
                 </Hint>
                 <Hint term="SPLIT" cost={QUESTION_COST} active={kind === "split"} disabled>
@@ -420,7 +434,7 @@ export function CaseBoard({
                     <span className="font-type">{suspects[witness].name}</span>
                     <span className="text-bone-dim">
                       {" "}
-                      — &ldquo;is the Tyger one of{" "}
+                      — &ldquo;is Red John one of{" "}
                       {mask === 0 ? (
                         <em className="text-bone-dim/60">…mark them on the board</em>
                       ) : mask === control ? (
@@ -478,7 +492,7 @@ export function CaseBoard({
                     !ready ||
                     (deductions.candidates.length !== 1 && popcount(mask) !== 1)
                   }
-                  title="Name the Tyger. Mark exactly one suspect, or narrow the board to one."
+                  title="Name Red John. Mark exactly one suspect, or narrow the board to one."
                   className="cursor-pointer border border-brass px-4 py-2 font-mono text-[10px] tracking-file text-brass transition-colors hover:bg-brass/15 disabled:cursor-not-allowed disabled:border-ink-3 disabled:text-bone-dim/40"
                 >
                   NAME THEM
