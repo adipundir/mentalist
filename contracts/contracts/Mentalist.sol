@@ -172,37 +172,7 @@ contract Mentalist {
 
         caseId = nextCaseId++;
 
-        // ── Place Red John and the liars.
-        //
-        // The randomness lives in the *permutation*, not in N separate draws: build a list
-        // whose contents are public knowledge (one guilty, the rest innocent) and shuffle
-        // it once. The marginal distribution of every seat is uniform by construction, so
-        // there is no rejection-sampling bias to get wrong, and it costs one op, not N.
-        bytes32 yes = ebool.unwrap(e.asEbool(true));
-        bytes32 no = ebool.unwrap(e.asEbool(false));
-
-        bytes32[] memory guiltSeed = new bytes32[](suspects);
-        bytes32[] memory liarSeed = new bytes32[](suspects);
-        for (uint8 i = 0; i < suspects; i++) {
-            guiltSeed[i] = i == 0 ? yes : no;
-            liarSeed[i] = i < liars ? yes : no;
-        }
-
-        elist guiltList = e.shuffle(e.newEList(guiltSeed, ETypes.Bool));
-        elist liarList = e.shuffle(e.newEList(liarSeed, ETypes.Bool));
-
-        for (uint8 i = 0; i < suspects; i++) {
-            ebool g = e.getEbool(guiltList, uint16(i));
-            // Red John always lies. One encrypted OR welds guilt to dishonesty, which is
-            // also why the true liar count is `liars` or `liars + 1` and the player can
-            // never take an exact parity check on the liar population.
-            ebool l = e.or(e.getEbool(liarList, uint16(i)), g);
-
-            _guilt[caseId][i] = g;
-            _liar[caseId][i] = l;
-            e.allowThis(g); // persist across turns — without this the case is unplayable
-            e.allowThis(l);
-        }
+        _deal(caseId, suspects, liars);
 
         cases[caseId] = Case({
             detective: msg.sender,
@@ -221,6 +191,57 @@ contract Mentalist {
         casesPlayed[msg.sender] += 1;
 
         emit CaseOpened(caseId, msg.sender, suspects, liars, focus, turnAt);
+    }
+
+    /**
+     * @notice Place Red John and the liars for a fresh case.
+     *
+     * @dev The randomness lives in a *permutation*, not in N separate draws: build a list
+     *      whose contents are public knowledge (one guilty, the rest innocent) and shuffle
+     *      it once. Every seat's marginal distribution is uniform by construction, so
+     *      there is no rejection-sampling bias to get wrong, and it costs one op, not N.
+     *      It also gives *exactly* `liars` liars, which is a much better thing to be able
+     *      to tell the player than "roughly a third of them".
+     *
+     *      `virtual` for one reason, and it is a tooling limitation rather than a design
+     *      choice: the Inco Lightning v1.0.0 package's in-process Foundry mock (`IncoTest`)
+     *      implements the scalar operations but **not** the elist ops, so a contract that
+     *      shuffles cannot run under `forge test` at all. Overriding just the dealer lets
+     *      the fast suite exercise every rule of the game — the encrypted lie, the Focus
+     *      economy, access control, the turncoat, settlement — while this real dealing
+     *      path is covered against a live covalidator by the Hardhat integration test.
+     */
+    function _deal(uint256 caseId, uint8 suspects, uint8 liars) internal virtual {
+        bytes32 yes = ebool.unwrap(e.asEbool(true));
+        bytes32 no = ebool.unwrap(e.asEbool(false));
+
+        bytes32[] memory guiltSeed = new bytes32[](suspects);
+        bytes32[] memory liarSeed = new bytes32[](suspects);
+        for (uint8 i = 0; i < suspects; i++) {
+            guiltSeed[i] = i == 0 ? yes : no;
+            liarSeed[i] = i < liars ? yes : no;
+        }
+
+        elist guiltList = e.shuffle(e.newEList(guiltSeed, ETypes.Bool));
+        elist liarList = e.shuffle(e.newEList(liarSeed, ETypes.Bool));
+
+        for (uint8 i = 0; i < suspects; i++) {
+            ebool g = e.getEbool(guiltList, uint16(i));
+            // Red John always lies. One encrypted OR welds guilt to dishonesty — which is
+            // also why the realised liar count is `liars` or `liars + 1`, denying the
+            // player an exact parity check on the liar population.
+            ebool l = e.or(e.getEbool(liarList, uint16(i)), g);
+            _seat(caseId, i, g, l);
+        }
+    }
+
+    /// @dev Persist one seat's secrets. `allowThis` is mandatory: without it the contract
+    ///      permanently loses access to its own case file on the next transaction.
+    function _seat(uint256 caseId, uint8 i, ebool guilty, ebool lies) internal {
+        _guilt[caseId][i] = guilty;
+        _liar[caseId][i] = lies;
+        e.allowThis(guilty);
+        e.allowThis(lies);
     }
 
     /**
@@ -353,6 +374,19 @@ contract Mentalist {
     /// @notice The encrypted answer to question `questionId`. Only the detective may decrypt it.
     function testimony(uint256 caseId, uint16 questionId) external view returns (ebool) {
         return _testimony[caseId][questionId];
+    }
+
+    /// @notice Handle for "is seat `i` Red John". Publishing the *handle* discloses
+    ///         nothing — decryption requires an access grant, and this one is granted to
+    ///         nobody until `accuse` reveals the board. The frontend needs it to paint the
+    ///         post-mortem; tests need it to assert against ground truth.
+    function guiltOf(uint256 caseId, uint8 seat) external view returns (ebool) {
+        return _guilt[caseId][seat];
+    }
+
+    /// @notice Handle for "does seat `i` lie". Same disclosure argument as `guiltOf`.
+    function liarOf(uint256 caseId, uint8 seat) external view returns (ebool) {
+        return _liar[caseId][seat];
     }
 
     function getCase(uint256 caseId) external view returns (Case memory) {

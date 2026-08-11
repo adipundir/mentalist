@@ -117,13 +117,22 @@ move," it's **"can I afford the 2 Focus to be certain, or do I gamble the 1?"**
 
 Standard case: **N = 9, K = 3, Focus = 6.**
 
-- Safe line: control (2) + four splits (4) = **exactly 6**. Zero slack. Perfect play wins.
-- Greedy line: skip the control, trust a witness blind (~61% they're honest), spend 5–6 on
-  splits and keep a Focus in reserve.
+- Safe line: control (2) + binary splits. The **worst case** is four splits, so 6 Focus is
+  exactly enough to guarantee a win with correct play. Most layouts collapse in three
+  splits, finishing on 5 and leaving **one Focus of surplus**.
+- Greedy line: skip the control, trust a witness blind (~61% they're honest), and bank
+  more surplus — at the risk of reading every answer backwards.
 
-There is no dominant strategy, and perfect play requires correct bookkeeping *under
-inversion* — which is exactly where humans make mistakes under time pressure. The board is
-re-dealt every case, so it's a fresh puzzle, not a solved one.
+That surplus is the point. Leftover Focus converts to Megapot tickets (§4), so the reward
+for playing well is denominated in lottery entries rather than in a number going up. There
+is no dominant strategy, and correct play requires accurate bookkeeping *under inversion* —
+exactly where humans slip under time pressure. The board is re-dealt every case, so it's a
+fresh puzzle, not a solved one.
+
+> This is measured, not asserted: `test_SixFocusAlwaysSolvesTheStandardCase` plays the
+> strategy to completion across twelve fresh deals and asserts both that the search always
+> isolates Red John and that the worst observed spend is 6. An earlier draft of this
+> document claimed the line costs *exactly* 6 every time; the test disproved it.
 
 ### 2.6 The accusation
 

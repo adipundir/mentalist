@@ -13,7 +13,8 @@
     "deploy:token:local": "hardhat ignition deploy ignition/modules/ConfidentialToken.ts --network anvil",
     "deploy:token:testnet": "hardhat ignition deploy ignition/modules/ConfidentialToken.ts --network baseSepolia",
     "deploy:token:mainnet": "hardhat ignition deploy ignition/modules/ConfidentialToken.ts --network base",
-    "node": "docker compose up"
+    "node": "docker compose up",
+    "test:forge": "forge test -vv"
   },
   "devDependencies": {
     "@inco/lightning-js": "1.0.0",
@@ -33,7 +34,10 @@
     "solidity-coverage": "^0.8.17",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
-    "viem": "^2.43.5"
+    "viem": "^2.43.5",
+    "forge-std": "git+https://github.com/foundry-rs/forge-std.git#2f05b3001ed9d74b171d17eac80b3765ce186a76",
+    "ds-test": "git+https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0",
+    "@safe-global/safe-smart-account": "git+https://github.com/safe-global/safe-smart-account.git#dc437e8fba8b4805d76bcbd1c668c9fd3d1e83be"
   },
   "dependencies": {
     "@inco/lightning": "1.0.0",
@@ -43,20 +47,20 @@
     "dotenv": "^17.2.3"
   },
   "overrides": {
-    "forge-std": "github:foundry-rs/forge-std#2f05b3001ed9d74b171d17eac80b3765ce186a76",
-    "ds-test": "github:dapphub/ds-test#e282159d5170298eb2455a6c05280ab5a73a4ef0",
-    "@safe-global/safe-smart-account": "github:safe-global/safe-smart-account#dc437e8fba8b4805d76bcbd1c668c9fd3d1e83be"
+    "forge-std": "git+https://github.com/foundry-rs/forge-std.git#2f05b3001ed9d74b171d17eac80b3765ce186a76",
+    "ds-test": "git+https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0",
+    "@safe-global/safe-smart-account": "git+https://github.com/safe-global/safe-smart-account.git#dc437e8fba8b4805d76bcbd1c668c9fd3d1e83be"
   },
   "resolutions": {
-    "forge-std": "github:foundry-rs/forge-std#2f05b3001ed9d74b171d17eac80b3765ce186a76",
-    "ds-test": "github:dapphub/ds-test#e282159d5170298eb2455a6c05280ab5a73a4ef0",
-    "@safe-global/safe-smart-account": "github:safe-global/safe-smart-account#dc437e8fba8b4805d76bcbd1c668c9fd3d1e83be"
+    "forge-std": "git+https://github.com/foundry-rs/forge-std.git#2f05b3001ed9d74b171d17eac80b3765ce186a76",
+    "ds-test": "git+https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0",
+    "@safe-global/safe-smart-account": "git+https://github.com/safe-global/safe-smart-account.git#dc437e8fba8b4805d76bcbd1c668c9fd3d1e83be"
   },
   "pnpm": {
     "overrides": {
-      "forge-std": "github:foundry-rs/forge-std#2f05b3001ed9d74b171d17eac80b3765ce186a76",
-      "ds-test": "github:dapphub/ds-test#e282159d5170298eb2455a6c05280ab5a73a4ef0",
-      "@safe-global/safe-smart-account": "github:safe-global/safe-smart-account#dc437e8fba8b4805d76bcbd1c668c9fd3d1e83be"
+      "forge-std": "git+https://github.com/foundry-rs/forge-std.git#2f05b3001ed9d74b171d17eac80b3765ce186a76",
+      "ds-test": "git+https://github.com/dapphub/ds-test.git#e282159d5170298eb2455a6c05280ab5a73a4ef0",
+      "@safe-global/safe-smart-account": "git+https://github.com/safe-global/safe-smart-account.git#dc437e8fba8b4805d76bcbd1c668c9fd3d1e83be"
     }
   }
 }
