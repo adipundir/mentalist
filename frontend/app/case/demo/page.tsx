@@ -58,6 +58,7 @@ function DemoInner() {
         config={config}
         oracle={oracle}
         seed={seed}
+        autoPlay={params.get("auto") === "1"}
         onNewCase={() => {
           setSeed(Math.floor(Math.random() * 1e9));
           setNonce((n) => n + 1);

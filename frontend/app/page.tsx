@@ -48,7 +48,7 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
           href="/case/demo?auto=1"
           kicker="ZERO CLICKS"
           title="Watch a case"
-          note="A full interrogation, played out. Forty seconds."
+          note="A full interrogation, played out. Fifteen seconds."
         />
         <Door
           href="/case/demo"

@@ -31,11 +31,13 @@ interface Props {
   seed: number;
   /** Rendered under the board — the on-chain mode puts its Basescan line here. */
   chainStatus?: React.ReactNode;
+  /** Play the case on its own, for the zero-click door. */
+  autoPlay?: boolean;
   onSolved?: (focusLeft: number, questions: number) => void;
   onNewCase?: () => void;
 }
 
-export function CaseBoard({ config, oracle, seed, chainStatus, onSolved, onNewCase }: Props) {
+export function CaseBoard({ config, oracle, seed, chainStatus, autoPlay, onSolved, onNewCase }: Props) {
   const n = config.suspects;
   const suspects = useMemo(() => generateSuspects(n, seed), [n, seed]);
 
@@ -155,6 +157,87 @@ export function CaseBoard({ config, oracle, seed, chainStatus, onSolved, onNewCa
       setBusy(false);
     }
   }
+
+  /**
+   * The zero-click door. Plays the documented winning line — control question first, then
+   * binary splits over whatever is still live — using the same Notebook a human sees. It
+   * deliberately plays *well but not instantly*, pausing on each move so a viewer can read
+   * what happened before the next one lands.
+   *
+   * It cheats at nothing: it only ever reads `deductions`, which is derived from answers
+   * the player legitimately holds.
+   */
+  const autoRef = useRef(false);
+  useEffect(() => {
+    if (!autoPlay || !ready || over || autoRef.current) return;
+    autoRef.current = true;
+
+    let cancelled = false;
+    const pause = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+    (async () => {
+      // 1. Establish a witness we can trust — or trust in reverse.
+      let trusted = 0;
+      let honest = true;
+      {
+        const control = fullMask(n);
+        setWitness(trusted);
+        await pause(700);
+        setMask(control);
+        await pause(700);
+        const r = await oracle.ask(trusted, control, setPhase);
+        if (cancelled) return;
+        setTestimony((t) => [...t, { id: t.length, witness: trusted, mask: control, cost: r.cost, answer: r.answer }]);
+        setFocusLeft((f) => f - r.cost);
+        setMask(0);
+        honest = r.answer; // control question: answer === NOT(this witness lies)
+      }
+
+      // 2. Split until one name is left.
+      let live = Array.from({ length: n }, (_, i) => i);
+      let asked: Testimony[] = [];
+      while (live.length > 1 && !cancelled) {
+        const half = live.slice(0, Math.floor(live.length / 2));
+        const mask = half.reduce((m, s) => m | (1 << s), 0);
+
+        await pause(900);
+        setMask(mask);
+        await pause(700);
+
+        const r = await oracle.ask(trusted, mask, setPhase);
+        if (cancelled) return;
+        asked = [...asked, { id: asked.length, witness: trusted, mask, cost: r.cost, answer: r.answer }];
+        setTestimony((t) => [...t, { id: t.length, witness: trusted, mask, cost: r.cost, answer: r.answer }]);
+        setFocusLeft((f) => f - r.cost);
+        setMask(0);
+
+        const inHalf = honest ? r.answer : !r.answer;
+        live = inHalf ? half : live.filter((s) => !half.includes(s));
+      }
+
+      // 3. Name them.
+      if (cancelled || live.length !== 1) return;
+      await pause(1100);
+      setBusy(true);
+      setAccused(live[0]);
+      const drone = sfx.drone();
+      const { correct, truth: layout } = await atLeast(oracle.accuse(live[0], setPhase), 1200);
+      drone.resolve();
+      if (cancelled) return;
+      setTruth({ killer: layout.killer, liars: layout.liars });
+      setOutcome(correct ? "solved" : "missed");
+      sfx.stamp();
+      setBusy(false);
+      setPhase("idle");
+    })().catch(() => {
+      setBusy(false);
+      setPhase("idle");
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [autoPlay, ready, over, oracle, n]);
 
   function verdictFor(seat: number): SeatVerdict {
     if (truth) return seat === truth.killer ? "tyger" : "cleared";
