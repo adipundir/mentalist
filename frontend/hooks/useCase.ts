@@ -76,7 +76,7 @@ export function useCase({
     (seat: number) => {
       if (over || busy) return;
       unlockNarrator();
-      sfx.tick(180 + seat * 9, 0.04, 0.035);
+      sfx.tick(180 + seat * 9, 0.045, 0.045);
       setMask((m) => toggleSeat(m, seat));
     },
     [over, busy],
@@ -86,8 +86,15 @@ export function useCase({
     (seat: number) => {
       if (over || busy) return;
       unlockNarrator();
-      sfx.tick(320, 0.05, 0.045);
-      setWitness((w) => (w === seat ? null : seat));
+      sfx.startRoomTone();
+      setWitness((w) => {
+        const next = w === seat ? null : seat;
+        if (next !== null) {
+          sfx.knock(0.9 + (seat % 3) * 0.08);
+          sfx.whoosh(); // rides under the camera push-in
+        }
+        return next;
+      });
     },
     [over, busy],
   );
@@ -103,6 +110,7 @@ export function useCase({
     setBusy(true);
     setError(null);
     setSaying(null);
+    sfx.switchClick();
     drone.current = sfx.drone();
 
     try {
@@ -117,6 +125,10 @@ export function useCase({
         setTurned((t) => [...t, result.turnedWitness!]);
         sfx.scratch();
       }
+
+      // The stab is the loud moment; it fires on the answer, never on navigation.
+      if (result.answer) sfx.stabYes();
+      else sfx.stabNo();
 
       const line = replyLine(result.answer, witness, turn);
       setSaying({ seat: witness, line, answer: result.answer });
@@ -138,6 +150,7 @@ export function useCase({
     setError(null);
     setAccused(seat);
     setSaying(null);
+    sfx.stabAccuse();
     drone.current = sfx.drone();
 
     try {
@@ -146,7 +159,14 @@ export function useCase({
       drone.current = null;
       setTruth({ killer: layout.killer, liars: layout.liars });
       setOutcome(correct ? "solved" : "missed");
-      sfx.stamp();
+      // The unmasking is the biggest sound in the game and it happens once per case.
+      if (correct) {
+        sfx.stingUnmask();
+        setTimeout(() => sfx.stingSolved(), 900);
+      } else {
+        sfx.stingMissed();
+      }
+      setTimeout(() => sfx.stamp(), 260);
       if (onResolved) setTimeout(() => onResolved(correct, focusLeft), 3000);
     } catch (e) {
       drone.current?.stop();

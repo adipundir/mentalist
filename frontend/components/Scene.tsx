@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CONTROL_COST, fullMask, maskSeats, popcount, type CaseConfig } from "@/lib/case";
 import type { Suspect } from "@/lib/suspects";
@@ -12,6 +12,7 @@ import { Dialogue, type Line } from "./Dialogue";
 import { Notebook } from "./Notebook";
 import { PhaseBanner } from "./PhaseBanner";
 import { janeism } from "@/lib/script";
+import * as sfx from "@/lib/sound";
 
 /**
  * The game, played in a room.
@@ -46,12 +47,35 @@ export function Scene({
   useEffect(() => {
     if (!g.ready) return;
     setLine({
-      text: `${config.liars} of these ${g.n} are lying to you. Whoever Red John is, he always does.`,
+      text: `${config.liars} of these ${g.n} are lying. Red John always is.`,
       tone: "narrator",
     });
     const id = setTimeout(() => setLine(null), 5200);
     return () => clearTimeout(id);
   }, [g.ready, config.liars, g.n]);
+
+  // A newly proven liar gets a plucked string — the "tell". Tracked so it fires once per
+  // suspect rather than on every re-render that recomputes the same deduction.
+  const flagged = useRef(new Set<number>());
+  useEffect(() => {
+    g.deductions.honesty.forEach((h, i) => {
+      if (h === "liar" && !flagged.current.has(i)) {
+        flagged.current.add(i);
+        sfx.pluck(300 + i * 24);
+      }
+    });
+  }, [g.deductions.honesty]);
+
+  // Notebook: paper.
+  useEffect(() => {
+    if (notebook) sfx.paper();
+  }, [notebook]);
+
+  // Room tone runs for the life of the scene.
+  useEffect(() => {
+    sfx.startRoomTone();
+    return () => sfx.stopRoomTone();
+  }, []);
 
   // Testimony takes over the bar the moment it lands.
   useEffect(() => {
@@ -179,10 +203,7 @@ export function Scene({
       <div className="border-x-2 border-b-2 border-ink-3 bg-ink px-3 py-3 sm:px-5">
         {g.witness === null ? (
           <p className="py-2 text-center font-body text-[14px] italic text-bone-dim">
-            Click a suspect to put them under the light.
-            <span className="ml-2 not-italic text-bone-dim/50">
-              {janeism(g.testimony.length)}
-            </span>
+            {janeism(g.testimony.length)}
           </p>
         ) : (
           <>
@@ -212,7 +233,7 @@ export function Scene({
 
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <Act onClick={g.askAll} disabled={g.over || g.busy || g.witness === null || g.focusLeft < CONTROL_COST} tone="brass">
-            ASK ABOUT EVERYONE · {CONTROL_COST} FOCUS
+            ASK ABOUT EVERYONE · {CONTROL_COST}
           </Act>
           <Act onClick={g.askSelf} disabled={g.over || g.busy || g.witness === null}>
             &ldquo;ARE YOU RED JOHN?&rdquo; · 1
@@ -241,9 +262,6 @@ export function Scene({
           </span>
         </div>
 
-        <p className="mt-2 font-mono text-[9px] tracking-file text-bone-dim/50">
-          CLICK A SUSPECT TO QUESTION THEM · DOUBLE-CLICK TO MARK THEM INTO THE QUESTION
-        </p>
       </div>
 
       <AnimatePresence>
