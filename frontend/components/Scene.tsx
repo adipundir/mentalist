@@ -114,6 +114,7 @@ export function Scene({
           honest: honesty === "honest",
           inQuestion: ((g.mask >> i) & 1) === 1,
           turned: g.turned.includes(i),
+          saying: g.saying?.seat === i ? { line: g.saying.line, answer: g.saying.answer } : null,
         };
       }),
     [suspects, g.truth, g.deductions, g.saying, g.busy, g.witness, g.mask, g.turned],

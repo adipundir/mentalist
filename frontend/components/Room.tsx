@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
-import { motion } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Character, type Expression } from "./Character";
 import type { Suspect } from "@/lib/suspects";
 
@@ -33,6 +33,8 @@ export interface RoomSubject {
   honest: boolean;
   inQuestion: boolean;
   turned: boolean;
+  /** What they're saying right now — rendered as a bubble over their head. */
+  saying?: { line: string; answer: boolean } | null;
 }
 
 /**
@@ -202,14 +204,14 @@ export function Room({
                 left: `${spot.x}%`,
                 bottom: `${spot.bottom}%`,
                 width: `${w * spot.scale}%`,
-                zIndex: spot.z + (isFocus ? 200 : 0),
+                zIndex: spot.z + (s.saying ? 400 : isFocus ? 200 : 0),
                 transform: "translateX(-50%)",
               }}
               animate={{
-                opacity: s.cleared ? 0.3 : dim ? 0.45 : 1,
+                opacity: s.saying ? 1 : s.cleared ? 0.3 : dim ? 0.45 : 1,
                 y: isFocus ? -8 : 0,
                 scale: isFocus ? 1.12 : 1,
-                filter: dim ? "brightness(0.5)" : "brightness(1)",
+                filter: s.saying ? "brightness(1)" : dim ? "brightness(0.5)" : "brightness(1)",
               }}
               transition={{ type: "spring", stiffness: 220, damping: 24 }}
             >
@@ -226,6 +228,47 @@ export function Room({
                 fullBody
                 className="h-auto w-full drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]"
               />
+
+              {/* speech bubble — the line comes out of the person, not just the caption bar */}
+              <AnimatePresence>
+                {s.saying && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10, scale: 0.85 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    transition={{ type: "spring", stiffness: 420, damping: 24 }}
+                    className="pointer-events-none absolute bottom-full left-1/2 z-[300] mb-2 -translate-x-1/2"
+                    style={{ width: "260%" }}
+                  >
+                    <div
+                      className="relative border-[2.5px] bg-[#f4ecd8] px-2.5 py-1.5 text-center"
+                      style={{
+                        borderColor: s.saying.answer ? "#a81c1c" : "#1c1613",
+                        borderRadius: 14,
+                        boxShadow: "3px 4px 0 rgb(0 0 0 / 0.55)",
+                      }}
+                    >
+                      <p className="font-type text-[10px] leading-tight text-[#1c1613]">
+                        &ldquo;{s.saying.line}&rdquo;
+                      </p>
+                      <span
+                        className="font-mono text-[9px] tracking-file"
+                        style={{ color: s.saying.answer ? "#a81c1c" : "#4a423a" }}
+                      >
+                        {s.saying.answer ? "YES" : "NO"}
+                      </span>
+                      <span
+                        className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2"
+                        style={{
+                          borderLeft: "7px solid transparent",
+                          borderRight: "7px solid transparent",
+                          borderTop: `10px solid ${s.saying.answer ? "#a81c1c" : "#1c1613"}`,
+                        }}
+                      />
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               {/* nameplate — only for the figure under the light */}
               <motion.div
