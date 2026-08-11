@@ -185,6 +185,9 @@ contract Mentalist {
             turned: false,
             solved: false,
             status: Status.Open,
+            // Recorded for display only — never compared against, so validator drift is
+            // not a concern here.
+            // forge-lint: disable-next-line(block-timestamp,unsafe-typecast)
             openedAt: uint64(block.timestamp)
         });
 
@@ -260,7 +263,7 @@ contract Mentalist {
         if (c.detective != msg.sender) revert NotYourCase();
         if (witness >= c.suspects) revert BadWitness();
 
-        uint16 full = uint16((1 << c.suspects) - 1);
+        uint16 full = _fullMask(c.suspects);
         if (mask == 0 || mask > full) revert BadMask();
 
         uint8 cost = mask == full ? CONTROL_COST : QUESTION_COST;
@@ -286,6 +289,9 @@ contract Mentalist {
 
         uint16 qid = c.questionsAsked;
         _testimony[caseId][qid] = answer;
+        // Safe: `focus` is a uint8 and every question costs at least 1 Focus, so at most
+        // 255 questions can ever be asked and `qid + 1` cannot exceed 255.
+        // forge-lint: disable-next-line(unsafe-typecast)
         c.questionsAsked = uint8(qid + 1);
 
         answerHandle = ebool.unwrap(answer);
@@ -395,7 +401,14 @@ contract Mentalist {
 
     /// @notice The full-lineup mask for a case — the control question.
     function controlMask(uint256 caseId) external view returns (uint16) {
-        return uint16((1 << cases[caseId].suspects) - 1);
+        return _fullMask(cases[caseId].suspects);
+    }
+
+    /// @dev Mask covering every seat. `n` is bounded by MAX_SUSPECTS (12), so the shift
+    ///      never exceeds 12 and the result always fits in a uint16.
+    function _fullMask(uint8 n) internal pure returns (uint16) {
+        // forge-lint: disable-next-line(incorrect-shift)
+        return uint16((uint256(1) << n) - 1);
     }
 
     /// @dev Accept sponsorship so a case's Inco fee can be pre-funded rather than charged
