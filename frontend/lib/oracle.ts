@@ -95,7 +95,7 @@ export async function atLeast<T>(p: Promise<T>, ms: number): Promise<T> {
  * then Red John welded in with an OR. Mirrors `Mentalist._deal` so the demo is a faithful
  * model of the game and not merely a lookalike.
  */
-export function dealLocally(config: CaseConfig, seed: number): DealtCase {
+export function dealLocally(config: CaseConfig, seed: number, forcedKiller?: number): DealtCase {
   let s = seed >>> 0;
   const rand = () => {
     s = (s + 0x6d2b79f5) | 0;
@@ -114,7 +114,11 @@ export function dealLocally(config: CaseConfig, seed: number): DealtCase {
   };
 
   const n = config.suspects;
-  const guilt = shuffle([true, ...Array(n - 1).fill(false)]);
+  // In the campaign the culprit is who the story says it is; only the liars are dealt.
+  const guilt =
+    forcedKiller !== undefined
+      ? Array.from({ length: n }, (_, i) => i === forcedKiller)
+      : shuffle([true, ...Array(n - 1).fill(false)]);
   const base = shuffle([...Array(config.liars).fill(true), ...Array(n - config.liars).fill(false)]);
 
   const killer = guilt.findIndex(Boolean);
@@ -124,7 +128,7 @@ export function dealLocally(config: CaseConfig, seed: number): DealtCase {
   return { caseId: seed, killer, liars };
 }
 
-export function localOracle(): Oracle {
+export function localOracle(forcedKiller?: number): Oracle {
   let dealt: DealtCase | null = null;
   let config: CaseConfig | null = null;
   let asked = 0;
@@ -135,7 +139,7 @@ export function localOracle(): Oracle {
 
     async open(cfg, seed) {
       config = cfg;
-      dealt = dealLocally(cfg, seed);
+      dealt = dealLocally(cfg, seed, forcedKiller);
       asked = 0;
       turnedAlready = false;
       await wait(sample(LATENCY.mine));

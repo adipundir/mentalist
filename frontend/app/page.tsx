@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { CASES } from "@/lib/case";
+import { CHAPTERS } from "@/lib/story";
 
 /**
  * Three doors, in order of how much they ask of the visitor. A judge with ninety seconds
@@ -43,7 +44,14 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
       </figure>
 
       {/* ── the three doors ── */}
-      <nav className="mt-12 grid gap-3 sm:grid-cols-3">
+      <nav className="mt-12 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Door
+          href="/story"
+          kicker="THE CAMPAIGN"
+          title="Work the list"
+          primary
+          note="Seven chapters, narrated. 2,164 names down to one."
+        />
         <Door
           href="/case/demo?auto=1"
           kicker="ZERO CLICKS"
@@ -54,8 +62,7 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
           href="/case/demo"
           kicker="NO WALLET"
           title="Solve one"
-          primary
-          note="The real game, dealt in your browser. Nothing to install."
+          note="A one-off case, dealt in your browser. Nothing to install."
         />
         <Door
           href="/case/play"
@@ -65,10 +72,31 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
         />
       </nav>
 
-      {/* ── the case ladder ── */}
+      {/* ── the campaign ── */}
       <section className="mt-14">
         <h2 className="border-b border-ink-3 pb-2 font-mono text-[10px] tracking-file text-bone-dim">
-          THE FILE
+          THE LIST — SEVEN CHAPTERS
+        </h2>
+        <ol className="mt-3 divide-y divide-ink-3">
+          {CHAPTERS.map((c) => (
+            <li key={c.title} className="flex items-baseline justify-between gap-4 py-2.5">
+              <span className="min-w-0">
+                <span className="font-mono text-[10px] text-bone-dim/50">{c.label}</span>{" "}
+                <span className="font-type text-[14px] text-bone">{c.title}</span>
+                <span className="block font-body text-[12px] italic text-bone-dim">{c.blurb}</span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] tracking-file text-bone-dim">
+                {c.n} SUSPECTS
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      {/* ── free play ── */}
+      <section className="mt-12">
+        <h2 className="border-b border-ink-3 pb-2 font-mono text-[10px] tracking-file text-bone-dim">
+          FREE PLAY
         </h2>
         <ol className="mt-3 divide-y divide-ink-3">
           {CASES.map((c, i) => (

@@ -17,11 +17,13 @@ import {
   type Testimony,
 } from "@/lib/case";
 import { deduce } from "@/lib/solver";
-import { caseNumber, caseTitle, generateSuspects } from "@/lib/suspects";
+import { caseNumber, caseTitle, generateSuspects, type Suspect } from "@/lib/suspects";
+import type { CharacterSpec } from "./Character";
 import { atLeast, type Oracle } from "@/lib/oracle";
 import * as sfx from "@/lib/sound";
 import { narrate, unlockNarrator } from "@/lib/narrator";
 import { replyLine } from "@/lib/script";
+import { Character } from "./Character";
 import { Dossier, type SeatVerdict } from "./Dossier";
 import { Transcript } from "./Transcript";
 import { PhaseBanner } from "./PhaseBanner";
@@ -37,6 +39,14 @@ interface Props {
   autoPlay?: boolean;
   /** Rendered inside the verdict — the on-chain settle + Megapot claim flow. */
   renderSettlement?: (solved: boolean, focusLeft: number) => React.ReactNode;
+  /** Campaign mode supplies a scripted lineup instead of a generated one. */
+  suspects?: Suspect[];
+  titleOverride?: string;
+  chapterOverride?: string;
+  /** A line from the team, shown alongside the board. */
+  nudge?: { name: string; spec: CharacterSpec; line: string } | null;
+  /** Campaign hook — fires once the case resolves, instead of showing the verdict modal. */
+  onResolved?: (solved: boolean, focusLeft: number) => void;
   onSolved?: (focusLeft: number, questions: number) => void;
   onNewCase?: () => void;
 }
@@ -48,11 +58,17 @@ export function CaseBoard({
   chainStatus,
   autoPlay,
   renderSettlement,
+  suspects: suppliedSuspects,
+  titleOverride,
+  chapterOverride,
+  nudge,
+  onResolved,
   onSolved,
   onNewCase,
 }: Props) {
   const n = config.suspects;
-  const suspects = useMemo(() => generateSuspects(n, seed), [n, seed]);
+  const generated = useMemo(() => generateSuspects(n, seed), [n, seed]);
+  const suspects = suppliedSuspects ?? generated;
 
   const [focusLeft, setFocusLeft] = useState(config.focus);
   const [testimony, setTestimony] = useState<Testimony[]>([]);
@@ -170,6 +186,8 @@ export function CaseBoard({
       setOutcome(correct ? "solved" : "missed");
       sfx.stamp();
       if (correct) onSolved?.(focusLeft, testimony.length);
+      // The campaign shows its own closing card, so give it a beat to admire the board.
+      if (onResolved) setTimeout(() => onResolved(correct, focusLeft), 2600);
     } catch (e) {
       droneRef.current?.stop();
       droneRef.current = null;
@@ -280,10 +298,10 @@ export function CaseBoard({
       <header className="mb-5 flex flex-wrap items-end justify-between gap-4 border-b border-ink-3 pb-4">
         <div>
           <p className="font-mono text-[10px] tracking-file text-bone-dim">
-            CASE {caseNumber(seed)} · {config.label.toUpperCase()}
+            {chapterOverride ?? `CASE ${caseNumber(seed)} · ${config.label.toUpperCase()}`}
           </p>
           <h1 className="font-type text-[26px] leading-tight text-bone sm:text-[32px]">
-            {caseTitle(seed)}
+            {titleOverride ?? caseTitle(seed)}
           </h1>
           <p className="max-w-xl font-body text-[13px] italic text-bone-dim">{config.blurb}</p>
         </div>
@@ -333,7 +351,8 @@ export function CaseBoard({
       <div className="grid gap-6 lg:grid-cols-[1fr_340px]">
         {/* ── the lineup ── */}
         <section>
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3">
+          {/* pt-14 reserves room for a speech bubble above the first row */}
+          <div className="grid grid-cols-2 gap-2.5 pt-14 sm:grid-cols-3">
             {suspects.map((s, i) => (
               <Dossier
                 key={s.seat}
@@ -367,6 +386,22 @@ export function CaseBoard({
               turned={turned}
             />
           </div>
+
+          {nudge && !over && (
+            <div className="paper flex gap-3 border border-ink-3 p-3">
+              <div className="w-16 shrink-0 border border-ink-3 bg-[#211c1a]">
+                <Character spec={nudge.spec} expression="talking" className="h-20 w-full" />
+              </div>
+              <div className="min-w-0">
+                <p className="font-mono text-[9px] tracking-file text-brass">
+                  {nudge.name.toUpperCase()}
+                </p>
+                <p className="font-body text-[12px] leading-snug text-bone-dim">
+                  &ldquo;{nudge.line}&rdquo;
+                </p>
+              </div>
+            </div>
+          )}
 
           {!over && (
             <div className="paper border border-ink-3 p-4">
@@ -504,7 +539,7 @@ export function CaseBoard({
       </AnimatePresence>
 
       <AnimatePresence>
-        {over && truth && (
+        {over && truth && !onResolved && (
           <Verdict
             solved={outcome === "solved"}
             suspects={suspects}

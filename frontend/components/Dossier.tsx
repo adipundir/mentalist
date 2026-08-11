@@ -70,7 +70,11 @@ export function Dossier({
   const expression = expressionFor({ verdict, honesty, isWitness, saying, thinking, index });
 
   return (
-    <div className="deal-in relative" style={{ animationDelay: `${index * 45}ms` }}>
+    // A speaking card lifts above its neighbours, or the next row paints over its bubble.
+    <div
+      className="deal-in relative"
+      style={{ animationDelay: `${index * 45}ms`, zIndex: saying ? 40 : undefined }}
+    >
       {/* speech bubble — the interaction the board is built around */}
       <AnimatePresence>
         {saying && (
@@ -79,7 +83,7 @@ export function Dossier({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: "spring", stiffness: 420, damping: 26 }}
-            className="absolute -top-3 left-1/2 z-30 w-[92%] -translate-x-1/2 -translate-y-full"
+            className="absolute -top-2 left-1/2 z-40 w-[96%] -translate-x-1/2 -translate-y-full"
           >
             <div
               className={[
@@ -96,7 +100,7 @@ export function Dossier({
               >
                 {saying.answer ? "YES" : "NO"}
               </span>
-              {/* bubble tail */}
+              {/* bubble tail — points back at whoever is talking */}
               <span
                 className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2"
                 style={{
@@ -168,7 +172,12 @@ export function Dossier({
               inQuestion ? "border-blood-hot bg-[#2a2320]" : "border-ink-3 bg-[#211c1a]",
             ].join(" ")}
           >
-            <Character spec={suspect.character} expression={expression} cleared={cleared} className="h-28 w-full" />
+            <Character
+              spec={suspect.character}
+              expression={expression}
+              cleared={cleared && !saying}
+              className="h-28 w-full"
+            />
             {inQuestion && (
               <span className="absolute right-1 top-1 border border-blood-hot bg-blood-hot/20 px-1 font-mono text-[8px] tracking-file text-blood-hot">
                 IN
