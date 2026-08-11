@@ -249,3 +249,22 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Dust drifting through the lamp beam. Slow and barely there — if you can *see* it moving
+   it reads as snow, not air. */
+@keyframes mote-drift {
+  0%   { transform: translate(0, 0); opacity: 0; }
+  12%  { opacity: var(--mote-peak, 0.22); }
+  88%  { opacity: var(--mote-peak, 0.22); }
+  100% { transform: translate(14px, 46px); opacity: 0; }
+}
+
+.mote {
+  animation-name: mote-drift;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mote { animation: none; opacity: 0.12 !important; }
+}

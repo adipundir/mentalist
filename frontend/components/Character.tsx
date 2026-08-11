@@ -237,6 +237,54 @@ function AccessoryPart({ style, suit }: { style: Accessory; suit: string }) {
   }
 }
 
+/**
+ * The standing figure below the collar.
+ *
+ * Posture carries as much as the face at full height: a nervous suspect draws his arms in,
+ * a smug one plants his feet. Kept to flat shapes so it reads at any size.
+ */
+function Body({ spec, expression }: { spec: CharacterSpec; expression: Expression }) {
+  const tense = expression === "nervous" || expression === "caught" || expression === "shocked";
+  const open = expression === "smug" || expression === "sinister";
+  const armSwing = tense ? 6 : open ? -8 : 0;
+
+  return (
+    <g strokeLinejoin="round" strokeLinecap="round">
+      {/* legs */}
+      <path
+        d={`M40 168 L${open ? 32 : 37} 240 L${open ? 31 : 36} 250 L46 250 L47 168 Z`}
+        fill={spec.suit}
+        stroke={INK}
+        strokeWidth="2.6"
+      />
+      <path
+        d={`M53 168 L${open ? 68 : 63} 240 L${open ? 69 : 64} 250 L54 250 L54 168 Z`}
+        fill={spec.suit}
+        stroke={INK}
+        strokeWidth="2.6"
+      />
+      {/* shoes */}
+      <path d={`M${open ? 27 : 32} 250 h20 v6 h-22 a3 3 0 0 1 2 -6 Z`} fill="#201915" stroke={INK} strokeWidth="2.2" />
+      <path d={`M${open ? 65 : 60} 250 h20 a3 3 0 0 1 2 6 h-22 Z`} fill="#201915" stroke={INK} strokeWidth="2.2" />
+
+      {/* torso — jacket over shirt */}
+      <path d="M28 118 Q26 150 30 176 L64 176 Q68 150 66 118 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+      <path d="M44 116 L50 132 L56 116 L56 172 L44 172 Z" fill={spec.shirt} stroke={INK} strokeWidth="2" />
+      <path d="M50 128 L54 140 L50 166 L46 140 Z" fill={spec.tie} stroke={INK} strokeWidth="1.8" />
+
+      {/* arms */}
+      <g transform={`rotate(${armSwing} 30 124)`}>
+        <path d="M28 118 Q16 142 18 172 L28 174 Q30 146 34 124 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <circle cx="22" cy="178" r="6" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+      </g>
+      <g transform={`rotate(${-armSwing} 66 124)`}>
+        <path d="M66 118 Q78 142 76 172 L66 174 Q64 146 60 124 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <circle cx="72" cy="178" r="6" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+      </g>
+    </g>
+  );
+}
+
 // ── the character ───────────────────────────────────────────
 
 export function Character({
@@ -244,11 +292,14 @@ export function Character({
   expression = "neutral",
   /** Dim and desaturate — used for suspects the notebook has ruled out. */
   cleared = false,
+  /** Draw the whole figure, standing, for the room scene. */
+  fullBody = false,
   className,
 }: {
   spec: CharacterSpec;
   expression?: Expression;
   cleared?: boolean;
+  fullBody?: boolean;
   className?: string;
 }) {
   const [blink, setBlink] = useState(false);
@@ -290,7 +341,7 @@ export function Character({
 
   return (
     <svg
-      viewBox="14 6 72 100"
+      viewBox={fullBody ? "2 6 96 250" : "14 6 72 100"}
       className={className}
       style={{
         filter: cleared ? "grayscale(1)" : undefined,
@@ -300,6 +351,8 @@ export function Character({
       aria-hidden
     >
       <g transform={`rotate(${spec.tilt} 50 70)`}>
+        {fullBody && <Body spec={spec} expression={expression} />}
+
         {/* shoulders + shirt + tie */}
         <path
           d="M8 130 Q12 100 34 94 L50 100 L66 94 Q88 100 92 130 Z"

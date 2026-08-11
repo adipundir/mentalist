@@ -6,7 +6,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { CHAPTERS, FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
 import { localOracle } from "@/lib/oracle";
-import { CaseBoard } from "@/components/CaseBoard";
+import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
 import { Finale } from "@/components/Finale";
 
@@ -86,21 +86,22 @@ function StoryInner() {
         </span>
       </div>
 
-      <CaseBoard
-        key={`${index}-${attempt}`}
-        config={chapter}
-        oracle={oracle}
-        seed={1000 + index * 31 + attempt}
-        suspects={suspects}
-        titleOverride={chapter.title}
-        chapterOverride={chapter.label}
-        nudge={{
-          name: person(chapter.nudge.speaker).name,
-          spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
-          line: chapter.nudge.line,
-        }}
-        onResolved={finishChapter}
-      />
+      <div className="px-2 pb-8 pt-3 sm:px-4">
+        <Scene
+          key={`${index}-${attempt}`}
+          config={chapter}
+          oracle={oracle}
+          suspects={suspects}
+          title={chapter.title}
+          chapter={`${chapter.label} · ${chapter.n} SUSPECTS · ${chapter.liars} LYING`}
+          nudge={{
+            name: person(chapter.nudge.speaker).name,
+            spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
+            line: chapter.nudge.line,
+          }}
+          onResolved={finishChapter}
+        />
+      </div>
 
       <AnimatePresence>
         {stage === "opening" && (
