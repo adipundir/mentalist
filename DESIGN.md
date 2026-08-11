@@ -165,16 +165,58 @@ advantage over the alternatives, and it's worth calling out explicitly in the de
 Thematically: Patrick Jane was a con man before he was a consultant. The jackpot is the
 long shot — the one case nobody solves.
 
-- **Entry.** A case costs a small USDC stake. That stake buys a **Megapot ticket** through
-  `purchaseTickets(referrer, value, recipient)` with the game treasury as referrer.
-  Playing *is* entering the draw.
-- **Efficiency pays.** Unspent Focus at the moment you close a case converts to **extra
-  tickets**. Solving in 4 Focus instead of 6 literally buys you two more shots at the
-  jackpot. This is what makes the tight Focus economy matter beyond bragging rights — the
-  skill ceiling has a payout curve attached.
-- **The treasury is self-funding.** Megapot's referral fee (10% of ticket sales routed to
-  the referrer) accrues back to the game contract and funds case prizes. The game pays for
-  itself out of the lottery it feeds.
+> **Correction to an earlier draft.** This section was originally written against
+> `purchaseTickets(referrer, value, recipient)` — the **V1 `BaseJackpot` API**, which is
+> archived at `v1.docs.megapot.io` and is a different, incompatible protocol. The current
+> contracts are `Jackpot` + `JackpotRandomTicketBuyer`, verified live by RPC (details in
+> §4.2). Building on V1 would have been a visible red flag against a rubric that weights
+> *depth of integration* at 30%.
+
+### 4.1 The mechanic
+
+- **Efficiency pays.** Unspent Focus at the moment you close a case converts 1:1 into
+  **real Megapot tickets**, minted straight to your wallet. Solving in 4 Focus instead of 6
+  is two more shots at the jackpot. This is what makes the tight Focus economy matter
+  beyond bragging rights — the skill ceiling has a payout curve attached, and a streak
+  milestone pays a bonus so a wrong accusation costs more than the case it lost.
+- **The game funds the tickets.** Megapot's gifting flow lets a payer buy for an arbitrary
+  recipient — *"tickets are never free, you fund every gift."* `CaseRewards` is the payer
+  and the player is the recipient, so someone who has never held USDC still walks away
+  holding a genuine lottery ticket NFT.
+- **The tickets pay for themselves.** `CaseRewards` passes itself as the `_referrers`
+  entry, earning the protocol referral fee (currently 10% of ticket price at purchase, plus
+  a share of referred winnings at claim). Those fees accrue inside the Jackpot and
+  `sweepReferralFees()` pulls them back into the treasury that funds the next round of
+  rewards. The loop closes.
+
+### 4.2 The integration facts that matter
+
+Every value below was confirmed against Base Sepolia by direct RPC, not read off a docs
+page — two research passes disagreed about whether a V2 testnet deployment even existed, so
+it was settled against the chain.
+
+| | Base Sepolia | Base mainnet |
+|---|---|---|
+| `Jackpot` | `0x465dA3c859f193A3807386387bEE941B2A4c3279` | `0x3bAe643002069dBCbcd62B1A4eb4C4A397d042a2` |
+| `JackpotRandomTicketBuyer` | `0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746` | `0xb9560b43b91dE2c1DaF5dfbb76b2CFcDaFc13aBd` |
+| Ticket token | Circle USDC `0x036CbD…dCF7e` (6dp) | Circle USDC `0x833589…02913` (6dp) |
+| Ticket price | **0.01 USDC** | 1.00 USDC |
+| Drawing cadence | **30 minutes** | 24 hours |
+
+Three things this buys the build:
+
+1. **A demo can show a complete cycle.** Thirty-minute testnet drawings mean buy → draw →
+   settle → claim fits inside a single sitting. On mainnet you would wait a day.
+2. **Rewards cost cents.** At 0.01 USDC a ticket, a full evening of playtesting is under a
+   dollar.
+3. **Nothing is hardcoded that shouldn't be.** `CaseRewards` reads the jackpot and the
+   ticket token *off the buyer contract at construction*, and the ticket price live on every
+   claim. Megapot runs different tokens per network and a legacy testnet deployment on a
+   mock token; assuming any of it is how integrations break.
+
+**The single easiest thing to get wrong:** `_referralSplitBps` is 1e18-scaled and must sum
+to exactly `1e18`, despite the name. Passing basis points silently mis-splits the fee.
+`CaseRewards.FULL_REFERRAL_SPLIT` is `1e18` with a comment saying exactly this.
 
 > **Track selection.** The jam requires choosing one track. The hidden mechanics are the
 > soul of this build, so the primary submission is the **Inco track**. The Megapot layer is
