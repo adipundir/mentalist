@@ -14,6 +14,8 @@ interface Props {
   questions: number;
   seed: number;
   config: CaseConfig;
+  /** On-chain mode only: settle the verdict and claim Megapot tickets. */
+  settlement?: React.ReactNode;
   onNewCase?: () => void;
 }
 
@@ -31,6 +33,7 @@ export function Verdict({
   questions,
   seed,
   config,
+  settlement,
   onNewCase,
 }: Props) {
   const [copied, setCopied] = useState(false);
@@ -149,6 +152,8 @@ export function Verdict({
             })}
           </ul>
         </div>
+
+        {settlement}
 
         <div className="mt-6 flex flex-wrap items-center gap-2">
           <button

@@ -8,7 +8,7 @@
  *
  *   pnpm --filter contracts play:onchain
  */
-import { createPublicClient, createWalletClient, http, decodeEventLog, type Hex } from "viem";
+import { createPublicClient, createWalletClient, http, decodeEventLog, bytesToHex, pad, toHex, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 import { Lightning } from "@inco/lightning-js/lite";
@@ -30,6 +30,13 @@ const ABI = [
     outputs: [{ type: "bytes32" }] },
   { type: "function", name: "accuse", stateMutability: "nonpayable",
     inputs: [{ name: "caseId", type: "uint256" }, { name: "seat", type: "uint8" }], outputs: [] },
+  { type: "function", name: "settle", stateMutability: "nonpayable",
+    inputs: [{ name: "caseId", type: "uint256" },
+             { name: "attestation", type: "tuple", components: [
+                { name: "handle", type: "bytes32" }, { name: "value", type: "bytes32" }] },
+             { name: "signatures", type: "bytes[]" }], outputs: [] },
+  { type: "function", name: "streak", stateMutability: "view",
+    inputs: [{ name: "", type: "address" }], outputs: [{ type: "uint32" }] },
   { type: "function", name: "quoteOpenFee", stateMutability: "pure",
     inputs: [{ name: "suspects", type: "uint8" }], outputs: [{ type: "uint256" }] },
   { type: "function", name: "getCase", stateMutability: "view",
@@ -186,6 +193,28 @@ async function main() {
     console.log(`  seat ${i + 1}  ${guilt[i] ? "THE TYGER" : "innocent "}  ${liars[i] ? "lied" : "truthful"}`);
   }
 
+  // ── Model A settlement: the CONTRACT rules on the accusation ──
+  const vRaw = by.get(ev.guiltHandles[seat].toLowerCase()) as any;
+  const attestation = {
+    handle: vRaw.handle,
+    value: pad(toHex(asBool(vRaw.plaintext) ? 1 : 0), { size: 32 }),
+  };
+  const signatures = vRaw.covalidatorSignatures.map((sig: Uint8Array) => bytesToHex(sig));
+
+  console.log("\nfiling the verdict with the contract...");
+  const settleReceipt = await send("settle", [caseId, attestation, signatures]);
+  console.log(`  settled (gas ${settleReceipt.gasUsed})`);
+
+  // Same propagation wait as after openCase — otherwise this asserts against stale state.
+  let caseAfter: any;
+  for (let i = 0; i < 30; i++) {
+    caseAfter = await publicClient.readContract({ address: GAME, abi: ABI, functionName: "getCase", args: [caseId] });
+    if (caseAfter.status === 3) break;
+    await new Promise((r) => setTimeout(r, 400));
+  }
+  const streak = await publicClient.readContract({ address: GAME, abi: ABI, functionName: "streak", args: [account.address] }) as number;
+  console.log(`  case status ${caseAfter.status} (3 = Closed), solved=${caseAfter.solved}, streak=${streak}, focus left ${caseAfter.focusLeft}`);
+
   const ok = killer === seat;
   console.log(`\n${ok ? "CASE CLOSED — the deduction was correct." : "MISS — named " + (seat + 1) + ", it was " + (killer + 1)}`);
 
@@ -197,6 +226,9 @@ async function main() {
     ["the Tyger lies", liars[killer] === true],
     ["liar count is LIARS or LIARS+1", liarCount === LIARS || liarCount === LIARS + 1],
     ["the deduction found him", ok],
+    ["contract closed the case", caseAfter.status === 3],
+    ["contract agrees it was solved", caseAfter.solved === ok],
+    ["streak advanced", Number(streak) >= 1],
   ] as const;
   console.log();
   for (const [label, pass] of checks) console.log(`  ${pass ? "PASS" : "FAIL"}  ${label}`);

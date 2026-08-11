@@ -6,7 +6,8 @@ import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { CASES } from "@/lib/case";
 import { CaseBoard } from "@/components/CaseBoard";
-import { chainOracle, getZap } from "@/lib/chain-oracle";
+import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
+import { Settlement } from "@/components/Settlement";
 import { MENTALIST_ADDRESS, addressUrl, isDeployed, txUrl } from "@/lib/contracts";
 
 /**
@@ -28,7 +29,7 @@ export default function PlayPage() {
     void getZap().catch(() => {});
   }, []);
 
-  const oracle = useMemo(() => {
+  const oracle: ChainOracle | null = useMemo(() => {
     if (!publicClient || !walletClient || !address) return null;
     return chainOracle({
       publicClient,
@@ -98,6 +99,9 @@ export default function PlayPage() {
           oracle={oracle}
           seed={0x9a3f + caseIndex * 7919 + nonce}
           onNewCase={() => setNonce((n) => n + 1)}
+          renderSettlement={(solved, focusLeft) => (
+            <Settlement oracle={oracle} solved={solved} focusLeft={focusLeft} />
+          )}
           chainStatus={
             <div className="crt border border-ink-3 p-3 font-mono text-[10px] leading-relaxed tracking-file">
               <p>

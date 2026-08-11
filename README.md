@@ -228,6 +228,37 @@ would have been a lie. Opening a case now forces the previous one to resolve, as
 
 ---
 
+## Pre-existing work disclosure
+
+Required by the jam's Terms & Conditions §4.2 ("You must disclose in writing any
+pre-existing, project-specific work included in your submission, along with details in your
+repository history and description").
+
+**There is no pre-existing project-specific work in this submission.** Everything in
+`contracts/contracts/`, `contracts/test-forge/`, `contracts/scripts/`, `frontend/lib/`,
+`frontend/components/` and `frontend/app/` was written during the jam window and is visible
+as incremental commits in this repository's history.
+
+What is *not* ours, and is used as a building block under §4.1 ("You may use open-source
+libraries, frameworks, public SDKs, and third-party APIs — including Inco and Megapot
+tooling"):
+
+| | |
+|---|---|
+| Project skeleton | `create-inco-app` (Inco's official scaffold) — Hardhat + Next.js + RainbowKit wiring. Its two example contracts (`ConfidentialERC20`, `ConfidentialLottery`) were **deleted**; see commit `0ce43c5`. |
+| Confidential compute | `@inco/lightning` and `@inco/lightning-js` v1.0.0 |
+| Lottery protocol | Megapot's deployed `Jackpot` and `JackpotRandomTicketBuyer` contracts on Base |
+| Everything else | Next.js, React, wagmi, viem, Tailwind, framer-motion, Foundry, OpenZeppelin |
+
+The very first commit (`0d502db`) is the untouched scaffold, so the diff from that commit
+to `HEAD` is exactly the work done during the jam.
+
+**No art or audio assets are used at all.** Suspect portraits are drawn as inline SVG from a
+seeded PRNG, and every sound is synthesised at runtime with the Web Audio API — so there is
+nothing in this repository whose licensing needs checking.
+
+---
+
 ## Honest framing
 
 Inco is **TEE-based confidential compute — not FHE, and not zk.** "Secret" means the value

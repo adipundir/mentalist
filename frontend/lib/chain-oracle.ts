@@ -16,9 +16,9 @@
  */
 
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
-import { decodeEventLog } from "viem";
+import { bytesToHex, decodeEventLog, pad, toHex } from "viem";
 import { Lightning } from "@inco/lightning-js/lite";
-import { MENTALIST_ABI, MENTALIST_ADDRESS } from "./contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS, REWARDS_ABI, REWARDS_ADDRESS } from "./contracts";
 import type { CaseConfig, Phase } from "./case";
 import type { AskResult, DealtCase, Oracle } from "./oracle";
 
@@ -77,18 +77,65 @@ function asBool(plaintext: unknown): boolean {
   return Boolean(v);
 }
 
+/**
+ * The on-chain oracle exposes two actions the demo has no equivalent for: Model A
+ * settlement, and converting the result into Megapot tickets. Both are part of the loop —
+ * a case that is never settled never advances a streak, and a streak that never advances
+ * never earns a ticket.
+ */
+export interface ChainOracle extends Oracle {
+  caseId(): number | null;
+  /** Submit the covalidator attestation so the *contract* rules on your accusation. */
+  settle(): Promise<{ hash: Hex; solved: boolean }>;
+  /** How many Megapot tickets this closed case is worth. */
+  ticketsEarned(): Promise<number>;
+  /** Buy them, gifted straight to the player and funded by the reward treasury. */
+  claimTickets(): Promise<Hex>;
+}
+
 export function chainOracle(opts: {
   publicClient: PublicClient;
   walletClient: WalletClient;
   account: Address;
   onTx?: (hash: Hex, label: string) => void;
-}): Oracle {
+}): ChainOracle {
   const { publicClient, walletClient, account, onTx } = opts;
 
   let caseId: bigint | null = null;
 
+  /**
+   * The verdict attestation, captured during `accuse`.
+   *
+   * `accuse` already pays for a public reveal of the whole board, and the verdict bit is
+   * one of the handles that comes back — so settlement costs no extra covalidator
+   * round-trip. The value is re-encoded to the canonical padded bytes32 the covalidator
+   * signed over; inventing it would fail `isValidDecryptionAttestation`.
+   */
+  let verdict: { handle: Hex; value: Hex; signatures: Hex[]; solved: boolean } | null = null;
+
+  /**
+   * sepolia.base.org is load-balanced: a receipt confirmed by one node does not mean the
+   * next eth_call reaches a node that has the block. viem also simulates before every
+   * write. So after any state transition, wait until the new state is actually readable —
+   * otherwise the next call either reverts against stale state or reads a stale answer.
+   */
+  async function waitForStatus(target: number) {
+    const id = caseId;
+    if (id === null) return;
+    for (let i = 0; i < 30; i++) {
+      const c = (await publicClient.readContract({
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
+        functionName: "getCase",
+        args: [id],
+      })) as { status: number };
+      if (c.status === target) return;
+      await new Promise((r) => setTimeout(r, 400));
+    }
+  }
+
   async function send(
-    functionName: "openCase" | "interrogate" | "accuse",
+    functionName: "openCase" | "interrogate" | "accuse" | "settle",
     args: readonly unknown[],
     value: bigint | undefined,
     label: string,
@@ -144,20 +191,8 @@ export function chainOracle(opts: {
       }
       if (caseId === null) throw new Error("could not find the case id in the receipt");
 
-      // sepolia.base.org is load-balanced: a receipt confirmed by one node does not mean
-      // the next eth_call reaches a node that has the block, and viem simulates before
-      // every write. Without this the first interrogate can revert WrongStatus() against
-      // state that is already committed.
-      for (let i = 0; i < 30; i++) {
-        const c = (await publicClient.readContract({
-          address: MENTALIST_ADDRESS,
-          abi: MENTALIST_ABI,
-          functionName: "getCase",
-          args: [caseId],
-        })) as { status: number };
-        if (c.status === 1) break;
-        await new Promise((r) => setTimeout(r, 400));
-      }
+      // Status 1 = Open. See waitForStatus.
+      await waitForStatus(1);
 
       // The layout genuinely is not knowable client-side; the post-mortem fills this in.
       return { caseId: Number(caseId), killer: -1, liars: [] } satisfies DealtCase;
@@ -245,11 +280,67 @@ export function chainOracle(opts: {
       const liars = liarHandles.map(readAt);
       const killer = guilt.findIndex(Boolean);
 
+      const verdictRaw = byHandle.get(guiltHandles[seat].toLowerCase());
+      if (verdictRaw) {
+        verdict = {
+          handle: verdictRaw.handle as Hex,
+          value: pad(toHex(asBool(verdictRaw.plaintext) ? 1 : 0), { size: 32 }),
+          signatures: (verdictRaw.covalidatorSignatures as Uint8Array[]).map((sig) => bytesToHex(sig)),
+          solved: killer === seat,
+        };
+      }
+
       onPhase?.("idle");
       return {
         correct: killer === seat,
         truth: { caseId: Number(caseId), killer, liars },
       };
+    },
+
+    caseId: () => (caseId === null ? null : Number(caseId)),
+
+    async settle() {
+      if (caseId === null || !verdict) throw new Error("nothing to settle");
+      const receipt = await send(
+        "settle",
+        [caseId, { handle: verdict.handle, value: verdict.value }, verdict.signatures],
+        undefined,
+        "filed the report",
+      );
+      if (receipt.status !== "success") throw new Error("settlement reverted");
+
+      // Same load-balancer race as `open`: `ticketsEarned` reads the case, and a lagging
+      // node still reporting Accused would report zero tickets for a case that just earned
+      // some. Wait for Closed before anyone asks.
+      await waitForStatus(3);
+
+      return { hash: receipt.transactionHash, solved: verdict.solved };
+    },
+
+    async ticketsEarned() {
+      if (caseId === null || !REWARDS_ADDRESS) return 0;
+      const n = (await publicClient.readContract({
+        address: REWARDS_ADDRESS,
+        abi: REWARDS_ABI,
+        functionName: "ticketsEarned",
+        args: [caseId],
+      })) as bigint;
+      return Number(n);
+    },
+
+    async claimTickets() {
+      if (caseId === null) throw new Error("no case");
+      const hash = await walletClient.writeContract({
+        address: REWARDS_ADDRESS,
+        abi: REWARDS_ABI,
+        functionName: "claimTickets",
+        args: [caseId],
+        account,
+        chain: walletClient.chain,
+      } as never);
+      onTx?.(hash, "claimed Megapot tickets");
+      await publicClient.waitForTransactionReceipt({ hash });
+      return hash;
     },
   };
 }

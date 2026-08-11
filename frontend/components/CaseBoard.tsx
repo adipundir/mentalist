@@ -33,11 +33,22 @@ interface Props {
   chainStatus?: React.ReactNode;
   /** Play the case on its own, for the zero-click door. */
   autoPlay?: boolean;
+  /** Rendered inside the verdict — the on-chain settle + Megapot claim flow. */
+  renderSettlement?: (solved: boolean, focusLeft: number) => React.ReactNode;
   onSolved?: (focusLeft: number, questions: number) => void;
   onNewCase?: () => void;
 }
 
-export function CaseBoard({ config, oracle, seed, chainStatus, autoPlay, onSolved, onNewCase }: Props) {
+export function CaseBoard({
+  config,
+  oracle,
+  seed,
+  chainStatus,
+  autoPlay,
+  renderSettlement,
+  onSolved,
+  onNewCase,
+}: Props) {
   const n = config.suspects;
   const suspects = useMemo(() => generateSuspects(n, seed), [n, seed]);
 
@@ -489,6 +500,7 @@ export function CaseBoard({ config, oracle, seed, chainStatus, autoPlay, onSolve
             questions={testimony.length}
             seed={seed}
             config={config}
+            settlement={renderSettlement?.(outcome === "solved", focusLeft)}
             onNewCase={onNewCase}
           />
         )}
