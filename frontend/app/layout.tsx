@@ -1,46 +1,42 @@
 import "./globals.css";
-import "@rainbow-me/rainbowkit/styles.css";
 import type { Metadata } from "next";
-import { IBM_Plex_Mono } from "next/font/google";
-import { Providers } from "@/components/Providers";
-import { Header } from "@/components/Header";
-import { Toaster } from "sonner";
+import { IBM_Plex_Mono, Special_Elite, Crimson_Pro } from "next/font/google";
 
+/** Data, addresses, the terminal panel. */
 const mono = IBM_Plex_Mono({
   subsets: ["latin"],
   variable: "--font-mono",
   weight: ["400", "500", "600"],
 });
 
+/** Typewriter — testimony, stamps, case headers. The voice of the file. */
+const typewriter = Special_Elite({
+  subsets: ["latin"],
+  variable: "--font-type",
+  weight: "400",
+});
+
+/** Body serif — prose, dossier copy. */
+const body = Crimson_Pro({
+  subsets: ["latin"],
+  variable: "--font-body",
+  weight: ["400", "600"],
+});
+
 export const metadata: Metadata = {
-  title: "web3 starter",
-  description: "ethereum dapp starter with solidity and next.js",
+  title: "MENTALIST — everyone lies, the Tyger always does",
+  description:
+    "A confidential deduction game on Base. The evidence is encrypted, testimony passes through a hidden honesty bit, and nobody — not even the deployer — knows who the Tyger is.",
 };
 
-export default function RootLayout({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html suppressHydrationWarning lang="en">
-      <body suppressHydrationWarning className={`min-h-screen bg-background font-mono ${mono.variable}`}>
-        <Providers>
-          <Header />
-          {children}
-        </Providers>
-        <Toaster
-          position="bottom-center"
-          toastOptions={{
-            style: {
-              background: "hsl(var(--card))",
-              color: "hsl(var(--foreground))",
-              border: "1px solid hsl(var(--border))",
-              fontFamily: "var(--font-mono), ui-monospace, monospace",
-              fontSize: "14px",
-            },
-          }}
-        />
+      <body
+        suppressHydrationWarning
+        className={`grain vignette min-h-screen ${mono.variable} ${typewriter.variable} ${body.variable}`}
+      >
+        {children}
       </body>
     </html>
   );

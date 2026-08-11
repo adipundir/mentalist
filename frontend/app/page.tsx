@@ -1,35 +1,137 @@
-import { ConfLottery } from "@/components/ConfLottery";
+import Link from "next/link";
+import { CASES } from "@/lib/case";
 
-const Home = () => {
+/**
+ * Three doors, in order of how much they ask of the visitor. A judge with ninety seconds
+ * and no wallet must be able to play a complete case, so "SOLVE ONE" comes before
+ * "PLAY ON-CHAIN" and needs nothing but a click.
+ */
+export default function Home() {
   return (
-    <main className="min-h-[calc(100vh-65px)] flex flex-col">
-      <div className="flex-1 max-w-4xl w-full mx-auto px-6 py-12 md:py-16">
-        <div className="mb-8 md:mb-12">
-          <h1 className="text-xl md:text-2xl font-medium text-foreground mb-2">
-            confidential lottery
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            privacy-preserving lottery with encrypted deposits using Inco
-          </p>
-        </div>
-        <ConfLottery />
-      </div>
+    <main className="mx-auto w-full max-w-[900px] px-6 py-16 sm:py-24">
+      <p className="font-mono text-[10px] tracking-file text-bone-dim">
+        CONFIDENTIAL · BASE SEPOLIA · INCO LIGHTNING
+      </p>
 
-      <footer className="border-t border-border py-6">
-        <div className="max-w-4xl mx-auto px-6 flex items-center justify-between text-xs text-muted-foreground">
-          <span>built with next.js + wagmi + inco</span>
-          <a
-            href="https://docs.inco.org"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hover:text-foreground transition-colors"
-          >
-            inco docs →
-          </a>
-        </div>
+      <h1 className="mt-3 font-type text-[48px] leading-[0.95] text-bone sm:text-[72px]">
+        MENTALIST
+      </h1>
+
+      <p className="mt-4 max-w-[54ch] font-body text-[18px] leading-relaxed text-bone">
+        Nine suspects. One of them is the Tyger. Some of them lie —{" "}
+        <span className="text-blood-hot">and the Tyger always does</span>.
+      </p>
+
+      <p className="mt-4 max-w-[62ch] font-body text-[15px] leading-relaxed text-bone-dim">
+        You interrogate witnesses with yes/no questions about who&rsquo;s in the room. Every
+        answer is computed inside an encrypted enclave and passed through that
+        witness&rsquo;s hidden honesty bit before it reaches you. The chain sees the question.
+        Only you see the answer. Nobody — not the other players, not the deployer, not an
+        observer — knows who the Tyger is until you name him.
+      </p>
+
+      <figure className="mt-8 border-l-2 border-blood pl-4">
+        <pre className="overflow-x-auto font-mono text-[13px] leading-relaxed text-bone">
+          <code>{`ebool truth  = e.or(...);              // is the Tyger in this set?
+ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</code>
+        </pre>
+        <figcaption className="mt-2 font-body text-[13px] italic text-bone-dim">
+          The whole game is that second line. A transparent chain cannot run it, and
+          commit-reveal cannot fake it — proving the answer was computed honestly would mean
+          opening the honesty bit, which is the very thing the game is about.
+        </figcaption>
+      </figure>
+
+      {/* ── the three doors ── */}
+      <nav className="mt-12 grid gap-3 sm:grid-cols-3">
+        <Door
+          href="/case/demo?auto=1"
+          kicker="ZERO CLICKS"
+          title="Watch a case"
+          note="A full interrogation, played out. Forty seconds."
+        />
+        <Door
+          href="/case/demo"
+          kicker="NO WALLET"
+          title="Solve one"
+          primary
+          note="The real game, dealt in your browser. Nothing to install."
+        />
+        <Door
+          href="/case/play"
+          kicker="BASE SEPOLIA"
+          title="Play on-chain"
+          note="The genuine article: encrypted state, attested answers, Megapot tickets."
+        />
+      </nav>
+
+      {/* ── the case ladder ── */}
+      <section className="mt-14">
+        <h2 className="border-b border-ink-3 pb-2 font-mono text-[10px] tracking-file text-bone-dim">
+          THE FILE
+        </h2>
+        <ol className="mt-3 divide-y divide-ink-3">
+          {CASES.map((c, i) => (
+            <li key={c.label} className="flex items-baseline justify-between gap-4 py-2.5">
+              <span className="min-w-0">
+                <span className="font-mono text-[10px] text-bone-dim/50">
+                  {String(i + 1).padStart(2, "0")}
+                </span>{" "}
+                <span className="font-type text-[14px] text-bone">{c.label}</span>
+                <span className="block font-body text-[12px] italic text-bone-dim">{c.blurb}</span>
+              </span>
+              <span className="shrink-0 font-mono text-[10px] tracking-file text-bone-dim">
+                {c.suspects}·{c.liars}·{c.focus}
+              </span>
+            </li>
+          ))}
+        </ol>
+      </section>
+
+      <footer className="mt-14 border-t border-ink-3 pt-5 font-body text-[12px] leading-relaxed text-bone-dim/80">
+        <p>
+          Built for the Inco × Megapot Summer Game Jam. Inco is{" "}
+          <span className="text-bone-dim">TEE-based confidential compute — not FHE, not zk</span>.
+          &ldquo;Secret&rdquo; means the value is decrypted inside an Intel TDX enclave;
+          &ldquo;provably fair&rdquo; means a covalidator attestation, not a zero-knowledge
+          proof. The claim that the deployer cannot know who the Tyger is rests on that
+          hardware assumption, and we would rather say so than oversell it.
+        </p>
       </footer>
     </main>
   );
-};
+}
 
-export default Home;
+function Door({
+  href,
+  kicker,
+  title,
+  note,
+  primary,
+}: {
+  href: string;
+  kicker: string;
+  title: string;
+  note: string;
+  primary?: boolean;
+}) {
+  return (
+    <Link
+      href={href}
+      className={[
+        "paper group flex cursor-pointer flex-col gap-1 border p-4 transition-colors",
+        primary
+          ? "border-blood-hot hover:bg-blood-hot/10"
+          : "border-ink-3 hover:border-bone-dim",
+      ].join(" ")}
+    >
+      <span
+        className={`font-mono text-[9px] tracking-file ${primary ? "text-blood-hot" : "text-bone-dim/60"}`}
+      >
+        {kicker}
+      </span>
+      <span className="font-type text-[19px] leading-tight text-bone">{title}</span>
+      <span className="font-body text-[12px] leading-snug text-bone-dim">{note}</span>
+    </Link>
+  );
+}

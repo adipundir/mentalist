@@ -1,99 +1,251 @@
 @import "tailwindcss";
 @config "../tailwind.config.ts";
 
+/*
+ * MENTALIST — dossiers and redaction bars.
+ *
+ * One accent colour, used fewer than six times per screen. The moment red lands on more
+ * than a handful of elements the noir collapses into "dark mode with red buttons";
+ * restraint is the aesthetic. #c1272d is reserved exclusively for live and hover states,
+ * so brightness itself carries meaning.
+ */
+
 @layer base {
   :root {
-    --background: 0 0% 98%;
-    --foreground: 0 0% 9%;
-    --card: 0 0% 95%;
-    --card-foreground: 0 0% 9%;
-    --popover: 0 0% 95%;
-    --popover-foreground: 0 0% 9%;
-    --primary: 0 0% 15%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 0 0% 90%;
-    --secondary-foreground: 0 0% 15%;
-    --muted: 0 0% 92%;
-    --muted-foreground: 0 0% 45%;
-    --accent: 0 0% 90%;
-    --accent-foreground: 0 0% 15%;
-    --destructive: 0 0% 35%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 0 0% 85%;
-    --input: 0 0% 85%;
-    --ring: 0 0% 15%;
-    --radius: 0;
+    --ink: 18 19 22; /* charcoal, the board */
+    --ink-2: 26 27 31; /* raised card */
+    --ink-3: 34 35 40; /* hairlines */
+    --bone: 216 210 196; /* aged paper text */
+    --bone-dim: 138 133 122;
+    --blood: 142 27 27; /* the accent */
+    --blood-hot: 193 39 45; /* live / hover ONLY */
+    --brass: 176 141 87;
+    --phosphor: 126 214 160; /* the one terminal panel */
+
+    --background: var(--ink);
+    --foreground: var(--bone);
+    --radius: 2px;
   }
 
-  .dark {
-    --background: 0 0% 4%;
-    --foreground: 0 0% 90%;
-    --card: 0 0% 7%;
-    --card-foreground: 0 0% 90%;
-    --popover: 0 0% 7%;
-    --popover-foreground: 0 0% 90%;
-    --primary: 0 0% 85%;
-    --primary-foreground: 0 0% 4%;
-    --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 85%;
-    --muted: 0 0% 12%;
-    --muted-foreground: 0 0% 50%;
-    --accent: 0 0% 12%;
-    --accent-foreground: 0 0% 85%;
-    --destructive: 0 0% 60%;
-    --destructive-foreground: 0 0% 4%;
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
-    --ring: 0 0% 85%;
-    --radius: 0;
-  }
-}
-
-@layer base {
   * {
-    border-color: hsl(var(--border));
+    border-color: rgb(var(--ink-3));
+  }
+
+  html {
+    color-scheme: dark;
   }
 
   body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
+    background: rgb(var(--ink));
+    color: rgb(var(--bone));
+    font-family: var(--font-body), ui-serif, Georgia, serif;
     -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
+    overflow-x: hidden;
+  }
+
+  ::selection {
+    background: rgb(var(--blood));
+    color: rgb(var(--bone));
   }
 }
 
-::selection {
-  background: hsl(var(--primary) / 0.3);
+/*
+ * Grain. Static, never animated.
+ *
+ * Lucas Pope's finding on Obra Dinn was that the dither had to be *stable* — it reads as an
+ * applied surface texture rather than crawling television static, and a per-frame noise
+ * layer measurably hurts text legibility. One fixed data URI, fixed to the viewport.
+ */
+.grain::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  opacity: 0.32;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
 }
 
-/* Smooth transitions for interactive elements */
-@layer base {
-  button,
-  input,
-  a {
-    transition-property: color, background-color, border-color, opacity;
-    transition-duration: 150ms;
-    transition-timing-function: ease;
+.vignette::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  pointer-events: none;
+  background: radial-gradient(
+    ellipse at 50% 42%,
+    transparent 42%,
+    rgb(var(--ink) / 0.55) 88%,
+    rgb(var(--ink)) 100%
+  );
+}
+
+/* Aged paper for dossier cards — a warm wash plus a fibre speckle. */
+.paper {
+  background-color: rgb(var(--ink-2));
+  background-image:
+    radial-gradient(circle at 18% 22%, rgb(var(--brass) / 0.07), transparent 45%),
+    radial-gradient(circle at 82% 78%, rgb(var(--blood) / 0.05), transparent 40%);
+  box-shadow:
+    inset 0 1px 0 rgb(var(--bone) / 0.04),
+    0 12px 28px -18px rgb(0 0 0 / 0.9);
+}
+
+/* Redaction bar: the thing the eye goes to first on a classified page. */
+.redact {
+  position: relative;
+  color: transparent;
+  background: rgb(var(--ink-3));
+  box-shadow: 0 0 0 1px rgb(var(--ink-3));
+}
+
+.redact::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    92deg,
+    rgb(var(--bone) / 0.05) 0 3px,
+    transparent 3px 7px
+  );
+}
+
+/* The single CRT panel. Scoped, never full-screen — full-page scanlines read as generic
+   cyberpunk and hurt legibility; one green terminal set into a 1947 board reads as two
+   eras in deliberate tension. */
+.crt {
+  background: rgb(8 12 9);
+  color: rgb(var(--phosphor));
+  text-shadow: 0 0 6px rgb(var(--phosphor) / 0.5);
+  position: relative;
+  overflow: hidden;
+}
+
+.crt::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgb(0 0 0 / 0.22) 0 1px,
+    transparent 1px 3px
+  );
+}
+
+/* Typewriter caret for testimony as it prints. */
+.caret::after {
+  content: "▌";
+  animation: blink 1s steps(2) infinite;
+  color: rgb(var(--blood-hot));
+}
+
+@keyframes blink {
+  50% {
+    opacity: 0;
   }
 }
 
-/* Custom scrollbar for webkit browsers */
-@layer base {
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+/* The stamp: the loudest single moment in the app, so it gets the most easing. */
+@keyframes stamp-slam {
+  0% {
+    transform: scale(2.6) rotate(-14deg);
+    opacity: 0;
+    filter: blur(6px);
+  }
+  55% {
+    transform: scale(0.92) rotate(-9deg);
+    opacity: 1;
+    filter: blur(0);
+  }
+  70% {
+    transform: scale(1.04) rotate(-11deg);
+  }
+  100% {
+    transform: scale(1) rotate(-10deg);
+    opacity: 1;
+  }
+}
+
+.stamp {
+  animation: stamp-slam 480ms cubic-bezier(0.2, 1.4, 0.35, 1) both;
+}
+
+@keyframes shake {
+  0%, 100% { transform: translate(0, 0); }
+  20% { transform: translate(-3px, 1px); }
+  40% { transform: translate(3px, -1px); }
+  60% { transform: translate(-2px, -1px); }
+  80% { transform: translate(2px, 1px); }
+}
+
+.shake {
+  animation: shake 220ms ease-in-out;
+}
+
+/* Pen scratch across an eliminated name. */
+@keyframes strike {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.struck::before {
+  content: "";
+  position: absolute;
+  left: -2%;
+  right: -2%;
+  top: 52%;
+  height: 2px;
+  background: rgb(var(--blood-hot));
+  transform-origin: left center;
+  animation: strike 180ms ease-out both;
+  box-shadow: 0 0 8px rgb(var(--blood-hot) / 0.6);
+}
+
+/* Dossier entry. `both` fill so the card is never left mid-animation, and the reduced-motion
+   block below turns it off entirely — with no animation the element simply renders at its
+   natural, visible state. */
+@keyframes deal-in {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.deal-in {
+  animation: deal-in 320ms ease-out both;
+}
+
+/* The waiting beat — a slow breath, not a spinner. */
+@keyframes breathe {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.9; }
+}
+
+.breathe {
+  animation: breathe 1.4s ease-in-out infinite;
+}
+
+/*
+ * A judge with vestibular sensitivity who can still use the app remembers it, and it costs
+ * four rules. Everything resolves straight to its end state.
+ */
+@media (prefers-reduced-motion: reduce) {
+  .stamp,
+  .shake,
+  .struck::before,
+  .breathe,
+  .caret::after,
+  .deal-in {
+    animation: none !important;
   }
 
-  ::-webkit-scrollbar-track {
-    background: hsl(var(--background));
+  .grain::after {
+    opacity: 0.14;
   }
 
-  ::-webkit-scrollbar-thumb {
-    background: hsl(var(--border));
-    border-radius: 3px;
-  }
-
-  ::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground));
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
   }
 }
