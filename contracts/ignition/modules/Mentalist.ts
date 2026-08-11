@@ -21,7 +21,16 @@ const MEGAPOT_BUYER: Record<number, string> = {
 };
 
 export default buildModule("Mentalist", (m) => {
-  const sponsorship = m.getParameter("sponsorship", 20_000_000_000_000_000n); // 0.02 ETH
+  // Sized against the actual fee schedule rather than guessed. An elist op costs
+  // BIT_FEE (1e-6 ETH / 256) × elements × bits, and a Bool is 1 bit, so dealing a
+  // 9-suspect case — two list creations plus two shuffles — is 140,625,000,000 wei,
+  // about 0.00000014 ETH. 0.0003 ETH therefore sponsors roughly 2,000 cases.
+  //
+  // It is belt-and-braces anyway: `openCase` requires the player's msg.value to cover
+  // the fee, and that lands in the contract balance before the library draws from it,
+  // so the game is self-funding. This float just means it can never stall on a rounding
+  // edge, and it keeps the door open to sponsoring cases outright later.
+  const sponsorship = m.getParameter("sponsorship", 300_000_000_000_000n); // 0.0003 ETH
 
   const game = m.contract("Mentalist", [], { value: sponsorship });
 

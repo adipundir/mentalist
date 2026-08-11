@@ -11,9 +11,10 @@
  *                     to the detective, never publicly revealed).
  *
  * Keeping them behind one interface is what makes the demo *faithful* rather than a
- * mock-up: both compute `answer = truth XOR liar[witness]`, both enforce the same Focus
- * economy, and the local one deliberately reproduces the chain's latency profile so the
- * animation timings that look right in the demo are the timings that look right on-chain.
+ * mock-up: both deal the same distribution, both compute
+ * `answer = truth XOR liar[witness]`, and both enforce the same Focus economy. The demo is
+ * deliberately faster than the chain (see the latency note below) — what carries over is
+ * the deduction and the choreography, not the wall clock.
  */
 
 import { fullMask, questionCost, type CaseConfig, type Phase } from "./case";
@@ -39,17 +40,37 @@ export interface Oracle {
   accuse(seat: number, onPhase?: (p: Phase) => void): Promise<{ correct: boolean; truth: DealtCase }>;
 }
 
-// ── latency profile ─────────────────────────────────────────
+// ── latency ─────────────────────────────────────────────────
 //
-// Measured against Base Sepolia + Inco's covalidator rather than guessed. The demo oracle
-// samples from the same distribution so the reveal choreography is tuned once and holds in
-// both modes. See scripts/measure-latency.ts for how these were obtained.
+// MEASURED, on Base Sepolia against the live covalidator, by playing a full case with
+// contracts/scripts/play-onchain.ts:
+//
+//   openCase          ~2.6 s
+//   interrogate mine   1.6 – 2.4 s
+//   attestedDecrypt    5.5 – 11.3 s   ← the dominant cost, by a wide margin
+//   full 6-move case   ~103 s
+//
+// An earlier draft of this file guessed the decrypt at 420 ms p50 / 1.6 s p95. That was
+// wrong by roughly 5×, and the animation budget was built on it.
+//
+// The demo deliberately does NOT reproduce those numbers. Making a practice file take
+// eleven seconds per question would lose a judge before the mechanic ever lands, and the
+// demo is honestly labelled as a browser-dealt practice file rather than a simulation of
+// chain timing. What the two modes *do* share is the choreography: named phases, a floored
+// beat, and a drone that resolves on the answer — so the on-chain wait reads as
+// deliberation at 11 s exactly as it does at 1 s.
 
 export const LATENCY = {
-  /** Base Sepolia inclusion, preconfirmation endpoint. */
+  /** Demo-mode pacing: brisk enough to stay playable, slow enough to feel adjudicated. */
   mine: { p50: 260, p95: 900 },
-  /** Inco covalidator attested decrypt, first attempt at 350ms then backing off. */
   read: { p50: 420, p95: 1600 },
+} as const;
+
+/** What the same steps actually cost on-chain. Kept here so the numbers are not folklore. */
+export const MEASURED_CHAIN_LATENCY = {
+  open: { p50: 2600, p95: 3200 },
+  mine: { p50: 1900, p95: 2400 },
+  read: { p50: 6000, p95: 11300 },
 } as const;
 
 const sample = (band: { p50: number; p95: number }) =>

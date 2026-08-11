@@ -143,6 +143,13 @@ contract Mentalist {
     error InvalidAttestation();
     error HandleMismatch();
 
+    // ─────────────────────────────────────────── construction
+
+    /// @dev Payable so the deployer can seed the fee float in the same transaction.
+    ///      Inco fees are drawn from *this contract's* balance, so without a payable
+    ///      constructor the float has to arrive in a second transaction via `receive`.
+    constructor() payable {}
+
     // ─────────────────────────────────────────── fees
 
     /// @notice Total Inco fee to open a case of `suspects` seats.

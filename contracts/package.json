@@ -11,7 +11,8 @@
     "deploy:testnet": "hardhat ignition deploy ignition/modules/Mentalist.ts --network baseSepolia",
     "deploy:mainnet": "hardhat ignition deploy ignition/modules/Mentalist.ts --network base",
     "node": "docker compose up",
-    "test:forge": "forge test -vv"
+    "test:forge": "forge test -vv",
+    "play:onchain": "npx tsx scripts/play-onchain.ts"
   },
   "devDependencies": {
     "@inco/lightning-js": "1.0.0",

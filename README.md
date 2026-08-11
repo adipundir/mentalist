@@ -125,19 +125,37 @@ forge test            # 25 tests, in-process Inco mock, no Docker
 pnpm compile
 ```
 
-### Deploying (the one step that needs you)
+### Live on Base Sepolia
 
-A deployer keypair has been generated into `contracts/.env` (gitignored, testnet-only,
-used for nothing else). **It has no funds.** Faucets need a human:
+| | |
+|---|---|
+| `Mentalist` | [`0x6ED2DF67Bf8FB2D84F8648ef741ef48ce39feF17`](https://sepolia.basescan.org/address/0x6ED2DF67Bf8FB2D84F8648ef741ef48ce39feF17) |
+| `CaseRewards` | [`0x4b3250dad7C853fD34030910434846fCbe91e3bC`](https://sepolia.basescan.org/address/0x4b3250dad7C853fD34030910434846fCbe91e3bC) |
+
+Put both into `frontend/.env.local` as `NEXT_PUBLIC_MENTALIST_ADDRESS` and
+`NEXT_PUBLIC_REWARDS_ADDRESS` (see `.env.example`). To redeploy:
+`pnpm --filter contracts deploy:testnet`.
+
+**Proving it works end to end**, against the live covalidator rather than a mock:
 
 ```bash
-# 1. Fund 0xeeeA77e9dCb9DF9EA10d1eDe21ba1046087aAf95 with Base Sepolia ETH (~0.05)
-#    https://www.alchemy.com/faucets/base-sepolia
-# 2.
-pnpm --filter contracts deploy:testnet
-# 3. Put the two addresses in frontend/.env.local:
-#    NEXT_PUBLIC_MENTALIST_ADDRESS=0x...
-#    NEXT_PUBLIC_REWARDS_ADDRESS=0x...
+pnpm --filter contracts play:onchain
+```
+
+That opens a real case, asks the control question, reads the answer back through
+`attestedDecrypt`, plays binary splits to a single suspect, accuses, and asserts the four
+invariants the design rests on. A passing run looks like this:
+
+```
+case #2 opened in 2618ms  (fee 140625000000 wei, gas 1314742)
+control question: witness 0 -> NO   -> witness 0 is A LIAR (read them inverted)
+binary splits:    9 -> 4 -> 2 -> 1
+seat 1  THE TYGER  lied
+CASE CLOSED — the deduction was correct.
+  PASS  exactly one Tyger
+  PASS  the Tyger lies
+  PASS  liar count is LIARS or LIARS+1
+  PASS  the deduction found him
 ```
 
 To fund Megapot rewards, send Base Sepolia USDC
@@ -167,6 +185,33 @@ do not exist in 1.0.0; the real surface is `get(handle)` and
 `getDecryptionAttestation(requester, HandleWithProof)`.
 
 ---
+
+## Measured on-chain latency
+
+From a real playthrough on Base Sepolia:
+
+| step | time |
+|---|---|
+| `openCase` | ~2.6 s |
+| `interrogate` (mining) | 1.6 – 2.4 s |
+| `attestedDecrypt` | **5.5 – 11.3 s** |
+| full six-move case | ~103 s |
+
+The decrypt dominates by a wide margin, and an earlier draft of the frontend had guessed it
+at ~1.6 s — wrong by roughly 5×, with the animation budget built on top of that guess. The
+demo deliberately runs faster than the chain and says so; what carries between the two modes
+is the deduction and the choreography, not the wall clock.
+
+Two races only a live run surfaces, both now handled:
+
+- **Stale reads.** `sepolia.base.org` is load-balanced, so a confirmed receipt does not mean
+  the next `eth_call` reaches a node with that block. viem simulates before every write, so
+  the first `interrogate` could revert `WrongStatus()` against state that was already
+  committed. The oracle now waits for the case to read back as open.
+- **"acl disallowed" is not terminal.** For a second or two after `interrogate` lands, the
+  covalidator can see the answer handle before it has indexed the `e.allow` that came with
+  it — `inco.isAllowed(handle, detective)` returns `true` on-chain while the enclave still
+  refuses. The SDK treats `PermissionDenied` as fatal, so an outer retry wraps it.
 
 ## Two bugs the tests caught
 

@@ -68,7 +68,7 @@ function DemoInner() {
             PRACTICE FILE — DEALT IN THIS BROWSER, NOT ON CHAIN.
             <br />
             <span className="text-bone-dim/60">
-              Same rules, same dealer, same latency. For encrypted state and real Megapot
+              Same rules, same dealer, same deduction. For encrypted state and real Megapot
               tickets,{" "}
             </span>
             <Link href="/case/play" className="text-blood-hot hover:underline">

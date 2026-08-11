@@ -25,6 +25,32 @@ import type { AskResult, DealtCase, Oracle } from "./oracle";
 /** Shared retry policy: quick first attempt, patient tail. One config, imported everywhere. */
 export const BACKOFF = { maxRetries: 12, baseDelayInMs: 350, backoffFactor: 1.4 } as const;
 
+/**
+ * The SDK's backoff retries "ciphertext not found", but treats PermissionDenied
+ * ("acl disallowed") as terminal — and that one is not actually terminal here.
+ *
+ * Measured on Base Sepolia: for a second or two after `interrogate` lands, the covalidator
+ * can see the answer handle before it has indexed the `e.allow` that came with it. The
+ * grant is genuinely on-chain by then (`inco.isAllowed(handle, detective)` returns true),
+ * the enclave just hasn't caught up. That is a read-your-own-write race, not an
+ * authorisation failure, and without this outer retry the very first question of every
+ * session fails.
+ */
+async function withPatience<T>(attempt: () => Promise<T>): Promise<T> {
+  let lastError: unknown;
+  for (let i = 0; i < 8; i++) {
+    try {
+      return await attempt();
+    } catch (e) {
+      lastError = e;
+      const msg = String((e as { cause?: unknown })?.cause ?? e);
+      if (!/acl disallowed|not found|PermissionDenied|threshold/i.test(msg)) throw e;
+      await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+    }
+  }
+  throw lastError;
+}
+
 type Zap = Awaited<ReturnType<typeof Lightning.baseSepoliaTestnet>>;
 
 let zapPromise: Promise<Zap> | null = null;
@@ -118,6 +144,21 @@ export function chainOracle(opts: {
       }
       if (caseId === null) throw new Error("could not find the case id in the receipt");
 
+      // sepolia.base.org is load-balanced: a receipt confirmed by one node does not mean
+      // the next eth_call reaches a node that has the block, and viem simulates before
+      // every write. Without this the first interrogate can revert WrongStatus() against
+      // state that is already committed.
+      for (let i = 0; i < 30; i++) {
+        const c = (await publicClient.readContract({
+          address: MENTALIST_ADDRESS,
+          abi: MENTALIST_ABI,
+          functionName: "getCase",
+          args: [caseId],
+        })) as { status: number };
+        if (c.status === 1) break;
+        await new Promise((r) => setTimeout(r, 400));
+      }
+
       // The layout genuinely is not knowable client-side; the post-mortem fills this in.
       return { caseId: Number(caseId), killer: -1, liars: [] } satisfies DealtCase;
     },
@@ -157,10 +198,10 @@ export function chainOracle(opts: {
       // Private decrypt — the handle was granted to this wallet and nobody else.
       onPhase?.("reading");
       const zap = await getZap();
-      const [result] = await zap.attestedDecrypt(
-        walletClient as never,
-        [answerHandle],
-        { backoffConfig: BACKOFF } as never,
+      const [result] = await withPatience(() =>
+        zap.attestedDecrypt(walletClient as never, [answerHandle!], {
+          backoffConfig: BACKOFF,
+        } as never),
       );
 
       onPhase?.("idle");
@@ -191,9 +232,11 @@ export function chainOracle(opts: {
       // than 2N sequential ones.
       onPhase?.("revealing");
       const zap = await getZap();
-      const revealed = await zap.attestedReveal([...guiltHandles, ...liarHandles], {
-        backoffConfig: BACKOFF,
-      } as never);
+      const revealed = await withPatience(() =>
+        zap.attestedReveal([...guiltHandles, ...liarHandles], {
+          backoffConfig: BACKOFF,
+        } as never),
+      );
 
       const byHandle = new Map(revealed.map((r) => [r.handle.toLowerCase(), r]));
       const readAt = (h: Hex) => asBool(byHandle.get(h.toLowerCase())?.plaintext);
