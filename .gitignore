@@ -44,3 +44,15 @@ contracts/typechain-types/
 .env.local
 node_modules/
 .DS_Store
+
+# Foundry build output
+contracts/forge-out/
+contracts/forge-cache/
+# Hardhat build output
+contracts/artifacts/
+contracts/cache/
+contracts/typechain-types/
+contracts/ignition/deployments/
+# Next
+frontend/.next/
+frontend/out/

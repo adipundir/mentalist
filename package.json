@@ -14,9 +14,6 @@
     "contracts:deploy:local": "pnpm --filter contracts deploy:local",
     "contracts:deploy:testnet": "pnpm --filter contracts deploy:testnet",
     "contracts:deploy:mainnet": "pnpm --filter contracts deploy:mainnet",
-    "contracts:deploy:token:local": "pnpm --filter contracts deploy:token:local",
-    "contracts:deploy:token:testnet": "pnpm --filter contracts deploy:token:testnet",
-    "contracts:deploy:token:mainnet": "pnpm --filter contracts deploy:token:mainnet",
     "contracts:node": "pnpm --filter contracts node"
   },
   "engines": {
