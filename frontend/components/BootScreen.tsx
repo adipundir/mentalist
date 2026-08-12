@@ -63,7 +63,10 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
       }
       sfx.knock(0.7);
       setDone(true);
-      void narrate("Everybody lies. The trick is working out which way.", { rate: 0.92 });
+      void narrate(
+        "Seven rooms, and Red John killed in every one of them. Find the story that cannot be true.",
+        { rate: 0.94 },
+      );
       // Do not hold the screen for the whole line: it carries on over the board.
       setTimeout(onReady, 650);
     })();

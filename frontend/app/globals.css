@@ -384,3 +384,28 @@
     animation: none;
   }
 }
+
+/* ── what ran ─────────────────────────────────────────────────────────────────
+   Each drip draws itself downward, hangs, then fades as it soaks in, on its own
+   clock so the wall is never finished all at once. Animating the dash offset is
+   what makes it read as running rather than as a line switching on. */
+@keyframes rjDrip {
+  0% { stroke-dashoffset: var(--drip-len, 20); opacity: 0; }
+  8% { opacity: 0.8; }
+  55% { stroke-dashoffset: 0; opacity: 0.8; }
+  88% { stroke-dashoffset: 0; opacity: 0.18; }
+  100% { stroke-dashoffset: 0; opacity: 0; }
+}
+.rj-drip {
+  stroke-dashoffset: 0;
+  animation-name: rjDrip;
+  animation-timing-function: cubic-bezier(0.3, 0, 0.5, 1);
+  animation-iteration-count: infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rj-drip {
+    animation: none;
+    stroke-dashoffset: 0;
+  }
+}

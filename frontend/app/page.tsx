@@ -62,13 +62,31 @@ export default function Home() {
           </g>
         </g>
 
-        {/* what ran, before it dried */}
+        {/* What ran, while you were looking at it.
+            Each drip draws itself downward on its own clock, so the wall is never quite
+            finished. The bead at the end is the weight that pulled it. */}
         <g stroke="#a81f24" strokeLinecap="round" fill="none">
-          <path d="M44.6 56 q1.2 9 0.4 15.5" strokeWidth="2.2" opacity="0.75" />
-          <path d="M77.6 55 q-1 12 0.2 20" strokeWidth="1.9" opacity="0.6" />
-          <path d="M101 79 q3 11 1.5 19" strokeWidth="2.4" opacity="0.55" />
-          <path d="M18.4 55 q-2.4 8 -1 14" strokeWidth="2" opacity="0.5" />
-          <path d="M60 92.5 q1 9 -0.4 16" strokeWidth="2.6" opacity="0.65" />
+          {[
+            { d: "M44.6 56 q1.2 9 0.4 15.5", w: 2.2, o: 0.75, len: 16, dur: 9, delay: 0 },
+            { d: "M77.6 55 q-1 12 0.2 20", w: 1.9, o: 0.6, len: 21, dur: 13, delay: 3.5 },
+            { d: "M101 79 q3 11 1.5 19", w: 2.4, o: 0.55, len: 20, dur: 11, delay: 6 },
+            { d: "M18.4 55 q-2.4 8 -1 14", w: 2, o: 0.5, len: 15, dur: 15, delay: 1.5 },
+            { d: "M60 92.5 q1 9 -0.4 16", w: 2.6, o: 0.65, len: 17, dur: 8, delay: 4.5 },
+          ].map((r, i) => (
+            <path
+              key={i}
+              d={r.d}
+              strokeWidth={r.w}
+              opacity={r.o}
+              className="rj-drip"
+              style={{
+                strokeDasharray: r.len,
+                ["--drip-len" as string]: r.len,
+                animationDuration: `${r.dur}s`,
+                animationDelay: `${r.delay}s`,
+              }}
+            />
+          ))}
         </g>
       </motion.svg>
 
