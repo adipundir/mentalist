@@ -4,6 +4,7 @@ import { motion } from "framer-motion";
 import { useAccount } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { isDeployed, MENTALIST_ADDRESS, addressUrl } from "@/lib/contracts";
+import { PoweredBy } from "./PoweredBy";
 
 /**
  * The door. Connect a wallet on Base Sepolia, or you don't play.
@@ -11,6 +12,10 @@ import { isDeployed, MENTALIST_ADDRESS, addressUrl } from "@/lib/contracts";
  * There is no offline mode. Every case is dealt and answered on-chain, which means the
  * game asks for a wallet before it asks for anything else — a real cost, taken deliberately
  * so that nothing on screen is ever a simulation of the thing rather than the thing.
+ *
+ * The panel deliberately does not black out the room behind it: the lineup is already
+ * standing there under the lamp, and letting the player see who they are about to face is
+ * a better invitation than a wall.
  */
 export function Gate({ onReady }: { onReady: () => void }) {
   const { isConnected } = useAccount();
@@ -21,15 +26,16 @@ export function Gate({ onReady }: { onReady: () => void }) {
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 z-[92] flex items-center justify-center bg-ink/97 p-5 backdrop-blur"
+      className="fixed inset-0 z-[92] flex flex-col items-center justify-center bg-ink/75 p-5 backdrop-blur-[3px]"
     >
       <motion.div
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.08 }}
-        className="w-full max-w-[520px] text-center"
+        className="w-full max-w-[560px] rounded-sm border-2 border-ink-3 bg-ink/92 px-7 py-8 text-center shadow-[0_30px_80px_-20px_rgb(0_0_0/0.9)]"
       >
-        <p className="font-mono text-[10px] tracking-file text-blood-hot">
+        <p className="font-type text-[22px] leading-none tracking-wide text-bone-dim">MENTALIST</p>
+        <p className="mt-3 font-mono text-[10px] tracking-file text-blood-hot">
           CBI · SERIAL CRIMES
         </p>
         <h2 className="mt-1 font-type text-[32px] leading-tight text-bone">
@@ -60,13 +66,15 @@ export function Gate({ onReady }: { onReady: () => void }) {
         </div>
 
         {deployed && (
-          <p className="mt-8 font-mono text-[9px] tracking-file text-bone-dim/50">
+          <p className="mt-7 font-mono text-[9px] tracking-file text-bone-dim/50">
             CONTRACT ·{" "}
             <a href={addressUrl(MENTALIST_ADDRESS)} target="_blank" rel="noreferrer" className="underline">
               {MENTALIST_ADDRESS.slice(0, 10)}…{MENTALIST_ADDRESS.slice(-6)} ↗
             </a>
           </p>
         )}
+
+        <PoweredBy className="mt-6 border-t border-ink-3 pt-5" />
       </motion.div>
     </motion.div>
   );

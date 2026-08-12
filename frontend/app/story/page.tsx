@@ -9,6 +9,7 @@ import { lineup, person } from "@/lib/canon";
 import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
 import { MENTALIST_ADDRESS, addressUrl, txUrl } from "@/lib/contracts";
 import { Scene } from "@/components/Scene";
+import { Room } from "@/components/Room";
 import { StoryCard } from "@/components/StoryCard";
 import { Finale } from "@/components/Finale";
 import { Gate } from "@/components/Gate";
@@ -111,7 +112,7 @@ function StoryInner() {
       </div>
 
       <div className="px-2 pb-8 pt-3 sm:px-4">
-        {oracle && (
+        {oracle ? (
         <Scene
           key={`${index}-${attempt}`}
           config={chapter}
@@ -150,6 +151,25 @@ function StoryInner() {
           }
           onResolved={finishChapter}
         />
+        ) : (
+          <div className="relative mx-auto w-full max-w-[1400px]">
+            <Room
+              subjects={suspects.map((sp, i) => ({
+                suspect: sp,
+                expression: i % 3 === 0 ? "smug" : "neutral",
+                cleared: false,
+                liar: false,
+                honest: false,
+                inQuestion: false,
+                turned: false,
+                saying: null,
+              }))}
+              focused={null}
+              onFocus={() => {}}
+              onToggle={() => {}}
+              disabled
+            />
+          </div>
         )}
       </div>
 

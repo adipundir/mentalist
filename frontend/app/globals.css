@@ -16,9 +16,9 @@
     --ink-2: 26 27 31; /* raised card */
     --ink-3: 34 35 40; /* hairlines */
     --bone: 216 210 196; /* aged paper text */
-    --bone-dim: 138 133 122;
-    --blood: 142 27 27; /* the accent */
-    --blood-hot: 193 39 45; /* live / hover ONLY */
+    --bone-dim: 150 144 132;
+    --blood: 158 32 32; /* the accent, at rest */
+    --blood-hot: 232 62 58; /* live / hover / anything that means something */
     --brass: 176 141 87;
     --phosphor: 126 214 160; /* the one terminal panel */
 
