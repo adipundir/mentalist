@@ -42,8 +42,8 @@ export function Stake({
 }: {
   caseIndex: number;
   chapter: Chapter;
-  /** Fires with the case id once the stake is down and the case is live. */
-  onEntered: (caseId: bigint) => void;
+  /** Fires with the case id and the contract's own deadline once the stake is down. */
+  onEntered: (caseId: bigint, deadline?: bigint) => void;
 }) {
   const { address } = useAccount();
   const pub = usePublicClient();
@@ -57,6 +57,8 @@ export function Stake({
   const [balance, setBalance] = useState<bigint | null>(null);
   /** This wallet has already used its entry on a case that can no longer be played. */
   const [resumeBlocked, setResumeBlocked] = useState(false);
+  /** A case already paid for whose stake did not land. Reused so a retry is not billed twice. */
+  const [orphan, setOrphan] = useState<bigint | null>(null);
 
   // What the pot is worth right now, and whether this wallet has already had its go.
   useEffect(() => {
@@ -101,7 +103,7 @@ export function Stake({
           if (!live) return;
           if (c.status === 1 && c.questionsAsked === 0) {
             setStep("done");
-            onEntered(entry[1]);
+            onEntered(entry[1], entry[2]);
           } else {
             setResumeBlocked(true);
           }
@@ -141,8 +143,22 @@ export function Stake({
         await pub.waitForTransactionReceipt({ hash });
       }
 
-      // 2. Open the case yourself, so the answers are yours alone.
+      // 2. Open the case yourself, so the answers are yours alone. If a previous attempt
+      //    already paid for one and only the stake failed, finish that case rather than
+      //    buying a second.
       setStep("opening");
+      if (orphan !== null) {
+        setStep("entering");
+        const retry = await wallet.writeContract({
+          address: MARKET_ADDRESS, abi: MARKET_ABI, functionName: "enter",
+          args: [caseIndex, orphan, stake],
+        });
+        await pub.waitForTransactionReceipt({ hash: retry });
+        setOrphan(null);
+        setStep("done");
+        onEntered(orphan);
+        return;
+      }
       const fee = await pub.readContract({
         address: MENTALIST_ADDRESS,
         abi: MENTALIST_ABI,
@@ -170,6 +186,7 @@ export function Stake({
 
       // 3. Put the stake down against it.
       setStep("entering");
+      setOrphan(caseId);
       const enterHash = await wallet.writeContract({
         address: MARKET_ADDRESS,
         abi: MARKET_ABI,
@@ -178,13 +195,14 @@ export function Stake({
       });
       await pub.waitForTransactionReceipt({ hash: enterHash });
 
+      setOrphan(null);
       setStep("done");
       onEntered(caseId);
     } catch (e) {
       setStep("idle");
       setError(readable(e));
     }
-  }, [wallet, pub, address, stake, chapter, caseIndex, onEntered]);
+  }, [wallet, pub, address, stake, chapter, caseIndex, onEntered, orphan]);
 
   if (step === "done") return null;
 

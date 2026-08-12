@@ -284,6 +284,36 @@ live on every claim.
 
 ---
 
+## Proved on chain, with money
+
+`contracts/scripts/prove-market.ts` runs the entire loop against the live contracts and a
+live covalidator: it stakes real USDC, opens a case, hears every suspect's statement through
+attested decryption, solves it from the statements alone with no privileged reads, names a
+man, files the attestation, and records the result against the pot.
+
+```
+resuming case #3 (already staked 1 USDC)
+pot is 1 USDC across 1 entrant(s)
+contract ruled: CORRECT
+recorded: won=true  share=1 USDC
+round: pot 1, winning stake 1, 1 entrants, 1 winners
+
+PASS  market took the stake
+PASS  entry is bound to the case that was dealt
+PASS  the contract's ruling and the market agree
+PASS  a solved case has a share, a missed one does not
+PASS  deduction narrowed the room
+```
+
+An earlier run of the same script on case II drew two surviving candidates, named the wrong
+one, and correctly took nothing. That is the game working, not failing.
+
+> The script reads every value until two consecutive reads agree. Base Sepolia's public
+> endpoints are load balanced, and a read issued straight after a receipt can land on a node
+> that has not seen the block. An earlier version reported a solved case as a miss for
+> exactly that reason, which is a lie about the chain rather than a finding about the
+> contract.
+
 ## Testing notes
 
 `forge test` runs 52 Foundry tests: 23 on the game, 26 on the market.

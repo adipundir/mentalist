@@ -136,6 +136,10 @@ export function useCase({
     } catch (e) {
       drone.current?.stop();
       drone.current = null;
+      // Let go of the room. Leaving the camera pushed in on a suspect who never answered
+      // reads as though the question is still in flight.
+      setWitness(null);
+      setMask(0);
       setError(inCharacter(e));
     } finally {
       setPhase("idle");

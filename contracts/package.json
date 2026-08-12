@@ -13,7 +13,8 @@
     "node": "docker compose up",
     "test:forge": "forge test -vv",
     "play:onchain": "npx tsx scripts/play-onchain.ts",
-    "deploy:market": "npx tsx scripts/deploy-market.ts"
+    "deploy:market": "npx tsx scripts/deploy-market.ts",
+    "prove:market": "npx tsx scripts/prove-market.ts"
   },
   "devDependencies": {
     "@inco/lightning-js": "1.0.0",

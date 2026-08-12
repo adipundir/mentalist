@@ -166,9 +166,11 @@ function StoryInner() {
               <Stake
                 caseIndex={index}
                 chapter={chapter}
-                onEntered={(caseId) => {
+                onEntered={(caseId, deadline) => {
                   setStaked(caseId);
-                  setClosesAt(Date.now() + CASE_WINDOW_MS);
+                  // The contract owns the clock. Resuming a case mid-window must not hand
+                  // the player back a fresh twenty minutes it will not honour.
+                  setClosesAt(deadline ? Number(deadline) * 1000 : Date.now() + CASE_WINDOW_MS);
                 }}
               />
             )
