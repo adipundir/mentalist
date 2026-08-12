@@ -50,7 +50,7 @@ export function Scene({
   useEffect(() => {
     if (!g.ready) return;
     setLine({
-      text: `${config.liars} of these ${g.n} are lying. Red John always is.`,
+      text: `${config.liars === 1 ? "One of these" : `${config.liars} of these`} ${g.n} ${config.liars === 1 ? "is" : "are"} lying to you. Red John always is.`,
       tone: "narrator",
     });
     const id = setTimeout(() => setLine(null), 5200);
@@ -135,8 +135,8 @@ export function Scene({
         <Room
           subjects={subjects}
           focused={g.witness}
-          onFocus={g.chooseWitness}
-          onToggle={g.toggle}
+          onFocus={(seat) => (g.witness === null || g.witness === seat ? g.chooseWitness(seat) : g.askAbout(seat))}
+          onToggle={(seat) => (g.witness === null ? g.chooseWitness(seat) : g.askAbout(seat))}
           disabled={g.over || g.busy || !g.ready}
         />
 
@@ -153,7 +153,7 @@ export function Scene({
 
           <div className="flex items-start gap-4">
             <div className="text-right">
-              <p className="font-mono text-[9px] tracking-file text-bone-dim">FOCUS</p>
+              <p className="font-mono text-[9px] tracking-file text-bone-dim">QUESTIONS LEFT</p>
               <div className="mt-1 flex justify-end gap-1">
                 {Array.from({ length: config.focus }, (_, i) => (
                   <span
@@ -167,7 +167,7 @@ export function Scene({
               </div>
             </div>
             <div className="text-right">
-              <p className="font-mono text-[9px] tracking-file text-bone-dim">STILL POSSIBLE</p>
+              <p className="font-mono text-[9px] tracking-file text-bone-dim">COULD STILL BE HIM</p>
               <p
                 className={`font-type text-[24px] leading-none ${g.deductions.candidates.length === 1 ? "text-blood-hot" : "text-bone"}`}
               >
@@ -207,69 +207,50 @@ export function Scene({
         <Dialogue line={line} />
       </div>
 
-      {/* ── the interrogation controls ── */}
+      {/* ── one instruction, always telling you the next click ── */}
       <div className="border-x-2 border-b-2 border-ink-3 bg-ink px-3 py-3 sm:px-5">
-        {g.witness === null ? (
-          <p className="py-2 text-center font-body text-[14px] italic text-bone-dim">
-            {janeism(g.testimony.length)}
-          </p>
-        ) : (
-          <>
-            <p className="truncate font-body text-[14px] text-bone">
-              <span className="font-type">{suspects[g.witness].name}</span>
-              <span className="text-bone-dim">
-                {" "}
-                — &ldquo;is Red John one of{" "}
-                {g.mask === 0 ? (
-                  <em className="text-bone-dim/60">…nobody yet</em>
-                ) : g.mask === control ? (
-                  <span className="text-brass">all {g.n}</span>
-                ) : (
-                  <span className="text-bone">
-                    {maskSeats(g.mask, g.n).map((s) => suspects[s].name.split(" ").pop()).join(", ")}
-                  </span>
-                )}
-                ?&rdquo;
-              </span>
-            </p>
-            <Waiting phase={g.phase} />
-            {g.error && (
-              <p className="shake mt-1 font-mono text-[10px] tracking-file text-blood-hot">{g.error}</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="min-w-0 flex-1 font-body text-[15px] leading-snug text-bone">
+            {g.busy ? (
+              <Waiting phase={g.phase} />
+            ) : g.witness === null ? (
+              <>
+                <span className="text-blood-hot">Click anyone</span> to question them.
+              </>
+            ) : (
+              <>
+                Asking <span className="font-type text-bone">{suspects[g.witness].name}</span>
+                {" — "}
+                <span className="text-blood-hot">click who you want to ask about.</span>
+                <span className="ml-2 text-bone-dim">
+                  (Click {lastName(suspects[g.witness].name)} again to ask about himself.)
+                </span>
+              </>
             )}
-          </>
-        )}
+          </div>
 
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Act onClick={g.askAll} disabled={g.over || g.busy || g.witness === null || g.focusLeft < CONTROL_COST} tone="brass">
-            ASK ABOUT EVERYONE · {CONTROL_COST}
-          </Act>
-          <Act onClick={g.askSelf} disabled={g.over || g.busy || g.witness === null}>
-            &ldquo;ARE YOU RED JOHN?&rdquo; · 1
-          </Act>
-          <Act onClick={() => setNotebook(true)}>NOTEBOOK</Act>
-
-          <span className="ml-auto flex items-center gap-2">
-            {g.mask !== 0 && (
-              <span className="font-mono text-[10px] tracking-file text-bone-dim">
-                {popcount(g.mask)} MARKED · COST {g.cost}
-              </span>
-            )}
-            <Act onClick={g.clear} disabled={g.mask === 0 || g.busy}>
-              CLEAR
+          <div className="flex shrink-0 items-center gap-2">
+            <Act
+              onClick={g.askRoom}
+              disabled={g.over || g.busy || g.witness === null || g.focusLeft < CONTROL_COST}
+              tone="brass"
+            >
+              &ldquo;IS HE EVEN IN THIS ROOM?&rdquo; · 2
             </Act>
-            <Act onClick={g.ask} disabled={!g.canAsk} tone="blood">
-              {g.busy ? "…" : "PUT IT TO THEM"}
-            </Act>
+            <Act onClick={() => setNotebook(true)}>WHAT I KNOW</Act>
             <Act
               onClick={() => nameable !== null && void g.accuse(nameable)}
               disabled={g.busy || !g.ready || nameable === null || g.over}
-              tone="brass"
+              tone="blood"
             >
-              NAME THEM
+              {nameable !== null ? `ARREST ${lastName(suspects[nameable].name).toUpperCase()}` : "ARREST"}
             </Act>
-          </span>
+          </div>
         </div>
 
+        {g.error && (
+          <p className="shake mt-1 font-mono text-[10px] tracking-file text-blood-hot">{g.error}</p>
+        )}
       </div>
 
       <AnimatePresence>
@@ -286,6 +267,12 @@ export function Scene({
       </AnimatePresence>
     </div>
   );
+}
+
+/** Surname only — the room is small and full names crowd every label. */
+function lastName(name: string): string {
+  const parts = name.split(" ");
+  return parts[parts.length - 1] ?? name;
 }
 
 function Act({

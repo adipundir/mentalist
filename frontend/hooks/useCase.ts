@@ -1,15 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  classifyQuestion,
-  fullMask,
-  questionCost,
-  toggleSeat,
-  type CaseConfig,
-  type Phase,
-  type Testimony,
-} from "@/lib/case";
+import { CONTROL_COST, fullMask, type CaseConfig, type Phase, type Testimony } from "@/lib/case";
 import { deduce } from "@/lib/solver";
 import { atLeast, type Oracle } from "@/lib/oracle";
 import { replyLine } from "@/lib/script";
@@ -68,19 +60,7 @@ export function useCase({
   );
 
   const over = outcome !== "playing";
-  const cost = mask === 0 ? 0 : questionCost(mask, n);
-  const canAsk = !over && !busy && ready && witness !== null && mask !== 0 && cost <= focusLeft;
-  const kind = witness !== null && mask !== 0 ? classifyQuestion(mask, witness, n) : null;
-
-  const toggle = useCallback(
-    (seat: number) => {
-      if (over || busy) return;
-      unlockNarrator();
-      sfx.tick(180 + seat * 9, 0.045, 0.045);
-      setMask((m) => toggleSeat(m, seat));
-    },
-    [over, busy],
-  );
+  const canAsk = !over && !busy && ready && witness !== null;
 
   const chooseWitness = useCallback(
     (seat: number) => {
@@ -99,14 +79,36 @@ export function useCase({
     [over, busy],
   );
 
-  const askAll = useCallback(() => setMask(fullMask(n)), [n]);
-  const askSelf = useCallback(() => {
-    if (witness !== null) setMask(1 << witness);
-  }, [witness]);
-  const clear = useCallback(() => setMask(0), []);
+  /**
+   * Ask the chosen witness about one person, and fire immediately.
+   *
+   * The old flow was: pick a witness, double-click others to assemble a bitmask, then press
+   * a third button. That is a query builder, not an interrogation — nobody would guess it,
+   * and it buried a mechanic that is genuinely one sentence long. Now it is two clicks:
+   * who you are asking, and who you are asking about.
+   */
+  const askAbout = useCallback(
+    (target: number) => {
+      if (over || busy || witness === null || focusLeft < 1) return;
+      void fire(1 << target);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [over, busy, witness, focusLeft],
+  );
 
-  async function ask() {
-    if (!canAsk || witness === null) return;
+  /** "Is he even in this room?" — always true, so the answer is purely whether they lie. */
+  const askRoom = useCallback(
+    () => {
+      if (over || busy || witness === null || focusLeft < CONTROL_COST) return;
+      void fire(fullMask(n));
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [over, busy, witness, focusLeft, n],
+  );
+
+  async function fire(m: number) {
+    if (witness === null) return;
+    setMask(m);
     setBusy(true);
     setError(null);
     setSaying(null);
@@ -114,12 +116,12 @@ export function useCase({
     drone.current = sfx.drone();
 
     try {
-      const result = await atLeast(oracle.ask(witness, mask, setPhase), 900);
+      const result = await atLeast(oracle.ask(witness, m, setPhase), 900);
       drone.current?.resolve();
       drone.current = null;
 
       const turn = testimony.length;
-      setTestimony((t) => [...t, { id: t.length, witness, mask, cost: result.cost, answer: result.answer }]);
+      setTestimony((t) => [...t, { id: t.length, witness, mask: m, cost: result.cost, answer: result.answer }]);
       setFocusLeft((f) => f - result.cost);
       if (result.turnedWitness !== null) {
         setTurned((t) => [...t, result.turnedWitness!]);
@@ -196,15 +198,10 @@ export function useCase({
     saying,
     error,
     deductions,
-    cost,
     canAsk,
-    kind,
-    toggle,
     chooseWitness,
-    askAll,
-    askSelf,
-    clear,
-    ask,
+    askAbout,
+    askRoom,
     accuse,
     dismissSaying: () => setSaying(null),
   };

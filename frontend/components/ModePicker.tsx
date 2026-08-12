@@ -37,11 +37,8 @@ export function ModePicker({ onPick }: { onPick: (mode: PlayMode) => void }) {
         transition={{ delay: 0.08 }}
         className="w-full max-w-[720px]"
       >
-        <p className="text-center font-mono text-[10px] tracking-file text-bone-dim">
-          BEFORE YOU START
-        </p>
-        <h2 className="mt-1 text-center font-type text-[30px] leading-tight text-bone">
-          How real do you want this?
+        <h2 className="text-center font-type text-[30px] leading-tight text-bone">
+          Pick how you play
         </h2>
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
@@ -58,16 +55,13 @@ export function ModePicker({ onPick }: { onPick: (mode: PlayMode) => void }) {
             <span className="font-mono text-[9px] tracking-file text-blood-hot">
               THE CASE FILE · BASE SEPOLIA
             </span>
-            <span className="mt-1 font-type text-[20px] text-bone">Play it for real</span>
-            <span className="mt-2 font-body text-[13px] leading-snug text-bone-dim">
-              Red John&rsquo;s identity is dealt inside an encrypted enclave. Nobody can read
-              it — not you, not an observer, <em>not the people who built this</em>. Every
-              answer is decrypted for you and nobody else.
+            <span className="mt-1 font-type text-[22px] text-bone">For real</span>
+            <span className="mt-2 font-body text-[14px] leading-snug text-bone-dim">
+              The killer is hidden inside an encrypted enclave — <em>nobody</em> can read it,
+              including us. Win and you get real lottery tickets.
             </span>
-            <span className="mt-3 border-t border-ink-3 pt-2 font-mono text-[9px] leading-relaxed tracking-file text-bone-dim/70">
-              ≈10s PER QUESTION · REAL TRANSACTIONS
-              <br />
-              SOLVE A CHAPTER → EARN MEGAPOT TICKETS
+            <span className="mt-3 border-t border-ink-3 pt-2 font-mono text-[9px] tracking-file text-bone-dim/70">
+              SLOWER · ABOUT 10s A QUESTION
             </span>
           </button>
 
@@ -83,15 +77,12 @@ export function ModePicker({ onPick }: { onPick: (mode: PlayMode) => void }) {
             <span className="font-mono text-[9px] tracking-file text-bone-dim">
               PRACTICE FILE · OFFLINE
             </span>
-            <span className="mt-1 font-type text-[20px] text-bone">Play it now</span>
-            <span className="mt-2 font-body text-[13px] leading-snug text-bone-dim">
-              The identical game, dealt in your browser. Same rules, same dealer, same
-              deduction — instant, and no wallet.
+            <span className="mt-1 font-type text-[22px] text-bone">Right now</span>
+            <span className="mt-2 font-body text-[14px] leading-snug text-bone-dim">
+              Exactly the same game, running in this browser. No wallet, no waiting.
             </span>
-            <span className="mt-3 border-t border-ink-3 pt-2 font-mono text-[9px] leading-relaxed tracking-file text-bone-dim/70">
-              INSTANT · NO WALLET
-              <br />
-              NO TICKETS — NOTHING IS ON CHAIN
+            <span className="mt-3 border-t border-ink-3 pt-2 font-mono text-[9px] tracking-file text-bone-dim/70">
+              INSTANT · NO TICKETS
             </span>
           </button>
         </div>

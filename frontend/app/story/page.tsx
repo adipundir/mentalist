@@ -103,7 +103,7 @@ function StoryInner() {
           MENTALIST
         </Link>
         <span className="text-bone-dim/30">/</span>
-        <span className="font-mono text-[9px] tracking-file text-blood-hot">THE LIST</span>
+        <span className="font-mono text-[9px] tracking-file text-blood-hot">THE RED JOHN CASES</span>
 
         <ol className="ml-1 flex flex-wrap items-center gap-1">
           {CHAPTERS.map((c, i) => (
@@ -137,7 +137,7 @@ function StoryInner() {
           oracle={oracle}
           suspects={suspects}
           title={chapter.title}
-          chapter={`${chapter.label} · ${chapter.n} SUSPECTS · ${chapter.liars} LYING`}
+          chapter={`CASE ${index + 1} OF ${CHAPTERS.length}`}
           nudge={{
             name: person(chapter.nudge.speaker).name,
             spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
@@ -179,7 +179,7 @@ function StoryInner() {
         {stage === "opening" && (
           <StoryCard
             key={`open-${index}-${attempt}`}
-            chapter={`${chapter.label} — ${chapter.n} SUSPECTS · ${chapter.liars} LIARS · ${chapter.focus} FOCUS`}
+            chapter={`CASE ${index + 1} OF ${CHAPTERS.length} — ${chapter.n} SUSPECTS, ${chapter.liars} OF THEM LYING`}
             title={chapter.title}
             body={chapter.opening}
             onContinue={() => setStage("playing")}
@@ -194,7 +194,7 @@ function StoryInner() {
             title={chapter.title}
             body={solved ? chapter.successText : chapter.failureText}
             onContinue={advance}
-            continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CHAPTER") : "TRY AGAIN"}
+            continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CASE") : "TRY AGAIN"}
             extra={
               onChain ? (
                 <Settlement

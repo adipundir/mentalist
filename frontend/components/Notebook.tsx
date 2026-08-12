@@ -51,7 +51,7 @@ export function Notebook({
         className="paper max-h-full w-full max-w-[900px] overflow-y-auto border-2 border-ink-3 p-5 sm:p-7"
       >
         <header className="flex items-baseline justify-between border-b border-ink-3 pb-3">
-          <h2 className="font-type text-[22px] text-bone">The Notebook</h2>
+          <h2 className="font-type text-[22px] text-bone">What I know so far</h2>
           <button
             type="button"
             onClick={onClose}
@@ -63,7 +63,7 @@ export function Notebook({
 
         {/* the list, with the possibility space made physical */}
         <section className="mt-4">
-          <h3 className="font-mono text-[10px] tracking-file text-bone-dim">THE LIST</h3>
+          <h3 className="font-mono text-[10px] tracking-file text-bone-dim">THE SUSPECTS</h3>
           <ul className="mt-2 grid gap-1.5 sm:grid-cols-2">
             {suspects.map((s, i) => {
               const out = odds[i] === 0;
@@ -103,12 +103,11 @@ export function Notebook({
         {/* the transcript */}
         <section className="mt-5">
           <h3 className="font-mono text-[10px] tracking-file text-bone-dim">
-            TRANSCRIPT · {testimony.length} ON RECORD
+EVERYTHING THEY'VE TOLD ME · {testimony.length}
           </h3>
           {testimony.length === 0 ? (
             <p className="py-4 font-body text-[13px] italic text-bone-dim/70">
-              Nothing yet. Put somebody under the light and ask them something you already know
-              the answer to.
+              Nothing yet. Ask someone about someone else.
             </p>
           ) : (
             <ol className="mt-1 divide-y divide-ink-3">
@@ -132,33 +131,31 @@ export function Notebook({
                         <span
                           className={`font-mono text-[8px] tracking-file ${kind === "control" ? "text-brass" : "text-bone-dim/50"}`}
                         >
-                          {KIND[kind]}
+                          {kind === "control" ? "HONESTY TEST" : kind === "self" ? "ABOUT HIMSELF" : ""}
                         </span>
                         {stale && (
                           <span className="font-mono text-[8px] tracking-file text-blood-hot">
-                            UNRELIABLE SINCE
+  CHANGED HIS STORY SINCE
                           </span>
                         )}
                       </div>
                       <p className="font-body text-[12px] leading-snug text-bone-dim">
-                        &ldquo;Is Red John one of{" "}
                         {kind === "control" ? (
-                          <span className="text-brass">all {n}</span>
-                        ) : kind === "self" ? (
-                          <span className="text-bone">you</span>
+                          <>&ldquo;Is he even in this room?&rdquo;</>
                         ) : (
-                          <span className="text-bone">
-                            {maskSeats(t.mask, n)
-                              .map((s) => suspects[s].name.split(" ").pop())
-                              .join(", ")}
-                          </span>
+                          <>
+                            &ldquo;Is it{" "}
+                            <span className="text-bone">
+                              {maskSeats(t.mask, n).map((x) => suspects[x].name).join(", ")}
+                            </span>
+                            ?&rdquo;
+                          </>
                         )}
-                        ?&rdquo;
                       </p>
                       {usable && (
                         <p className="mt-0.5 font-mono text-[9px] tracking-file text-brass/80">
-                          {state === "liar" ? "INVERTED → " : "TAKEN AS → "}
-                          {effective ? "IN THAT SET" : "NOT IN THAT SET"}
+                          {state === "liar" ? "HE LIES, SO REALLY: " : "HE'S HONEST, SO: "}
+                          {effective ? "YES" : "NO"}
                         </p>
                       )}
                     </div>

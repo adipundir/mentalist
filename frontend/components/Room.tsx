@@ -59,9 +59,15 @@ function placement(i: number, n: number) {
   };
 }
 
-/** Figure width as a share of the scene, so ten fit without a scrum and three don't float. */
+/**
+ * Figure width as a share of the scene.
+ *
+ * Capped at 11 rather than scaling freely: a four-person lineup was rendering figures so
+ * large that the camera push-in cropped their legs, which is worse than a slightly empty
+ * room. Ten still fit without a scrum.
+ */
 function baseWidth(n: number) {
-  return Math.max(6.5, Math.min(13, 86 / n));
+  return Math.max(6.5, Math.min(11, 80 / n));
 }
 
 export function Room({
@@ -82,10 +88,20 @@ export function Room({
   const spots = useMemo(() => subjects.map((_, i) => placement(i, n)), [subjects, n]);
   const w = baseWidth(n);
 
-  // Camera: push toward the focused figure. Kept gentle — a hard zoom loses the room.
+  // Camera: push toward the focused figure. Kept gentle — a hard zoom loses the room, and
+  // in a small lineup the figures are already large, so the push scales down with the count.
   const target = focused !== null ? spots[focused] : null;
+  const zoom = n <= 5 ? 1.1 : n <= 7 ? 1.18 : 1.24;
+
+  // Clamp the pan to the actual overflow the zoom creates. Scaling by z gives (z-1)/2 of
+  // slack on each side; panning further than that walks a figure off the edge of the frame,
+  // which is exactly what a four-person lineup was doing to whoever stood on the far right.
+  const slack = ((zoom - 1) / 2) * 100;
+  const wanted = target ? (50 - target.x) * 0.42 : 0;
+  const pan = Math.max(-slack, Math.min(slack, wanted));
+
   const camera = target
-    ? { x: `${(50 - target.x) * 0.5}%`, y: "-1%", scale: 1.26 }
+    ? { x: `${pan}%`, y: "-1%", scale: zoom }
     : { x: "0%", y: "0%", scale: 1 };
 
   return (
@@ -210,7 +226,7 @@ export function Room({
               animate={{
                 opacity: s.saying ? 1 : s.cleared ? 0.3 : dim ? 0.45 : 1,
                 y: isFocus ? -8 : 0,
-                scale: isFocus ? 1.12 : 1,
+                scale: isFocus ? 1.06 : 1,
                 filter: s.saying ? "brightness(1)" : dim ? "brightness(0.5)" : "brightness(1)",
               }}
               transition={{ type: "spring", stiffness: 220, damping: 24 }}

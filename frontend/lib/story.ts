@@ -30,50 +30,47 @@ export interface Chapter extends CaseConfig {
 
 export const CHAPTERS: Chapter[] = [
   {
-    n: 10,
+    n: 4,
     title: "Cinnabar Sunday",
     label: "Chapter I",
-    blurb: "A smiley on a bedroom wall, a copycat in the crowd, and a list two thousand names deep.",
-    suspects: 10,
-    liars: 3,
-    focus: 8,
+    blurb: "Four people were in the house. One of them painted the wall.",
+    suspects: 4,
+    liars: 1,
+    focus: 5,
     turnAt: 0,
     culprit: "wagner",
-    roster: [
-      "partridge", "mars", "harken", "cooper", "mashburn",
-      "molinari", "wagner", "minelli", "morning", "ardiles",
-    ],
+    roster: ["partridge", "mashburn", "wagner", "ardiles"],
     opening:
-      "Sunday. The house still smells of lemon polish. Upstairs there is a woman who was alive on Friday, and above her bed a face in three-finger strokes, drying to rust. Ten people came through that door this morning. Cops, techs, a neighbour with a casserole. He likes to stand in the room and be thanked.",
+      "Sunday. The house still smells of lemon polish. Upstairs there is a woman who was alive on Friday, and above her bed a face in three-finger strokes, drying to rust. Four people had keys. One of them is lying to me, and one of them did it.",
     successText:
       "You say the name and he doesn't run — he beams, delighted to finally be seen. The strokes on the wall ran counter-clockwise. A copycat, then. Somewhere the original is reading about it, and is not amused.",
     failureText:
       "Wrong name. He lets you say it, lets the whole room turn and look at him, and says nothing at all. By morning the tape is down, the wall is painted over, and the face is drying on somebody else's ceiling.",
     nudge: {
       speaker: "lisbon",
-      line: "Half these people are lying to cover their own paperwork. Ask somebody about the entire room, Jane — see who lies straight to your face.",
+      line: "Pick someone. Then point at someone else and ask if it was them. That's all this is.",
     },
   },
   {
-    n: 9,
+    n: 6,
     title: "The Vermilion Hour",
     label: "Chapter II",
-    blurb: "An informant silenced in custody, Kristina Frye gone, and a masked man reciting Blake.",
-    suspects: 9,
-    liars: 4,
-    focus: 7,
+    blurb: "An informant silenced in custody, and a masked man reciting Blake.",
+    suspects: 6,
+    liars: 2,
+    focus: 6,
     turnAt: 0,
     culprit: "cooper",
-    roster: ["partridge", "harken", "mars", "mashburn", "molinari", "cooper", "ardiles", "minelli", "morning"],
+    roster: ["partridge", "harken", "mars", "cooper", "molinari", "morning"],
     opening:
-      "Nine people in the observation room and one of them has already killed on his behalf. Your informant died in protective custody with He is Ma finger-painted on the wall beside him. Kristina Frye's phone rings out into a room you can't picture. Somewhere a man in a plastic mask is warming up his Blake.",
+      "Six people in the observation room and one of them has already killed on his behalf. Your informant died in protective custody with He is Ma finger-painted on the wall beside him. Kristina Frye's phone rings out into a room you can't picture. Somewhere a man in a plastic mask is warming up his Blake.",
     successText:
       "You name him and he recites The Tyger at you, all four lines, until Cho puts a hand on his shoulder. A tool, not the hand that held it. But tools remember who sharpened them — and this one talks.",
     failureText:
       "Wrong, and the interview ends politely. Two days later Kristina is found sitting upright in a stranger's house, talking gently to your dead wife, and she never comes all the way back from wherever he sent her.",
     nudge: {
       speaker: "vanpelt",
-      line: "Two of them just gave me the exact same alibi, word for word. One of them's flipping everything he says — find out which, before you trust either.",
+      line: "Ask two different people about the same man. If they disagree, one of them is lying to you.",
     },
   },
   {
@@ -82,8 +79,8 @@ export const CHAPTERS: Chapter[] = [
     label: "Chapter III",
     blurb: "You shot the man who claimed to be him. Lorelei says you've already shaken the real one's hand.",
     suspects: 8,
-    liars: 4,
-    focus: 6,
+    liars: 3,
+    focus: 7,
     turnAt: 0,
     culprit: "haffner",
     roster: ["partridge", "bertram", "haffner", "kirkland", "smith", "stiles", "mcallister", "mashburn"],
@@ -95,7 +92,7 @@ export const CHAPTERS: Chapter[] = [
       "You say the wrong name and the food court empties around you like water. Somewhere a woman in an orange jumpsuit is being driven out of the world, and she takes the only true sentence in California with her.",
     nudge: {
       speaker: "cho",
-      line: "Ask one of them about himself. Guilty men love that question. Honest men just say no and get bored.",
+      line: "Ask a man about himself. If he says yes, he's a liar — and an innocent one. Red John would never admit it.",
     },
   },
   {
@@ -117,7 +114,7 @@ export const CHAPTERS: Chapter[] = [
       "Wrong name. Seven becomes six by his hand and not yours, and the disc in your pocket says he had your list two months before you finished writing it. He isn't narrowing. He's choosing.",
     nudge: {
       speaker: "lisbon",
-      line: "Six questions, seven suspects. Spend the first finding out who you're allowed to believe, and the rest gets easy.",
+      line: "Use 'is he even in this room' on someone. He always is — so their answer only tells you whether they lie.",
     },
   },
   {

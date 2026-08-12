@@ -56,3 +56,6 @@ contracts/ignition/deployments/
 # Next
 frontend/.next/
 frontend/out/
+
+# Throwaway testnet player wallet — never commit
+contracts/player-wallet.json
