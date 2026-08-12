@@ -13,6 +13,10 @@ export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ??
 export const REWARDS_ADDRESS = (process.env.NEXT_PUBLIC_REWARDS_ADDRESS ??
   "") as `0x${string}`;
 
+/** The pari-mutuel pool. Holds every stake and pays the winners in Megapot tickets. */
+export const MARKET_ADDRESS = (process.env.NEXT_PUBLIC_MARKET_ADDRESS ??
+  "") as `0x${string}`;
+
 export const isDeployed = () => /^0x[a-fA-F0-9]{40}$/.test(MENTALIST_ADDRESS);
 
 export const EXPLORER = baseSepolia.blockExplorers.default.url;
@@ -233,5 +237,130 @@ export const REWARDS_ABI = [
     stateMutability: "view",
     inputs: [{ name: "", type: "uint256" }],
     outputs: [{ type: "bool" }],
+  },
+] as const;
+
+/**
+ * `CaseMarket`, the betting half.
+ *
+ * You open your own case on `Mentalist` and then hand its id here with a stake. The market
+ * checks the case is yours, untouched, and the lineup this round calls for, which is what
+ * keeps it out of the confidential path entirely: it never holds a handle, and every answer
+ * is still granted to you and to nobody else.
+ */
+export const MARKET_ABI = [
+  {
+    type: "function",
+    name: "enter",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseIndex", type: "uint8" },
+      { name: "caseId", type: "uint256" },
+      { name: "stake", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "recordResult",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "caseIndex", type: "uint8" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "claim",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "caseIndex", type: "uint8" }],
+    outputs: [{ name: "ticketIds", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "refund",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "caseIndex", type: "uint8" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "rounds",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "uint8" }],
+    outputs: [
+      { name: "closesAt", type: "uint64" },
+      { name: "pot", type: "uint128" },
+      { name: "winningStake", type: "uint128" },
+      { name: "entrants", type: "uint32" },
+      { name: "winners", type: "uint32" },
+      { name: "sealed_", type: "bool" },
+    ],
+  },
+  {
+    type: "function",
+    name: "entries",
+    stateMutability: "view",
+    inputs: [
+      { name: "", type: "uint8" },
+      { name: "", type: "address" },
+    ],
+    outputs: [
+      { name: "stake", type: "uint128" },
+      { name: "caseId", type: "uint256" },
+      { name: "deadline", type: "uint64" },
+      { name: "recorded", type: "bool" },
+      { name: "won", type: "bool" },
+      { name: "claimed", type: "bool" },
+    ],
+  },
+  {
+    type: "function",
+    name: "shareOf",
+    stateMutability: "view",
+    inputs: [
+      { name: "caseIndex", type: "uint8" },
+      { name: "player", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "timeLeft",
+    stateMutability: "view",
+    inputs: [
+      { name: "caseIndex", type: "uint8" },
+      { name: "player", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
+
+/** Just enough ERC20 to approve and read a balance. */
+export const ERC20_ABI = [
+  {
+    type: "function",
+    name: "approve",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "spender", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "allowance",
+    stateMutability: "view",
+    inputs: [
+      { name: "owner", type: "address" },
+      { name: "spender", type: "address" },
+    ],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ name: "", type: "uint256" }],
   },
 ] as const;

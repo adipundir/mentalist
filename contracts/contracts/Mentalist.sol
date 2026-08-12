@@ -27,7 +27,7 @@ contract Mentalist {
 
     // ─────────────────────────────────────────── constants
 
-    uint8 public constant MIN_SUSPECTS = 4;
+    uint8 public constant MIN_SUSPECTS = 3;
     uint8 public constant MAX_SUSPECTS = 12;
 
     /// @dev A control question (mask covers every suspect) is a guaranteed honesty test,

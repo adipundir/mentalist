@@ -14,6 +14,7 @@ import { StoryCard } from "@/components/StoryCard";
 import { Finale } from "@/components/Finale";
 import { PoweredBy } from "@/components/PoweredBy";
 import { Settlement } from "@/components/Settlement";
+import { Stake } from "@/components/Stake";
 
 type Stage = "opening" | "playing" | "closing" | "finale";
 
@@ -38,7 +39,14 @@ function StoryInner() {
   // Each case stands for a fixed window. Set once per case so the clock does not restart
   // every render.
   const [closesAt, setClosesAt] = useState(() => Date.now() + CASE_WINDOW_MS);
-  useEffect(() => setClosesAt(Date.now() + CASE_WINDOW_MS), [index]);
+
+  // The clock only means anything once a stake is down, because that is when the contract
+  // starts counting. Until then it is just how long the case would stand.
+  const [staked, setStaked] = useState<bigint | null>(null);
+  useEffect(() => {
+    setStaked(null);
+    setClosesAt(Date.now() + CASE_WINDOW_MS);
+  }, [index]);
 
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -132,6 +140,19 @@ function StoryInner() {
           }}
           closesAt={closesAt}
           variant={index}
+          openedCaseId={staked}
+          entry={
+            !oracle || staked !== null ? null : (
+              <Stake
+                caseIndex={index}
+                chapter={chapter}
+                onEntered={(caseId) => {
+                  setStaked(caseId);
+                  setClosesAt(Date.now() + CASE_WINDOW_MS);
+                }}
+              />
+            )
+          }
           connect={
             oracle ? null : (
               <>
@@ -169,7 +190,7 @@ function StoryInner() {
             continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CASE") : "TRY AGAIN"}
             extra={
               oracle ? (
-                <Settlement oracle={oracle} solved={solved} />
+                <Settlement oracle={oracle} solved={solved} caseIndex={index} />
               ) : null
             }
           />

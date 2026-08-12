@@ -21,6 +21,8 @@ import * as sfx from "@/lib/sound";
  * question builder, is furniture that slides over it, so the suspects are never off screen
  * while you are talking to them.
  */
+export type SceneHandle = { begin: (caseId: bigint) => void };
+
 export function Scene({
   config,
   oracle,
@@ -31,6 +33,8 @@ export function Scene({
   closesAt,
   variant = 0,
   connect,
+  entry,
+  openedCaseId,
   onResolved,
 }: {
   config: CaseConfig;
@@ -46,12 +50,25 @@ export function Scene({
   variant?: number;
   /** Shown in place of the controls when there is no wallet yet. */
   connect?: React.ReactNode;
+  /** Shown in place of the controls until a stake is down. Null once the case is live. */
+  entry?: React.ReactNode;
+  /** The case the market already dealt. Adopting it avoids opening (and paying for) a second. */
+  openedCaseId?: bigint | null;
   onResolved?: (solved: boolean) => void;
 }) {
   const g = useCase({ config, oracle, names: useMemo(() => suspects.map((s) => lastName(s.name)), [suspects]), onResolved });
   const [notebook, setNotebook] = useState(false);
   const [chosen, setChosen] = useState<number | null>(null);
   const [line, setLine] = useState<Line | null>(null);
+
+  // The market deals the case as part of taking the stake, so the room picks up the one
+  // that already exists rather than opening another.
+  useEffect(() => {
+    if (openedCaseId == null || !oracle) return;
+    (oracle as { adopt?: (id: bigint) => void }).adopt?.(openedCaseId);
+    g.start(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openedCaseId, oracle]);
 
   // Open on the room, then a beat of narration so the player reads the space before the
   // interface arrives.
@@ -209,6 +226,8 @@ export function Scene({
       >
         {connect ? (
           <div className="flex flex-wrap items-center justify-center gap-4 py-1">{connect}</div>
+        ) : entry ? (
+          <div className="py-1">{entry}</div>
         ) : (
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1 font-body text-[15px] leading-snug text-bone">
@@ -237,7 +256,7 @@ export function Scene({
 
           <div className="flex shrink-0 items-center gap-2">
             {!g.started ? (
-              <Act onClick={g.start} tone="blood">
+              <Act onClick={() => g.start()} tone="blood">
                 OPEN THE CASE
               </Act>
             ) : (

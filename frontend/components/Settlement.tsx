@@ -1,40 +1,68 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
+import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import type { ChainOracle } from "@/lib/chain-oracle";
-import { REWARDS_ADDRESS, addressUrl, txUrl } from "@/lib/contracts";
+import { MARKET_ABI, MARKET_ADDRESS, txUrl } from "@/lib/contracts";
+import { usdc } from "@/lib/market";
 
-type Step = "settle" | "settling" | "claim" | "claiming" | "done" | "nothing";
+type Step = "settle" | "settling" | "record" | "recording" | "settled" | "claiming" | "done";
 
 /**
- * The end of an on-chain case, and the only place the two stacks meet.
+ * The end of a case, and the only place the two stacks meet.
  *
- * **Inco** decided the outcome: `accuse` revealed the board, and `settle` hands the
- * covalidator's attestation to the contract so the *contract*, not this client, rules on
- * whether the accusation was right. That is what makes the streak mean anything.
+ * **Inco** decides the outcome. `accuse` reveals the board and `settle` hands the
+ * covalidator's attestation to the game contract, so the *contract* rules on whether you
+ * were right rather than this browser. Nothing downstream would mean anything otherwise:
+ * a market that settled on a number the client reported would just be a scoreboard.
  *
- * **Megapot** pays it out: whatever Focus you didn't spend converts to real lottery
- * tickets, bought by the reward treasury and gifted straight to your wallet.
+ * **Megapot** pays it out. Recording your result against the market locks your stake into
+ * the winning side of the pot, and when the round closes your share is bought as real
+ * lottery tickets with the money of everyone who named the wrong man.
  *
- * Two transactions, deliberately separate: the first is the verdict, the second is the
- * reward, and a player should be able to see which is which.
+ * Three transactions, deliberately separate: the verdict, the claim on the pot, and the
+ * payout. A player should be able to see which is which.
  */
 export function Settlement({
   oracle,
   solved,
+  caseIndex,
 }: {
   oracle: ChainOracle;
   solved: boolean;
+  caseIndex: number;
 }) {
-  const [step, setStep] = useState<Step>("settle");
-  const [tickets, setTickets] = useState<number | null>(null);
-  const [hashes, setHashes] = useState<{ settle?: string; claim?: string }>({});
-  const [error, setError] = useState<string | null>(null);
+  const { address } = useAccount();
+  const pub = usePublicClient();
+  const { data: wallet } = useWalletClient();
 
-  // A miss still has to be filed, that is what breaks the streak.
+  const [step, setStep] = useState<Step>("settle");
+  const [hashes, setHashes] = useState<{ settle?: string; record?: string; claim?: string }>({});
+  const [error, setError] = useState<string | null>(null);
+  const [share, setShare] = useState<bigint>(0n);
+  const [sealed, setSealed] = useState(false);
+  const [claimed, setClaimed] = useState(false);
+
+  const refresh = useCallback(async () => {
+    if (!pub || !address) return;
+    try {
+      const [round, entry, mine] = await Promise.all([
+        pub.readContract({ address: MARKET_ADDRESS, abi: MARKET_ABI, functionName: "rounds", args: [caseIndex] }),
+        pub.readContract({ address: MARKET_ADDRESS, abi: MARKET_ABI, functionName: "entries", args: [caseIndex, address] }),
+        pub.readContract({ address: MARKET_ADDRESS, abi: MARKET_ABI, functionName: "shareOf", args: [caseIndex, address] }),
+      ]);
+      setSealed(round[5]);
+      setShare(mine);
+      setClaimed(entry[5]);
+      if (entry[3] && step === "record") setStep("settled");
+    } catch {
+      /* a cold read is not worth a message */
+    }
+  }, [pub, address, caseIndex, step]);
+
   useEffect(() => {
-    if (!solved && step === "claim") setStep("nothing");
-  }, [solved, step]);
+    void refresh();
+  }, [refresh]);
 
   async function fileReport() {
     setStep("settling");
@@ -42,29 +70,51 @@ export function Settlement({
     try {
       const { hash } = await oracle.settle();
       setHashes((h) => ({ ...h, settle: hash }));
-      if (!solved) {
-        setStep("nothing");
-        return;
-      }
-      const n = await oracle.ticketsEarned();
-      setTickets(n);
-      setStep(n > 0 ? "claim" : "nothing");
+      setStep("record");
     } catch (e) {
       setError(readable(e));
       setStep("settle");
     }
   }
 
+  async function record() {
+    if (!wallet || !pub) return;
+    setStep("recording");
+    setError(null);
+    try {
+      const hash = await wallet.writeContract({
+        address: MARKET_ADDRESS,
+        abi: MARKET_ABI,
+        functionName: "recordResult",
+        args: [caseIndex],
+      });
+      await pub.waitForTransactionReceipt({ hash });
+      setHashes((h) => ({ ...h, record: hash }));
+      setStep("settled");
+      void refresh();
+    } catch (e) {
+      setError(readable(e));
+      setStep("record");
+    }
+  }
+
   async function claim() {
+    if (!wallet || !pub) return;
     setStep("claiming");
     setError(null);
     try {
-      const hash = await oracle.claimTickets();
+      const hash = await wallet.writeContract({
+        address: MARKET_ADDRESS,
+        abi: MARKET_ABI,
+        functionName: "claim",
+        args: [caseIndex],
+      });
+      await pub.waitForTransactionReceipt({ hash });
       setHashes((h) => ({ ...h, claim: hash }));
       setStep("done");
     } catch (e) {
       setError(readable(e));
-      setStep("claim");
+      setStep("settled");
     }
   }
 
@@ -76,57 +126,66 @@ export function Settlement({
 
       {step === "settle" && (
         <>
-          <p className="font-body text-[13px] leading-relaxed text-bone-dim">
+          <p className="font-body text-[13px] leading-relaxed text-bone">
             The board is revealed, but the contract hasn&rsquo;t ruled yet. File the
-            covalidator&rsquo;s attestation and{" "}
-            <span className="text-bone">it</span> decides whether you were right, not this
-            browser.
+            covalidator&rsquo;s attestation and <span className="text-blood-hot">it</span>{" "}
+            decides whether you were right, not this browser.
           </p>
-          <button
-            type="button"
-            onClick={fileReport}
-            className="mt-2 cursor-pointer border border-brass px-4 py-2 font-mono text-[10px] tracking-file text-brass hover:bg-brass/15"
-          >
+          <Button tone="brass" onClick={fileReport}>
             FILE THE REPORT
-          </button>
+          </Button>
         </>
       )}
 
       {step === "settling" && <Waiting>SUBMITTING THE ATTESTATION…</Waiting>}
 
-      {step === "claim" && tickets !== null && (
+      {step === "record" && (
         <>
-          <p className="font-body text-[13px] leading-relaxed text-bone-dim">
-            Filed, and the contract agrees. Your share of the pot comes back as{" "}
-            <span className="text-blood-hot">
-              {tickets} Megapot ticket{tickets === 1 ? "" : "s"}
-            </span>
-            , bought for your wallet with the stakes of everyone who read the room wrong.
+          <p className="font-body text-[13px] leading-relaxed text-bone">
+            {solved
+              ? "Filed, and the contract agrees. Now claim your place on the winning side of the pot."
+              : "Filed. Wrong man, so your stake stays in the pot for whoever got it right. Record it and the round can settle."}
           </p>
-          <button
-            type="button"
-            onClick={claim}
-            className="mt-2 cursor-pointer border border-blood-hot bg-blood-hot/15 px-4 py-2 font-mono text-[10px] tracking-file text-blood-hot hover:bg-blood-hot/25"
-          >
-            CLAIM {tickets} TICKET{tickets === 1 ? "" : "S"}
-          </button>
+          <Button tone={solved ? "blood" : "dim"} onClick={record}>
+            {solved ? "CLAIM YOUR SHARE OF THE POT" : "RECORD THE RESULT"}
+          </Button>
+        </>
+      )}
+
+      {step === "recording" && <Waiting>RECORDING AGAINST THE POT…</Waiting>}
+
+      {step === "settled" && (
+        <>
+          {solved && share > 0n ? (
+            <p className="font-body text-[13px] leading-relaxed text-bone">
+              You&rsquo;re in for{" "}
+              <span className="text-brass">${usdc(share)}</span> of the pot, and it grows
+              every time someone after you names the wrong man.{" "}
+              {sealed
+                ? "The round has closed. Take it as tickets."
+                : "You can collect it as Megapot tickets once this round closes."}
+            </p>
+          ) : (
+            <p className="font-body text-[13px] leading-relaxed text-bone">
+              {solved
+                ? "Recorded. Your share is set once the round closes."
+                : "Recorded. Your stake belongs to whoever read the room correctly."}
+            </p>
+          )}
+          {solved && sealed && !claimed && share > 0n && (
+            <Button tone="blood" onClick={claim}>
+              COLLECT ${usdc(share)} IN MEGAPOT TICKETS
+            </Button>
+          )}
         </>
       )}
 
       {step === "claiming" && <Waiting>BUYING YOUR TICKETS…</Waiting>}
 
       {step === "done" && (
-        <p className="font-body text-[13px] leading-relaxed text-bone-dim">
-          Done. {tickets} Megapot ticket{tickets === 1 ? "" : "s"} are in your wallet, in the
-          next drawing. Testnet drawings run every 30 minutes.
-        </p>
-      )}
-
-      {step === "nothing" && (
-        <p className="font-body text-[13px] leading-relaxed text-bone-dim">
-          {solved
-            ? "Filed. No Focus left over, so no tickets this time, solve it in fewer reads."
-            : "Filed. A miss breaks the streak; the contract recorded it."}
+        <p className="font-body text-[13px] leading-relaxed text-bone">
+          Done. The tickets are in your wallet and in the next drawing. Testnet drawings run
+          every 30 minutes.
         </p>
       )}
 
@@ -134,52 +193,68 @@ export function Settlement({
         <p className="shake mt-2 font-mono text-[10px] tracking-file text-blood-hot">{error}</p>
       )}
 
-      <div className="mt-3 space-y-0.5 font-mono text-[9px] tracking-file text-bone-dim/75">
-        {hashes.settle && (
-          <p>
-            VERDICT FILED ·{" "}
-            <a href={txUrl(hashes.settle)} target="_blank" rel="noreferrer" className="underline">
-              {hashes.settle.slice(0, 14)}… ↗
-            </a>
-          </p>
-        )}
-        {hashes.claim && (
-          <p>
-            TICKETS BOUGHT ·{" "}
-            <a href={txUrl(hashes.claim)} target="_blank" rel="noreferrer" className="underline">
-              {hashes.claim.slice(0, 14)}… ↗
-            </a>
-          </p>
-        )}
-        {REWARDS_ADDRESS && (
-          <p>
-            TREASURY ·{" "}
-            <a href={addressUrl(REWARDS_ADDRESS)} target="_blank" rel="noreferrer" className="underline">
-              {REWARDS_ADDRESS.slice(0, 10)}…{REWARDS_ADDRESS.slice(-4)} ↗
-            </a>
-          </p>
-        )}
+      <div className="mt-3 space-y-0.5 font-mono text-[9px] tracking-file text-bone-dim">
+        {hashes.settle && <Receipt label="VERDICT FILED" hash={hashes.settle} />}
+        {hashes.record && <Receipt label="RECORDED ON THE POT" hash={hashes.record} />}
+        {hashes.claim && <Receipt label="TICKETS BOUGHT" hash={hashes.claim} />}
       </div>
     </div>
   );
 }
 
+function Receipt({ label, hash }: { label: string; hash: string }) {
+  return (
+    <p>
+      {label} ·{" "}
+      <a href={txUrl(hash)} target="_blank" rel="noreferrer" className="underline">
+        {hash.slice(0, 12)}… ↗
+      </a>
+    </p>
+  );
+}
+
+function Button({
+  tone,
+  onClick,
+  children,
+}: {
+  tone: "brass" | "blood" | "dim";
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  const style =
+    tone === "blood"
+      ? "border-blood-hot bg-blood-hot/15 text-blood-hot hover:bg-blood-hot/25"
+      : tone === "brass"
+        ? "border-brass text-brass hover:bg-brass/15"
+        : "border-ink-3 text-bone-dim hover:border-bone-dim hover:text-bone";
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`mt-2 cursor-pointer border px-4 py-2 font-mono text-[10px] tracking-file ${style}`}
+    >
+      {children}
+    </button>
+  );
+}
+
 function Waiting({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-center gap-2 font-mono text-[10px] tracking-file text-blood-hot">
-      <span className="breathe inline-block h-1.5 w-1.5 bg-blood-hot" aria-hidden />
+    <p className="font-mono text-[10px] tracking-file text-bone-dim">
       {children}
+      <span className="cursor-blink"> ▌</span>
     </p>
   );
 }
 
 function readable(e: unknown): string {
-  const msg = String((e as Error)?.message ?? e);
-  if (/user rejected|denied/i.test(msg)) return "YOU LEFT IT UNFILED.";
-  if (/TreasuryEmpty/i.test(msg)) return "THE TREASURY IS OUT OF USDC. NOTHING TO BUY WITH.";
-  if (/AlreadyRewarded/i.test(msg)) return "THESE TICKETS WERE ALREADY CLAIMED.";
-  if (/CaseNotSolved/i.test(msg)) return "THE CONTRACT HASN'T RULED THIS CASE SOLVED.";
-  if (/PurchasesDisabled/i.test(msg)) return "MEGAPOT ISN'T SELLING TICKETS RIGHT NOW.";
-  if (/HandleMismatch/i.test(msg)) return "THAT ATTESTATION ISN'T FOR THIS VERDICT.";
-  return msg.slice(0, 110).toUpperCase();
+  const m = String((e as { shortMessage?: string })?.shortMessage ?? e);
+  if (/NoEntry/.test(m)) return "NO STAKE ON THIS CASE";
+  if (/AlreadyRecorded/.test(m)) return "ALREADY RECORDED";
+  if (/RoundNotSealed/.test(m)) return "THE ROUND HAS NOT CLOSED YET";
+  if (/NotAWinner/.test(m)) return "NOTHING TO COLLECT";
+  if (/CaseNotClosed/.test(m)) return "FILE THE VERDICT FIRST";
+  if (/User rejected|denied/i.test(m)) return "CANCELLED";
+  return m.slice(0, 120).toUpperCase();
 }

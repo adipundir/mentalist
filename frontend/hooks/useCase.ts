@@ -48,14 +48,25 @@ export function useCase({
   // the instant the oracle existed, which put a signature prompt in front of anyone who
   // merely connected to look around.
   const [started, setStarted] = useState(false);
+  /** Set when the case was already dealt elsewhere, so opening it again would be a second bill. */
+  const [adopted, setAdopted] = useState(false);
   const [spoken, setSpoken] = useState<number[]>([]);
 
-  const start = useCallback(() => {
-    if (oracle) setStarted(true);
-  }, [oracle]);
+  const start = useCallback(
+    (already?: boolean) => {
+      if (!oracle) return;
+      if (already) setAdopted(true);
+      setStarted(true);
+    },
+    [oracle],
+  );
 
   useEffect(() => {
     if (!oracle || !started) return;
+    if (adopted) {
+      setReady(true);
+      return;
+    }
     let cancelled = false;
     setReady(false);
     oracle
@@ -65,7 +76,7 @@ export function useCase({
     return () => {
       cancelled = true;
     };
-  }, [oracle, config, started]);
+  }, [oracle, config, started, adopted]);
 
   const deductions = useMemo(
     () => deduce(n, config.liars, testimony, turned),

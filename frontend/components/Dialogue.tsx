@@ -75,7 +75,7 @@ export function Dialogue({ line, onDone }: { line: Line | null; onDone?: () => v
                         : "text-blood-hot",
                   ].join(" ")}
                 >
-                  {line.speaker ? line.speaker.name.toUpperCase() : ",, "}
+                  {line.speaker ? line.speaker.name.toUpperCase() : "..."}
                   {line.speaker?.role && (
                     <span className="ml-2 text-bone-dim/75">{line.speaker.role}</span>
                   )}

@@ -12,7 +12,8 @@
     "deploy:mainnet": "hardhat ignition deploy ignition/modules/Mentalist.ts --network base",
     "node": "docker compose up",
     "test:forge": "forge test -vv",
-    "play:onchain": "npx tsx scripts/play-onchain.ts"
+    "play:onchain": "npx tsx scripts/play-onchain.ts",
+    "deploy:market": "npx tsx scripts/deploy-market.ts"
   },
   "devDependencies": {
     "@inco/lightning-js": "1.0.0",

@@ -158,7 +158,7 @@ contract CaseMarketTest is IncoTest {
     }
 
     function _sealAfterWindow() internal {
-        (uint64 closesAt,,, ) = market.rounds(CASE_IX);
+        (uint64 closesAt, , , , , ) = market.rounds(CASE_IX);
         vm.warp(closesAt + market.playWindow() + 1);
         market.sealRound(CASE_IX);
     }
@@ -168,7 +168,7 @@ contract CaseMarketTest is IncoTest {
     function test_EnterStakesIntoThePotAndStartsTheClock() public {
         uint256 id = _enter(jane, 1_000_000);
 
-        (, uint128 pot, uint32 entrants, ) = market.rounds(CASE_IX);
+        (, uint128 pot, , uint32 entrants, , ) = market.rounds(CASE_IX);
         assertEq(pot, 1_000_000, "pot took the stake");
         assertEq(entrants, 1, "one entrant");
         assertEq(usdc.balanceOf(address(market)), 1_000_000, "market custodies the stake");
@@ -176,7 +176,7 @@ contract CaseMarketTest is IncoTest {
         assertEq(market.timeLeft(CASE_IX, jane), market.playWindow(), "clock started");
         assertTrue(market.hasPlayed(CASE_IX, jane), "recorded as played");
 
-        (uint128 stake, uint256 caseId,, ) = market.entries(CASE_IX, jane);
+        (uint128 stake, uint256 caseId, , , , ) = market.entries(CASE_IX, jane);
         assertEq(stake, 1_000_000);
         assertEq(caseId, id, "bound to the case she opened");
     }
@@ -242,7 +242,7 @@ contract CaseMarketTest is IncoTest {
     }
 
     function test_CannotEnterOnceTheRoundHasClosed() public {
-        (uint64 closesAt,,, ) = market.rounds(CASE_IX);
+        (uint64 closesAt, , , , , ) = market.rounds(CASE_IX);
         vm.warp(closesAt);
 
         uint256 id = _openCase(jane);
@@ -260,9 +260,9 @@ contract CaseMarketTest is IncoTest {
         vm.prank(jane);
         market.recordResult(CASE_IX);
 
-        (,, bool won, ) = _entry(jane);
+        (, , , , bool won, ) = _entry(jane);
         assertTrue(won, "named him, and named him in time");
-        (, uint128 winningStake, uint32 winners, ) = market.rounds(CASE_IX);
+        (, , uint128 winningStake, , uint32 winners, ) = market.rounds(CASE_IX);
         assertEq(winningStake, 1_000_000);
         assertEq(winners, 1);
     }
@@ -276,9 +276,9 @@ contract CaseMarketTest is IncoTest {
         vm.prank(jane);
         market.recordResult(CASE_IX);
 
-        (,, bool won, ) = _entry(jane);
+        (, , , , bool won, ) = _entry(jane);
         assertFalse(won, "the clock beat her");
-        (, uint128 winningStake,, ) = market.rounds(CASE_IX);
+        (, , uint128 winningStake, , , ) = market.rounds(CASE_IX);
         assertEq(winningStake, 0, "a late solve funds the pot like any other loss");
     }
 
@@ -289,7 +289,7 @@ contract CaseMarketTest is IncoTest {
         vm.prank(jane);
         market.recordResult(CASE_IX);
 
-        (,, bool won, ) = _entry(jane);
+        (, , , , bool won, ) = _entry(jane);
         assertFalse(won);
     }
 

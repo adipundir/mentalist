@@ -84,6 +84,14 @@ function asBool(plaintext: unknown): boolean {
  */
 export interface ChainOracle extends Oracle {
   caseId(): number | null;
+  /**
+   * Play a case that already exists.
+   *
+   * The market opens the case as part of taking your stake, so by the time the room is
+   * playable the case is already dealt and already yours. This adopts it instead of opening
+   * a second one and charging you twice.
+   */
+  adopt(id: bigint): void;
   /** Submit the covalidator attestation so the *contract* rules on your accusation. */
   settle(): Promise<{ hash: Hex; solved: boolean }>;
   /** How many Megapot tickets this closed case is worth. */
@@ -296,6 +304,10 @@ export function chainOracle(opts: {
     },
 
     caseId: () => (caseId === null ? null : Number(caseId)),
+
+    adopt(id: bigint) {
+      caseId = id;
+    },
 
     async settle() {
       if (caseId === null || !verdict) throw new Error("nothing to settle");
