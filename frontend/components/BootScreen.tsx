@@ -17,24 +17,30 @@ import * as sfx from "@/lib/sound";
  * before a gesture, so the one screen that *requires* a click is the right place to do it.
  */
 
+/**
+ * Two steps, not four.
+ *
+ * This screen exists to do the two things that genuinely cannot happen before a click,
+ * unlocking audio and loading the voices, and to cover the font swap. It is not a progress
+ * bar for work that is not happening, so it no longer pretends to be one.
+ */
 const STEPS = [
-  { label: "OPENING THE FILE", work: async () => sfx.startRoomTone() },
   {
-    label: "WAKING THE WITNESSES",
+    label: "OPENING THE FILE",
     work: async () => {
+      sfx.startRoomTone();
       unlockNarrator();
       await loadVoices();
     },
   },
   {
-    label: "CHECKING THE TAPE",
+    label: "WAKING THE WITNESSES",
     work: async () => {
       if (typeof document !== "undefined" && "fonts" in document) {
         await (document as unknown as { fonts: { ready: Promise<unknown> } }).fonts.ready;
       }
     },
   },
-  { label: "TWO THOUSAND ONE HUNDRED AND SIXTY-FOUR NAMES", work: async () => {} },
 ];
 
 export function BootScreen({ onReady }: { onReady: () => void }) {
@@ -51,13 +57,15 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
         setStep(i);
         sfx.tick(180 + i * 40, 0.04, 0.04);
         await STEPS[i].work();
-        // A floor per step so the sequence has a rhythm instead of flickering past.
-        await new Promise((r) => setTimeout(r, 520));
+        // Just enough of a floor to read as a beat rather than a flicker. It used to be
+        // 520ms across four steps, which is two seconds of watching a bar move.
+        await new Promise((r) => setTimeout(r, 170));
       }
       sfx.knock(0.7);
       setDone(true);
       void narrate("Everybody lies. The trick is working out which way.", { rate: 0.92 });
-      setTimeout(onReady, 2600);
+      // Do not hold the screen for the whole line: it carries on over the board.
+      setTimeout(onReady, 650);
     })();
   }, [onReady]);
 

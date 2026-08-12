@@ -2,7 +2,7 @@
 pragma solidity ^0.8.30;
 
 import { IncoTest } from "@inco/lightning/src/test/IncoTest.sol";
-import { e, ebool } from "@inco/lightning/src/Lib.sol";
+import { e, ebool, inco } from "@inco/lightning/src/Lib.sol";
 import { DecryptionAttestation } from "@inco/lightning/src/lightning-parts/DecryptionAttester.types.sol";
 import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Mentalist } from "../contracts/Mentalist.sol";
@@ -120,6 +120,12 @@ contract CaseMarketTest is IncoTest {
 
     // ── helpers ────────────────────────────────────────────────
 
+    /// @dev The player encrypts the seat on their own machine. This is the test-side stand-in
+    ///      for that, and it is the only reason these tests know who was named.
+    function _sealed(address who, uint8 seat) internal view returns (bytes memory) {
+        return fakePrepareEuint256Ciphertext(uint256(seat), who, address(game));
+    }
+
     function _openCase(address who) internal returns (uint256 id) {
         uint256 fee = game.quoteOpenFee(N);
         vm.prank(who);
@@ -155,8 +161,10 @@ contract CaseMarketTest is IncoTest {
         uint8 killer = _killerOf(id);
         uint8 seat = correct ? killer : (killer + 1) % N;
 
-        vm.prank(who);
-        game.accuse(id, seat);
+        bytes memory sealedSeat = _sealed(who, seat);
+        vm.startPrank(who);
+        game.accuse{ value: inco.getFee() }(id, sealedSeat);
+        vm.stopPrank();
         processAllOperations();
 
         (DecryptionAttestation memory att, bytes[] memory sigs) = getDecryptionAttestation(
@@ -297,8 +305,10 @@ contract CaseMarketTest is IncoTest {
         market.claimSeat(CASE_IX, id);
         _hearEveryone(jane, id);
 
-        vm.prank(jane);
-        game.accuse(id, 0);
+        bytes memory sealedSeat = _sealed(jane, 0);
+        vm.startPrank(jane);
+        game.accuse{ value: inco.getFee() }(id, sealedSeat);
+        vm.stopPrank();
         processAllOperations();
 
         vm.prank(jane);

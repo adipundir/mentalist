@@ -29,7 +29,7 @@ export default function Home() {
   }, []);
 
   return (
-    <main className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
+    <main className="relative flex min-h-[100dvh] flex-col items-center justify-center px-6 pb-20 text-center">
       {/* the mark, watching */}
       <motion.svg
         viewBox="0 0 120 120"

@@ -18,6 +18,7 @@
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
 import { bytesToHex, decodeEventLog, pad, toHex } from "viem";
 import { Lightning } from "@inco/lightning-js/lite";
+import { handleTypes } from "@inco/lightning-js";
 import { MENTALIST_ABI, MENTALIST_ADDRESS } from "./contracts";
 import type { CaseConfig, Phase } from "./case";
 import type { AskResult, DealtCase, Oracle } from "./oracle";
@@ -257,54 +258,65 @@ export function chainOracle(opts: {
     async accuse(seat, onPhase) {
       if (caseId === null) throw new Error("no case open");
 
-      const receipt = await send("accuse", [caseId, seat], undefined, "named them", onPhase);
+      // Encrypt the name here, on this machine, before anything leaves it. The seat never
+      // appears in the transaction, the logs, or any block explorer: the contract ingests a
+      // ciphertext and compares it to the hidden seat inside the enclave. Without this the
+      // whole wager would be public the moment it was placed.
+      onPhase?.("encrypting");
+      const zap = await getZap();
+      const sealed = await zap.encrypt(BigInt(seat), {
+        accountAddress: account,
+        dappAddress: MENTALIST_ADDRESS,
+        handleType: handleTypes.euint256,
+      });
 
+      const fee = (await publicClient.readContract({
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
+        functionName: "quoteNameFee",
+      })) as bigint;
+
+      const receipt = await send("accuse", [caseId, sealed], fee, "named him", onPhase);
+
+      let verdictHandle: Hex | null = null;
       let guiltHandles: Hex[] = [];
-      let liarHandles: Hex[] = [];
       for (const log of receipt.logs) {
         try {
           const parsed = decodeEventLog({ abi: MENTALIST_ABI, ...log });
           if (parsed.eventName === "Accused") {
-            const a = parsed.args as unknown as { guiltHandles: readonly Hex[]; liarHandles: readonly Hex[] };
+            const a = parsed.args as { verdict: Hex; guiltHandles: readonly Hex[] };
+            verdictHandle = a.verdict;
             guiltHandles = [...a.guiltHandles];
-            liarHandles = [...a.liarHandles];
           }
         } catch {
           /* not one of ours */
         }
       }
+      if (!verdictHandle) throw new Error("no verdict in the receipt");
 
-      // Public reveal, no wallet signature, and one round-trip for the whole board rather
-      // than 2N sequential ones.
-      onPhase?.("revealing");
-      const zap = await getZap();
-      const revealed = await withPatience(() =>
-        zap.attestedReveal([...guiltHandles, ...liarHandles], {
+      onPhase?.("reading");
+      const [v, ...board] = await withPatience(() =>
+        zap.attestedDecrypt(walletClient as never, [verdictHandle!, ...guiltHandles] as never, {
           backoffConfig: BACKOFF,
         } as never),
       );
 
-      const byHandle = new Map(revealed.map((r) => [r.handle.toLowerCase(), r]));
-      const readAt = (h: Hex) => asBool(byHandle.get(h.toLowerCase())?.plaintext);
+      const solved = asBool((v as { plaintext: unknown }).plaintext);
+      const killer = board.findIndex((b) => asBool((b as { plaintext: unknown }).plaintext));
 
-      const guilt = guiltHandles.map(readAt);
-      const liars = liarHandles.map(readAt);
-      const killer = guilt.findIndex(Boolean);
-
-      const verdictRaw = byHandle.get(guiltHandles[seat].toLowerCase());
-      if (verdictRaw) {
-        verdict = {
-          handle: verdictRaw.handle as Hex,
-          value: pad(toHex(asBool(verdictRaw.plaintext) ? 1 : 0), { size: 32 }),
-          signatures: (verdictRaw.covalidatorSignatures as Uint8Array[]).map((sig) => bytesToHex(sig)),
-          solved: killer === seat,
-        };
-      }
+      verdict = {
+        handle: verdictHandle,
+        value: pad(toHex(solved ? 1 : 0), { size: 32 }),
+        signatures: ((v as { covalidatorSignatures: Uint8Array[] }).covalidatorSignatures).map(
+          (sig) => bytesToHex(sig),
+        ),
+        solved,
+      };
 
       onPhase?.("idle");
       return {
-        correct: killer === seat,
-        truth: { caseId: Number(caseId), killer, liars },
+        correct: solved,
+        truth: { caseId: Number(caseId), killer, liars: [] },
       };
     },
 

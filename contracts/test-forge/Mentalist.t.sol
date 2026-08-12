@@ -43,6 +43,12 @@ contract MentalistTest is IncoTest {
 
     // ── helpers ────────────────────────────────────────────────
 
+    /// @dev The player encrypts the seat on their own machine. This is the test-side stand-in
+    ///      for that, and it is the only reason these tests know who was named.
+    function _sealed(address who, uint8 seat) internal view returns (bytes memory) {
+        return fakePrepareEuint256Ciphertext(uint256(seat), who, address(game));
+    }
+
     function _open(uint8 n) internal returns (uint256 id) {
         uint256 fee = game.quoteOpenFee(n);
         vm.prank(detective);
@@ -102,8 +108,10 @@ contract MentalistTest is IncoTest {
 
         (uint8 liar, ) = _liarSeat(id, n);
         uint8 named = correct ? liar : (liar + 1) % n;
-        vm.prank(detective);
-        game.accuse(id, named);
+        bytes memory sealedSeat = _sealed(detective, named);
+        vm.startPrank(detective);
+        game.accuse{ value: inco.getFee() }(id, sealedSeat);
+        vm.stopPrank();
         processAllOperations();
         _settle(id);
     }
@@ -133,14 +141,15 @@ contract MentalistTest is IncoTest {
         bool[4] memory seen;
         uint8 distinct;
 
-        for (uint8 k = 0; k < 24; k++) {
+        // Only the deal is under test, so these cases are never played out. Opening the next
+        // one closes the last as a walk-away, which is exactly what abandoning a room does.
+        for (uint8 k = 0; k < 10; k++) {
             uint256 id = _open(n);
             (uint8 seat, ) = _liarSeat(id, n);
             if (!seen[seat]) {
                 seen[seat] = true;
                 distinct++;
             }
-            _play(id, n, true);
         }
 
         assertGe(distinct, 3, "the liar is not pinned to one seat");
@@ -224,9 +233,14 @@ contract MentalistTest is IncoTest {
         game.beginHearing(id);
         processAllOperations();
 
+        // Both of these are external calls, so they are made before the prank and the
+        // expectRevert, either of which they would otherwise spend.
+        bytes memory ct = _sealed(stranger, 0);
+        uint256 fee = inco.getFee();
+
         vm.prank(stranger);
         vm.expectRevert(Mentalist.NotYourCase.selector);
-        game.accuse(id, 0);
+        game.accuse{ value: fee }(id, ct);
     }
 
     // ── the verdict ────────────────────────────────────────────
@@ -266,8 +280,10 @@ contract MentalistTest is IncoTest {
         vm.prank(detective);
         game.beginHearing(id);
         processAllOperations();
-        vm.prank(detective);
-        game.accuse(id, 0);
+        bytes memory sealedSeat = _sealed(detective, 0);
+        vm.startPrank(detective);
+        game.accuse{ value: inco.getFee() }(id, sealedSeat);
+        vm.stopPrank();
         processAllOperations();
 
         (DecryptionAttestation memory att, bytes[] memory sigs) = _attest(
@@ -295,8 +311,10 @@ contract MentalistTest is IncoTest {
         vm.prank(detective);
         game.beginHearing(id);
         processAllOperations();
-        vm.prank(detective);
-        game.accuse(id, 0);
+        bytes memory sealedSeat = _sealed(detective, 0);
+        vm.startPrank(detective);
+        game.accuse{ value: inco.getFee() }(id, sealedSeat);
+        vm.stopPrank();
         processAllOperations();
 
         uint256 fee = game.quoteOpenFee(4);

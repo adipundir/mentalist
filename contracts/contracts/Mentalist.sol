@@ -70,6 +70,8 @@ contract Mentalist {
     /// @dev The handle settlement must attest over, the accused seat's guilt bit.
     mapping(uint256 => bytes32) public verdictHandle;
 
+    /// @dev The seat holding the account that cannot be true. Never leaves the enclave.
+    mapping(uint256 => euint256) internal _tellSeat;
     /// @dev seat -> the encrypted index of the account that seat gives.
     mapping(uint256 => mapping(uint8 => euint256)) internal _statement;
 
@@ -98,10 +100,10 @@ contract Mentalist {
     /// @notice the Tyger got to the last witness you spoke to. Their honesty bit flipped.
 
     /// @param guiltHandles every seat's guilt bit, revealed, the case is over
+    /// @dev No seat here on purpose: who you named is encrypted and must stay that way.
     event Accused(
         uint256 indexed caseId,
         address indexed detective,
-        uint8 seat,
         bytes32 verdict,
         bytes32[] guiltHandles
     );
@@ -120,6 +122,8 @@ contract Mentalist {
     // ─────────────────────────────────────────── errors
 
     error BadConfig();
+    /// @dev Ingesting a ciphertext costs an Inco fee, and it has to be covered.
+    error FeeTooLow();
     /// @dev He has already said his piece. Everyone speaks exactly once.
     error AlreadyHeard();
     /// @dev You named someone and never filed the verdict. Settle it before opening another.
@@ -153,6 +157,13 @@ contract Mentalist {
      */
     function quoteOpenFee(uint8 suspects) public view returns (uint256) {
         return inco.getFee() * (uint256(suspects) + 2);
+    }
+
+    /// @notice What it costs to submit an encrypted accusation.
+    /// @dev One ciphertext ingest. Quoted with headroom so a fee refresh between the quote
+    ///      and the call cannot leave the player short.
+    function quoteNameFee() public view returns (uint256) {
+        return inco.getFee() * 2;
     }
 
     // ─────────────────────────────────────────── the game
@@ -257,6 +268,8 @@ contract Mentalist {
         // thing about this case that is secret. Everything else, the room, the people, the
         // words they say, is written down in the open where anyone can read it.
         euint256 tellSeat = e.randBounded(uint256(suspects));
+        _tellSeat[caseId] = tellSeat;
+        e.allowThis(tellSeat);
 
         for (uint8 i = 0; i < suspects; i++) {
             euint256 seatIx = e.asEuint256(uint256(i));
@@ -323,14 +336,36 @@ contract Mentalist {
         return _statement[caseId][seat];
     }
 
-    function accuse(uint256 caseId, uint8 seat) external {
+    /**
+     * @notice Name him. The name is encrypted on your machine before it is sent.
+     *
+     * @dev    `encryptedSeat` is a ciphertext the player produced locally, so the seat they
+     *         accuse never appears in the transaction, in the logs, or in any block
+     *         explorer. The contract ingests it, compares it to the hidden seat inside the
+     *         enclave, and stores an encrypted verdict that only this detective can read.
+     *
+     *         This closes the last plaintext leak in the game. The answer was already
+     *         secret and dealt per player, but the accusation used to go out in the clear,
+     *         which meant anyone watching the chain could see who you had backed and, once
+     *         the board opened, whether you were right. Now both halves of the wager are
+     *         confidential and the pool settles on an attestation rather than on anything
+     *         anybody could read off the wire.
+     *
+     *         The board itself is revealed here, so the player gets a post-mortem. That is
+     *         safe: every case is dealt independently, so opening your own board tells
+     *         nobody anything about theirs.
+     */
+    function accuse(uint256 caseId, bytes calldata encryptedSeat) external payable {
         Case storage c = cases[caseId];
         if (c.status != Status.Open) revert WrongStatus();
         if (c.detective != msg.sender) revert NotYourCase();
-        if (seat >= c.suspects) revert BadSeat();
+        if (msg.value < inco.getFee()) revert FeeTooLow();
 
-        // The whole board opens at once, so the player can see who was actually lying and
-        // not merely be told they were wrong.
+        euint256 named = encryptedSeat.newEuint256(msg.sender);
+        ebool correct = e.eq(named, _tellSeat[caseId]);
+        e.allow(correct, msg.sender);
+        e.allowThis(correct);
+
         bytes32[] memory guiltHandles = new bytes32[](c.suspects);
         for (uint8 i = 0; i < c.suspects; i++) {
             ebool g = _guilt[caseId][i];
@@ -338,11 +373,10 @@ contract Mentalist {
             guiltHandles[i] = ebool.unwrap(g);
         }
 
-        c.accusedSeat = seat;
         c.status = Status.Accused;
-        verdictHandle[caseId] = guiltHandles[seat];
+        verdictHandle[caseId] = ebool.unwrap(correct);
 
-        emit Accused(caseId, msg.sender, seat, guiltHandles[seat], guiltHandles);
+        emit Accused(caseId, msg.sender, ebool.unwrap(correct), guiltHandles);
     }
 
     /**

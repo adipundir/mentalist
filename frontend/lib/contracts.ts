@@ -47,6 +47,13 @@ export const MENTALIST_ABI = [
   },
   {
     type: "function",
+    name: "quoteNameFee",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    type: "function",
     name: "beginHearing",
     stateMutability: "nonpayable",
     inputs: [{ name: "caseId", type: "uint256" }],
@@ -65,10 +72,10 @@ export const MENTALIST_ABI = [
   {
     type: "function",
     name: "accuse",
-    stateMutability: "nonpayable",
+    stateMutability: "payable",
     inputs: [
       { name: "caseId", type: "uint256" },
-      { name: "seat", type: "uint8" },
+      { name: "encryptedSeat", type: "bytes" },
     ],
     outputs: [],
   },
@@ -192,7 +199,6 @@ export const MENTALIST_ABI = [
     inputs: [
       { name: "caseId", type: "uint256", indexed: true },
       { name: "detective", type: "address", indexed: true },
-      { name: "seat", type: "uint8" },
       { name: "verdict", type: "bytes32" },
       { name: "guiltHandles", type: "bytes32[]" },
     ],
