@@ -121,7 +121,7 @@ export default function Home() {
       </motion.div>
 
       <AnimatePresence>
-        {booting && <BootScreen onReady={() => router.push("/story")} />}
+        {booting && <BootScreen onReady={() => router.push("/cases")} />}
       </AnimatePresence>
     </main>
   );

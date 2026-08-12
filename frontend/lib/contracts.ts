@@ -10,9 +10,6 @@ import { baseSepolia } from "wagmi/chains";
 export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ??
   "") as `0x${string}`;
 
-export const REWARDS_ADDRESS = (process.env.NEXT_PUBLIC_REWARDS_ADDRESS ??
-  "") as `0x${string}`;
-
 /** The pari-mutuel pool. Holds every stake and pays the winners in Megapot tickets. */
 export const MARKET_ADDRESS = (process.env.NEXT_PUBLIC_MARKET_ADDRESS ??
   "") as `0x${string}`;
@@ -209,36 +206,6 @@ export const MENTALIST_ABI = [
   },
 ] as const;
 
-export const REWARDS_ABI = [
-  {
-    type: "function",
-    name: "claimTickets",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "caseId", type: "uint256" }],
-    outputs: [{ type: "uint256[]" }],
-  },
-  {
-    type: "function",
-    name: "ticketsEarned",
-    stateMutability: "view",
-    inputs: [{ name: "caseId", type: "uint256" }],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "fundedTicketsRemaining",
-    stateMutability: "view",
-    inputs: [],
-    outputs: [{ type: "uint256" }],
-  },
-  {
-    type: "function",
-    name: "rewarded",
-    stateMutability: "view",
-    inputs: [{ name: "", type: "uint256" }],
-    outputs: [{ type: "bool" }],
-  },
-] as const;
 
 /**
  * `CaseMarket`, the betting half.

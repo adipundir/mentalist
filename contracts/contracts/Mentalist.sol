@@ -133,6 +133,8 @@ contract Mentalist {
     // ─────────────────────────────────────────── errors
 
     error BadConfig();
+    /// @dev You named someone and never filed the verdict. Settle it before opening another.
+    error UnsettledCase(uint256 caseId);
     error NotYourCase();
     error WrongStatus();
     error NoFocusLeft();
@@ -184,19 +186,32 @@ contract Mentalist {
         uint256 fee = quoteOpenFee(suspects);
         if (msg.value < fee) revert FeeNotCovered(fee, msg.value);
 
-        // Walking away from an unresolved case is a loss.
+        // Resolving the case you left behind, without destroying one you already won.
         //
-        // Without this, the streak is worthless: settlement is player-initiated, so a
-        // detective who accused wrongly could simply never submit the attestation, leave
-        // the case hanging, and open a fresh one with their streak intact. Only winning
-        // cases would ever be settled and every leaderboard entry would be a lie. Opening
-        // a new case is therefore the moment the previous one is forced to resolve.
+        // Settlement is player-initiated, so a detective who accused wrongly could once
+        // simply never submit the attestation, leave the case hanging, and open a fresh one
+        // with their streak intact. The original fix force-closed *any* unresolved previous
+        // case as a loss, which was correct when a streak was the only thing at stake.
+        //
+        // It is not correct now that a case can carry money. A player who accused, and is
+        // one transaction away from filing a verdict that says they were right, would have
+        // that case rewritten as a loss the moment they opened another one, and the market
+        // settles on exactly that flag. So the two states are treated differently:
+        //
+        //   Open     you walked away without even naming anyone. That is a loss.
+        //   Accused  the answer already exists and only you can file it. File it first.
+        //
+        // Neither leaves a route to a free abandon, and neither can turn a win into a loss.
         uint256 previous = latestCaseOf[msg.sender];
-        if (previous != 0 && cases[previous].status != Status.Closed) {
-            cases[previous].status = Status.Closed;
-            cases[previous].solved = false;
-            streak[msg.sender] = 0;
-            emit CaseAbandoned(previous, msg.sender);
+        if (previous != 0) {
+            Status prior = cases[previous].status;
+            if (prior == Status.Accused) revert UnsettledCase(previous);
+            if (prior == Status.Open) {
+                cases[previous].status = Status.Closed;
+                cases[previous].solved = false;
+                streak[msg.sender] = 0;
+                emit CaseAbandoned(previous, msg.sender);
+            }
         }
 
         caseId = nextCaseId++;

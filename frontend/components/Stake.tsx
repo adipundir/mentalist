@@ -55,6 +55,8 @@ export function Stake({
   const [pot, setPot] = useState<bigint>(0n);
   const [entrants, setEntrants] = useState(0);
   const [balance, setBalance] = useState<bigint | null>(null);
+  /** This wallet has already used its entry on a case that can no longer be played. */
+  const [resumeBlocked, setResumeBlocked] = useState(false);
 
   // What the pot is worth right now, and whether this wallet has already had its go.
   useEffect(() => {
@@ -86,9 +88,23 @@ export function Stake({
         setPot(round[1]);
         setEntrants(Number(round[3]));
         setBalance(bal);
+        // Only resume a case that is still open and genuinely untouched. Rejoining one
+        // that has questions already spent, or that was accused before a reload, hands the
+        // player a room where nothing they do can work.
         if (entry[0] > 0n) {
-          setStep("done");
-          onEntered(entry[1]);
+          const c = await pub.readContract({
+            address: MENTALIST_ADDRESS,
+            abi: MENTALIST_ABI,
+            functionName: "getCase",
+            args: [entry[1]],
+          });
+          if (!live) return;
+          if (c.status === 1 && c.questionsAsked === 0) {
+            setStep("done");
+            onEntered(entry[1]);
+          } else {
+            setResumeBlocked(true);
+          }
         }
       } catch {
         /* a cold RPC read is not worth a message to the player */
@@ -171,6 +187,17 @@ export function Stake({
   }, [wallet, pub, address, stake, chapter, caseIndex, onEntered]);
 
   if (step === "done") return null;
+
+  if (resumeBlocked) {
+    return (
+      <p className="text-center font-body text-[15px] text-bone">
+        You have already had your go at this room.{" "}
+        <a href="/cases" className="text-blood-hot underline">
+          Pick another case.
+        </a>
+      </p>
+    );
+  }
 
   const busy = step !== "idle";
   const short = balance !== null && balance < stake;

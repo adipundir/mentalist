@@ -3,7 +3,7 @@
 **A confidential deduction game for the Inco Summer Game Jam 2026.**
 
 > Nine suspects. One is Red John. Everyone lies, but Red John *always* lies.
-> You have six units of Focus. Read the room.
+> Everyone in this room knows who did it. Not all of them will tell you.
 
 ---
 
@@ -52,104 +52,105 @@ honestly, which is precisely the information the game is about.
 
 A case is dealt entirely by the TEE:
 
-- **N suspects** (9 in the standard case) laid out as dossier cards.
+- **N suspects** (between 3 and 8, depending on the case) standing in the room it happened in.
 - Exactly **one** is Red John, placed by `e.shuffle` over a list of `[1 × true, N-1 × false]`.
   The randomness lives in the *permutation*, so the placement is uniform by construction
   and no one, player, deployer, chain observer, can predict it.
-- **K of them are liars** (3 in the standard case): an independent `e.shuffle`.
+- **K of them are liars** (between 1 and 4, depending on the case): an independent `e.shuffle`.
 - **Red John is forced to lie**: `liar[i] = e.or(liar[i], guilt[i])`.
   One encrypted OR. So the true liar count is K or K+1, and *you don't know which*, which is a feature: it denies you an exact parity check on the liar population.
 
 ### 2.2 The move
 
-You spend **Focus** (6 in the standard case) on interrogations. One interrogation is:
+You click one suspect. That is the entire input.
 
-> **Witness `w`**: "Is the killer one of *these* people?" (a subset `S` of the lineup)
-
-The contract computes, without ever leaving encrypted state:
+Each of them has exactly one statement in him, and it is always about the same fixed set of
+other suspects, decided when the case was written rather than when it was dealt. The contract
+computes, without ever leaving encrypted state:
 
 ```solidity
-ebool truth = FALSE;
-for (i in S) truth = e.or(truth, guilt[i]);   // is the killer in S?
-ebool answer = e.xor(truth, liar[w]);         // ...as filtered through w's honesty
-e.allow(answer, msg.sender);                  // only the detective may decrypt it
+ebool truth  = e.or(guilt[s] for s in S);   // is the killer inside that set?
+ebool answer = e.xor(truth, liar[w]);       // ...as filtered through w's honesty
+e.allow(answer, msg.sender);                // and only the detective may read it
 ```
 
-`e.allow`: not `e.reveal`. The **question is public** (it's in the event log, and in a
-duel your opponent watches you ask it). The **answer is yours alone**. That asymmetry is
-the game's spine.
+**The words are scripted. The direction is not.** If he lies, the sentence comes out
+inverted, and nothing about the delivery tells you which happened. That single `xor` is the
+whole game: what you are told is the truth about a secret you are hunting, corrupted by a
+second secret you also cannot see.
 
-### 2.3 The three questions that matter
+### 2.3 Why there is no question builder any more
 
-The strategy space collapses into three archetypal questions, and discovering them is the
-learning curve:
+An earlier draft let the player assemble the set: pick a witness, then click others to build
+a bitmask, then press ask, on a budget called Focus. It was a query builder wearing an
+interrogation's clothes. Nobody guessed it, and it buried a mechanic that is genuinely one
+sentence long.
 
-**1. The control question**: `S = everyone`.
-The killer is *always* among all N suspects, so the truth is always `TRUE`. The answer is
-therefore `NOT liar[w]`, exactly. **This is a perfect, 100%-reliable honesty test.** It is
-also literally the interrogator's technique it's named after: *ask a question you already
-know the answer to*. Costs 2 Focus.
+Fixing the sets costs less than it looks. The player never had private information when
+choosing them, so removing the choice removes bookkeeping, not strategy. What remains is the
+part that was always the game: hearing a room of contradictory statements and working out
+which of them are inverted.
 
-**2. The split**: `S = about half the board`.
-A binary search. Worth a full bit **if and only if** you know the witness's honesty. Costs
-1 Focus.
+### 2.4 Who each man speaks about is searched, not authored
 
-**3. The self-incrimination**: `S = {w}`, asking a witness about themselves.
-| Witness is… | truth | liar | answer |
-|---|---|---|---|
-| innocent + honest | false | 0 | **NO** |
-| innocent + liar | false | 1 | **YES** |
-| Red John | true | 1 (forced) | **NO** |
+The claim masks are not chosen by taste. For each case, every candidate assignment is scored
+by exhaustive enumeration over the dealer's entire world set, and the one that leaves the
+fewest suspects standing wins.
 
-A **YES is proof of an innocent liar**: it both exposes a liar and clears them. A NO is
-weak evidence of honesty. Costs 1 Focus.
+This matters because the statements have to constrain each other. Given the observed answers,
+each candidate killer *forces* every suspect's honesty: if he did it, then whoever put him
+inside their set is telling the truth and whoever cleared him is lying. A candidate survives
+only if the liar count that implies is one the dealer could have produced, and if the
+candidate is himself among the liars. Badly chosen sets leave that system underdetermined
+and the room becomes a coin flip.
 
-### 2.4 Why a known liar is as good as an honest witness
+### 2.5 What the deduction actually costs you
 
-This is the elegant part. Once a control question tells you witness `w` lies, `w` becomes a
-*perfect oracle*, just invert everything they say. So a control question is never wasted;
-it always converts a witness into a usable instrument. The tension isn't "did I waste a
-move," it's **"can I afford the 2 Focus to be certain, or do I gamble the 1?"**
+Nothing, in resources. Everyone speaks once, so there is no budget to mismanage and no
+dominant line to memorise. The cost is attention: the answers must be tracked *under
+inversion*, which is exactly where humans slip.
 
-### 2.5 The Focus economy is deliberately tight
-
-Standard case: **N = 9, K = 3, Focus = 6.**
-
-- Safe line: control (2) + binary splits. The **worst case** is four splits, so 6 Focus is
-  exactly enough to guarantee a win with correct play. Most layouts collapse in three
-  splits, finishing on 5 and leaving **one Focus of surplus**.
-- Greedy line: skip the control, trust a witness blind (~61% they're honest), and bank
-  more surplus, at the risk of reading every answer backwards.
-
-That surplus is the point. Leftover Focus converts to Megapot tickets (§4), so the reward
-for playing well is denominated in lottery entries rather than in a number going up. There
-is no dominant strategy, and correct play requires accurate bookkeeping *under inversion*, exactly where humans slip under time pressure. The board is re-dealt every case, so it's a
-fresh puzzle, not a solved one.
-
-> This is measured, not asserted: `test_SixFocusAlwaysSolvesTheStandardCase` plays the
-> strategy to completion across twelve fresh deals and asserts both that the search always
-> isolates Red John and that the worst observed spend is 6. An earlier draft of this
-> document claimed the line costs *exactly* 6 every time; the test disproved it.
+The room does the arithmetic with you. The notebook narrows the candidate list from the
+statements you legitimately hold, and never reads hidden state. What it cannot do is decide
+for you when two men are still standing.
 
 ### 2.6 The accusation
 
 Free. Ends the case. Correct → the dossier flips, the red smiley stamps across the board.
-Wrong → your streak dies.
+Wrong → your stake belongs to whoever read the room correctly.
 
 ---
 
 ## 3. Difficulty ladder and replay
 
-| Case | Suspects | Liars | Focus | Twist |
-|---|---|---|---|---|
-| 1, *The Warm-Up* | 6 | 1 | 5 | tutorial; the control question is signposted |
-| 2, *The Lineup* | 9 | 3 | 6 | standard |
-| 3, *Cold Case* | 12 | 5 | 7 |, |
-| 4, *The Blind Spot* | 9 | 3 | 6 | **Red John turns a witness mid-case** |
-| 5, *Tyger Tyger* | 12 | 5 | 7 | turned witness + no control question allowed |
+Seven cases, following the real arc, one released per day. The lineup shrinks the way the
+suspect list does and the proportion of liars climbs, so the later rooms are mostly hostile.
 
-**Case 4's twist is the second Inco-only mechanic.** After your third question, Red John
-intimidates a witness: `liar[w] = e.not(liar[w])`. Encrypted state **mutates in place**.
+| Case | Suspects | Liars | Typical candidates left |
+|---|---|---|---|
+| I, *Cinnabar Sunday* | 4 | 1 | 1.25 |
+| II, *The Vermilion Hour* | 6 | 2 | 1.82 |
+| III, *Oxblood Handshake* | 8 | 3 | 2.19 |
+| IV, *Seven Shades of Crimson* | 7 | 3 | 2.34 |
+| V, *Carmine on Her Cheek* | 6 | 4 | 1.73 |
+| VI, *Claret and Brimstone* | 5 | 4 | 1.16 |
+| VII, *Sanguine* | 3 | 2 | 1.44 |
+
+**Difficulty is not the same as ambiguity.** The last column is the average number of
+suspects still standing once every statement is in, measured by exhaustive enumeration over
+the dealer's whole world set. It does not climb monotonically, because a room with almost
+nobody honest is *informative*: when four of six are lying, the pattern of lies is itself a
+constraint. The hardest rooms to be certain in are the middle ones.
+
+That residual ambiguity is the design, not a defect. A case that always resolved to one man
+would make the market pointless, since everyone who did the arithmetic would win and split
+the pot evenly. Sometimes you have to bet.
+
+**What was cut.** Earlier drafts had a Focus budget, a control question, and a turncoat that
+flipped a witness mid-case with `liar[w] = e.not(liar[w])`. All three are gone. The turncoat
+was the better Inco demonstration and the worse game: with one statement per suspect there
+is nothing left to re-ask, so silently invalidating a statement was pure noise. The contract
+still implements it, and every round is configured with it switched off.
 Your control question from turn 1 is now stale, information *decays*. A zk commitment
 can't do this (the commitment is frozen); a trusted server can, but then the server is the
 game. This is the clearest demonstration in the project of Inco's actual architectural
@@ -171,13 +172,17 @@ long shot, the one case nobody solves.
 
 ### 4.1 The mechanic
 
-- **Efficiency pays.** Unspent Focus at the moment you close a case converts 1:1 into
-  **real Megapot tickets**, minted straight to your wallet. Solving in 4 Focus instead of 6
-  is two more shots at the jackpot. This is what makes the tight Focus economy matter
-  beyond bragging rights, the skill ceiling has a payout curve attached, and a streak
-  milestone pays a bonus so a wrong accusation costs more than the case it lost.
-- **The game funds the tickets.** Megapot's gifting flow lets a payer buy for an arbitrary
-  recipient, *"tickets are never free, you fund every gift."* `CaseRewards` is the payer
+- **Conviction pays, twice.** Every player stakes USDC into one pot per case. Name the right
+  man inside your twenty minutes and you are on the winning side; miss, or run out of clock,
+  and your stake stays. When the round closes the winners split **the whole pot in proportion
+  to what each of them staked**, paid as real Megapot tickets bought for their wallets. So
+  being right pays, and having been sure enough to back it pays again.
+- **A pool, not a book.** Fixed odds would need a bookmaker with a balance sheet, and any
+  multiplier the contract set would be a number someone invented. A pari-mutuel pool prices
+  itself and can never be insolvent, because it only ever pays out what it already holds.
+- **The losers fund the tickets.** Megapot's buyer takes a recipient and a referrer as
+  separate arguments, so the market buys for the winner's wallet while naming itself
+  referrer. Nothing is minted from nowhere: `CaseMarket` is the payer
   and the player is the recipient, so someone who has never held USDC still walks away
   holding a genuine lottery ticket NFT.
 - **The tickets pay for themselves.** `CaseRewards` passes itself as the `_referrers`

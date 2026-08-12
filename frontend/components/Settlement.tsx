@@ -27,10 +27,13 @@ export function Settlement({
   oracle,
   solved,
   caseIndex,
+  onBanked,
 }: {
   oracle: ChainOracle;
   solved: boolean;
   caseIndex: number;
+  /** Fires once the verdict is filed and recorded, so the page can let the player move on. */
+  onBanked?: () => void;
 }) {
   const { address } = useAccount();
   const pub = usePublicClient();
@@ -54,10 +57,14 @@ export function Settlement({
       setSealed(round[5]);
       setShare(mine);
       setClaimed(entry[5]);
-      if (entry[3] && step === "record") setStep("settled");
+      if (entry[3]) {
+        onBanked?.();
+        if (step === "record") setStep("settled");
+      }
     } catch {
       /* a cold read is not worth a message */
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pub, address, caseIndex, step]);
 
   useEffect(() => {
@@ -91,6 +98,7 @@ export function Settlement({
       await pub.waitForTransactionReceipt({ hash });
       setHashes((h) => ({ ...h, record: hash }));
       setStep("settled");
+      onBanked?.();
       void refresh();
     } catch (e) {
       setError(readable(e));

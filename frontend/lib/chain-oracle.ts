@@ -18,7 +18,7 @@
 import type { Address, Hex, PublicClient, WalletClient } from "viem";
 import { bytesToHex, decodeEventLog, pad, toHex } from "viem";
 import { Lightning } from "@inco/lightning-js/lite";
-import { MENTALIST_ABI, MENTALIST_ADDRESS, REWARDS_ABI, REWARDS_ADDRESS } from "./contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS } from "./contracts";
 import type { CaseConfig, Phase } from "./case";
 import type { AskResult, DealtCase, Oracle } from "./oracle";
 
@@ -94,10 +94,6 @@ export interface ChainOracle extends Oracle {
   adopt(id: bigint): void;
   /** Submit the covalidator attestation so the *contract* rules on your accusation. */
   settle(): Promise<{ hash: Hex; solved: boolean }>;
-  /** How many Megapot tickets this closed case is worth. */
-  ticketsEarned(): Promise<number>;
-  /** Buy them, gifted straight to the player and funded by the reward treasury. */
-  claimTickets(): Promise<Hex>;
 }
 
 export function chainOracle(opts: {
@@ -319,38 +315,13 @@ export function chainOracle(opts: {
       );
       if (receipt.status !== "success") throw new Error("settlement reverted");
 
-      // Same load-balancer race as `open`: `ticketsEarned` reads the case, and a lagging
-      // node still reporting Accused would report zero tickets for a case that just earned
-      // some. Wait for Closed before anyone asks.
+      // Same load-balancer race as `open`: the market reads this case's `solved` flag next,
+      // and a lagging node still reporting Accused would record a win as a loss. Wait for
+      // Closed before anyone asks.
       await waitForStatus(3);
 
       return { hash: receipt.transactionHash, solved: verdict.solved };
     },
 
-    async ticketsEarned() {
-      if (caseId === null || !REWARDS_ADDRESS) return 0;
-      const n = (await publicClient.readContract({
-        address: REWARDS_ADDRESS,
-        abi: REWARDS_ABI,
-        functionName: "ticketsEarned",
-        args: [caseId],
-      })) as bigint;
-      return Number(n);
-    },
-
-    async claimTickets() {
-      if (caseId === null) throw new Error("no case");
-      const hash = await walletClient.writeContract({
-        address: REWARDS_ADDRESS,
-        abi: REWARDS_ABI,
-        functionName: "claimTickets",
-        args: [caseId],
-        account,
-        chain: walletClient.chain,
-      } as never);
-      onTx?.(hash, "claimed Megapot tickets");
-      await publicClient.waitForTransactionReceipt({ hash });
-      return hash;
-    },
   };
 }

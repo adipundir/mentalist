@@ -310,6 +310,30 @@ contract CaseMarketTest is IncoTest {
         market.recordResult(CASE_IX);
     }
 
+    /**
+     * @dev Shares are computed against `winningStake`, so a result recorded after the round
+     *      sealed would shrink everyone else's share retroactively and promise out more than
+     *      the pot holds. The first claimant would be paid on the old denominator.
+     */
+    function test_CannotRecordAfterTheRoundHasSealed() public {
+        uint256 a = _enter(jane, 1_000_000);
+        uint256 b = _enter(lisbon, 1_000_000);
+        _play(jane, a, true);
+        _play(lisbon, b, true);
+
+        vm.prank(jane);
+        market.recordResult(CASE_IX);
+        _sealAfterWindow();
+
+        vm.prank(lisbon);
+        vm.expectRevert(CaseMarket.AlreadySealed.selector);
+        market.recordResult(CASE_IX);
+
+        // And the player who did record in time still owns the whole pot, undiluted.
+        assertEq(market.shareOf(CASE_IX, jane), 2_000_000, "share is not retroactively cut");
+        assertEq(usdc.balanceOf(address(market)), market.reserved(), "and the books still balance");
+    }
+
     function test_RoundCannotSealEarly() public {
         vm.expectRevert(CaseMarket.RoundNotClosed.selector);
         market.sealRound(CASE_IX);

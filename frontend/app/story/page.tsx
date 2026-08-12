@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
@@ -8,6 +9,7 @@ import { CHAPTERS, FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
 import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
 import { CASE_WINDOW_MS } from "@/lib/market";
+import { releaseOf } from "@/lib/schedule";
 import { Scene } from "@/components/Scene";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { StoryCard } from "@/components/StoryCard";
@@ -30,15 +32,22 @@ type Stage = "opening" | "playing" | "closing" | "finale";
  * stall.
  */
 function StoryInner() {
-  const [index, setIndex] = useState(0);
+  const router = useRouter();
+  const params = useSearchParams();
+  const requested = Number(params.get("case") ?? 0);
+  const [index, setIndex] = useState(
+    Number.isInteger(requested) && requested >= 0 && requested < CHAPTERS.length ? requested : 0,
+  );
   const [stage, setStage] = useState<Stage>("opening");
   const [solved, setSolved] = useState(false);
+  /** True once the verdict is filed on chain and recorded against the pot. */
+  const [banked, setBanked] = useState(false);
   const [attempt, setAttempt] = useState(0);
   const [txs, setTxs] = useState<{ hash: string; label: string }[]>([]);
 
   // Each case stands for a fixed window. Set once per case so the clock does not restart
   // every render.
-  const [closesAt, setClosesAt] = useState(() => Date.now() + CASE_WINDOW_MS);
+  const [closesAt, setClosesAt] = useState(0);
 
   // The clock only means anything once a stake is down, because that is when the contract
   // starts counting. Until then it is just how long the case would stand.
@@ -47,6 +56,10 @@ function StoryInner() {
     setStaked(null);
     setClosesAt(Date.now() + CASE_WINDOW_MS);
   }, [index]);
+
+  // Never render a clock the server could not have computed the same way.
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -76,17 +89,24 @@ function StoryInner() {
 
   function finishChapter(didSolve: boolean) {
     setSolved(didSolve);
+    setBanked(false);
     setStage("closing");
   }
 
   function advance() {
     if (!solved) {
-      setAttempt((a) => a + 1);
-      setStage("opening");
+      // The case is spent: it has been accused on chain, and the market allows one entry
+      // per wallet per room. Sending them back into it would be a room where every click
+      // reverts, so they go back to the board and pick a case they can actually open.
+      router.push("/cases");
       return;
     }
     if (isLast) {
       setStage("finale");
+      return;
+    }
+    if (!releaseOf(index + 1).released) {
+      router.push("/cases");
       return;
     }
     setIndex((i) => i + 1);
@@ -102,7 +122,7 @@ function StoryInner() {
         className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex flex-wrap items-center gap-3 px-4 pb-6 pt-4 sm:px-7"
         style={{ background: "linear-gradient(rgb(6 5 7 / 0.92), transparent)" }}
       >
-        <Link href="/" className="pointer-events-auto font-type text-[15px] tracking-wide text-bone hover:text-blood-hot">
+        <Link href="/cases" className="pointer-events-auto font-type text-[15px] tracking-wide text-bone hover:text-blood-hot">
           MENTALIST
         </Link>
         <span className="text-bone-dim">/</span>
@@ -138,7 +158,7 @@ function StoryInner() {
             spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
             line: chapter.nudge.line,
           }}
-          closesAt={closesAt}
+          closesAt={mounted ? closesAt : undefined}
           variant={index}
           openedCaseId={staked}
           entry={
@@ -187,10 +207,16 @@ function StoryInner() {
             title={chapter.title}
             body={solved ? chapter.successText : chapter.failureText}
             onContinue={advance}
-            continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CASE") : "TRY AGAIN"}
+            continueDisabled={!banked}
+            continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CASE") : "BACK TO THE CASES"}
             extra={
               oracle ? (
-                <Settlement oracle={oracle} solved={solved} caseIndex={index} />
+                <Settlement
+                  oracle={oracle}
+                  solved={solved}
+                  caseIndex={index}
+                  onBanked={() => setBanked(true)}
+                />
               ) : null
             }
           />

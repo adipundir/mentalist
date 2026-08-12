@@ -428,20 +428,66 @@ contract MentalistTest is IncoTest {
         _settle(a);
         assertEq(game.streak(detective), 1);
 
-        // Accuse wrongly on the next case, then simply walk away without settling.
+        // Accuse wrongly on the next case, then try to walk away without settling.
         uint256 b = _open(n, 3, 6, 0);
         (uint8 killerB, ) = _layout(b, n);
         vm.prank(detective);
         game.accuse(b, killerB == 0 ? 1 : 0);
         processAllOperations();
 
-        // Opening a third case must close the abandoned one as a loss.
+        // The dodge is refused outright rather than scored. Force-closing an accused case
+        // as a loss would be wrong now that a case can carry a stake: the verdict already
+        // exists and might say they were right.
+        uint256 fee = game.quoteOpenFee(n);
+        vm.prank(detective);
+        vm.expectRevert(abi.encodeWithSelector(Mentalist.UnsettledCase.selector, b));
+        game.openCase{ value: fee }(n, 3, 6, 0);
+
+        // Filing it is the only way forward, and it costs them the streak honestly.
+        _settle(b);
+        assertEq(game.streak(detective), 0, "a filed miss breaks the streak");
+        _open(n, 3, 6, 0);
+    }
+
+    /// @dev A case you never even named anyone in is a genuine walk-away, and still a loss.
+    function test_WalkingAwayBeforeAccusingIsStillALoss() public {
+        uint8 n = 9;
+        uint256 a = _open(n, 3, 6, 0);
+        (uint8 killerA, ) = _layout(a, n);
+        vm.prank(detective);
+        game.accuse(a, killerA);
+        processAllOperations();
+        _settle(a);
+        assertEq(game.streak(detective), 1);
+
+        uint256 b = _open(n, 3, 6, 0);
+        vm.prank(detective);
+        game.interrogate(b, 0, uint16(1 << 1));
+        processAllOperations();
+
         _open(n, 3, 6, 0);
 
-        Mentalist.Case memory abandoned = game.getCase(b);
-        assertTrue(abandoned.status == Mentalist.Status.Closed, "abandoned case is closed");
-        assertFalse(abandoned.solved, "and scored as a loss");
-        assertEq(game.streak(detective), 0, "the streak does not survive the dodge");
+        Mentalist.Case memory walked = game.getCase(b);
+        assertTrue(walked.status == Mentalist.Status.Closed, "closed");
+        assertFalse(walked.solved, "and scored as a loss");
+        assertEq(game.streak(detective), 0, "the streak does not survive it");
+    }
+
+    /// @dev The bug this replaced: opening a second case must never rewrite a win as a loss.
+    function test_OpeningAnotherCaseCannotDestroyAFiledWin() public {
+        uint8 n = 9;
+        uint256 a = _open(n, 3, 6, 0);
+        (uint8 killerA, ) = _layout(a, n);
+        vm.prank(detective);
+        game.accuse(a, killerA);
+        processAllOperations();
+        _settle(a);
+
+        _open(n, 3, 6, 0);
+
+        Mentalist.Case memory won = game.getCase(a);
+        assertTrue(won.solved, "the win survives opening another case");
+        assertTrue(won.status == Mentalist.Status.Closed);
     }
 
     function test_AbandoningAnUnfinishedCaseAlsoCounts() public {

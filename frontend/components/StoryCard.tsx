@@ -20,6 +20,7 @@ export function StoryCard({
   speaker,
   onContinue,
   continueLabel = "CONTINUE",
+  continueDisabled = false,
   extra,
 }: {
   chapter?: string;
@@ -29,6 +30,8 @@ export function StoryCard({
   speaker?: { name: string; role: string; spec: CharacterSpec } | null;
   onContinue: () => void;
   continueLabel?: string;
+  /** Holds the player on the card until the case is actually closed out on chain. */
+  continueDisabled?: boolean;
   /** Rendered above the continue row, the on-chain settle + Megapot claim. */
   extra?: React.ReactNode;
 }) {
@@ -58,14 +61,16 @@ export function StoryCard({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/96 p-5 backdrop-blur-sm"
-      onClick={() => (!done ? setShown(body.length) : extra ? undefined : onContinue())}
+      onClick={() =>
+        !done ? setShown(body.length) : extra || continueDisabled ? undefined : onContinue()
+      }
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
           if (!done) setShown(body.length);
-          else if (!extra) onContinue();
+          else if (!extra && !continueDisabled) onContinue();
         }
       }}
     >
@@ -126,15 +131,22 @@ export function StoryCard({
 
         <div className="mt-6 flex items-center justify-between gap-3 border-t border-ink-3 pt-4">
           <span className="font-mono text-[9px] tracking-file text-bone-dim/75">
-            {!done ? "CLICK TO SKIP" : extra ? "" : "CLICK ANYWHERE TO CONTINUE"}
+            {!done
+              ? "CLICK TO SKIP"
+              : continueDisabled
+                ? "CLOSE THE CASE ON-CHAIN FIRST"
+                : extra
+                  ? ""
+                  : "CLICK ANYWHERE TO CONTINUE"}
           </span>
           <button
             type="button"
+            disabled={continueDisabled}
             onClick={(e) => {
               e.stopPropagation();
-              onContinue();
+              if (!continueDisabled) onContinue();
             }}
-            className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2 font-mono text-[10px] tracking-file text-blood-hot hover:bg-blood-hot/25"
+            className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2 font-mono text-[10px] tracking-file text-blood-hot hover:bg-blood-hot/25 disabled:cursor-not-allowed disabled:border-ink-3 disabled:bg-transparent disabled:text-bone-dim"
           >
             {continueLabel}
           </button>

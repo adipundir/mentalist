@@ -343,9 +343,12 @@ function Act({
  * belongs to the room rather than to any one suspect.
  */
 function Countdown({ closesAt }: { closesAt: number }) {
-  const [now, setNow] = useState(() => Date.now());
+  // Anchored to closesAt rather than to a clock read during render, which would differ
+  // between the server pass and the browser's first pass and fail hydration.
+  const [now, setNow] = useState(closesAt);
 
   useEffect(() => {
+    setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);

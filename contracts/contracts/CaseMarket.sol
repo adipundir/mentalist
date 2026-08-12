@@ -231,6 +231,10 @@ contract CaseMarket is Ownable, ReentrancyGuard {
         Entry storage e = entries[caseIndex][msg.sender];
         if (e.stake == 0) revert NoEntry();
         if (e.recorded) revert AlreadyRecorded();
+        // Once the round is sealed the shares are fixed. Letting a late result join
+        // `winningStake` afterwards would dilute claims that were already computed against
+        // the smaller denominator, and the pot would be promised out twice.
+        if (rounds[caseIndex].sealed_) revert AlreadySealed();
 
         Mentalist.Case memory c = game.getCase(e.caseId);
         if (c.status != Mentalist.Status.Closed) revert CaseNotClosed();
