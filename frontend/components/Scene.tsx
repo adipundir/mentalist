@@ -10,7 +10,7 @@ import { useCase } from "@/hooks/useCase";
 import { Room, type RoomSubject } from "./Room";
 import { Dialogue, type Line } from "./Dialogue";
 import { Notebook } from "./Notebook";
-import { PhaseBanner } from "./PhaseBanner";
+import { Waiting } from "./Waiting";
 import { janeism } from "@/lib/script";
 import * as sfx from "@/lib/sound";
 
@@ -28,6 +28,7 @@ export function Scene({
   chapter,
   title,
   nudge,
+  chainStatus,
   onResolved,
 }: {
   config: CaseConfig;
@@ -36,6 +37,8 @@ export function Scene({
   chapter?: string;
   title: string;
   nudge?: { name: string; spec: CharacterSpec; line: string } | null;
+  /** Rendered into the room — the on-chain provenance strip. */
+  chainStatus?: React.ReactNode;
   onResolved?: (solved: boolean, focusLeft: number) => void;
 }) {
   const g = useCase({ config, oracle, onResolved });
@@ -175,6 +178,10 @@ export function Scene({
           </div>
         </div>
 
+        {chainStatus && (
+          <div className="pointer-events-auto absolute left-3 top-16 sm:left-5 sm:top-20">{chainStatus}</div>
+        )}
+
         {/* the team, leaning in */}
         {nudge && !g.over && !line && (
           <motion.div
@@ -225,7 +232,7 @@ export function Scene({
                 ?&rdquo;
               </span>
             </p>
-            {g.phase !== "idle" && <PhaseBanner phase={g.phase} />}
+            <Waiting phase={g.phase} />
             {g.error && (
               <p className="shake mt-1 font-mono text-[10px] tracking-file text-blood-hot">{g.error}</p>
             )}

@@ -20,6 +20,7 @@ export function StoryCard({
   speaker,
   onContinue,
   continueLabel = "CONTINUE",
+  extra,
 }: {
   chapter?: string;
   title: string;
@@ -28,6 +29,8 @@ export function StoryCard({
   speaker?: { name: string; role: string; spec: CharacterSpec } | null;
   onContinue: () => void;
   continueLabel?: string;
+  /** Rendered above the continue row — the on-chain settle + Megapot claim. */
+  extra?: React.ReactNode;
 }) {
   const [shown, setShown] = useState(0);
   const [muted, setMuted] = useState(isNarratorMuted());
@@ -55,13 +58,14 @@ export function StoryCard({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/96 p-5 backdrop-blur-sm"
-      onClick={() => (done ? onContinue() : setShown(body.length))}
+      onClick={() => (!done ? setShown(body.length) : extra ? undefined : onContinue())}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") {
           e.preventDefault();
-          done ? onContinue() : setShown(body.length);
+          if (!done) setShown(body.length);
+          else if (!extra) onContinue();
         }
       }}
     >
@@ -118,9 +122,11 @@ export function StoryCard({
           </p>
         </div>
 
+        {extra && <div onClick={(e) => e.stopPropagation()}>{extra}</div>}
+
         <div className="mt-6 flex items-center justify-between gap-3 border-t border-ink-3 pt-4">
           <span className="font-mono text-[9px] tracking-file text-bone-dim/50">
-            {done ? "CLICK ANYWHERE TO CONTINUE" : "CLICK TO SKIP"}
+            {!done ? "CLICK TO SKIP" : extra ? "" : "CLICK ANYWHERE TO CONTINUE"}
           </span>
           <button
             type="button"

@@ -31,11 +31,21 @@ server *is* the game.
 
 ## Play it
 
-| | | |
-|---|---|---|
-| **Watch a case** | `/case/demo?auto=1` | Zero clicks. |
-| **Solve one** | `/case/demo` | **No wallet.** The real game, dealt in your browser. |
-| **Play on-chain** | `/case/play` | Base Sepolia. Encrypted state, attested answers, real Megapot tickets. |
+`BEGIN` → boot → **THE LIST**, a seven-chapter campaign following the real Red John arc,
+with the lineup shrinking the way the suspect list does: 2,164 → 408 → 30 → **7** → 6 → 5 → 1.
+
+Before chapter one you choose how the campaign runs. **Both modes are the main loop** — the
+rules, the dealer and the scene are identical, and only the oracle differs:
+
+| | |
+|---|---|
+| **Play it for real** — Base Sepolia | Each chapter opens a real case. Red John is placed inside Inco's enclave, every answer is decrypted for you *and nobody else*, the contract settles the verdict against a covalidator attestation, and surplus Focus buys real Megapot tickets. ≈10s a question. |
+| **Play it now** — offline | The identical game dealt in your browser. Instant, no wallet, nothing on chain and no tickets. |
+
+That split exists because of a measured number, not a guess — see
+[measured latency](#measured-on-chain-latency). A campaign that demanded a funded wallet
+would be unplayable for anyone who just wants to see it; a campaign that quietly ran offline
+while the "real" game hid on another route would not put the integration in the main loop.
 
 The no-wallet demo is not a mock-up. It runs the same rules, the same dealer distribution
 and the same `answer = truth XOR liar[witness]` computation as the contract, so the
@@ -191,12 +201,22 @@ do not exist in 1.0.0; the real surface is `get(handle)` and
 
 From a real playthrough on Base Sepolia:
 
+Measured with `pnpm --filter contracts play:onchain` and `measure-latency.ts`, warm SDK:
+
 | step | time |
 |---|---|
-| `openCase` | ~2.6 s |
-| `interrogate` (mining) | 1.6 – 2.4 s |
-| `attestedDecrypt` | **5.5 – 11.3 s** |
-| full six-move case | ~103 s |
+| SDK cold init | ~1.7 s (pre-warmed during the boot screen) |
+| `openCase` | ~2.1 s (hidden behind the chapter's opening card) |
+| `interrogate` (mining) | 1.5 – 2.2 s |
+| `attestedDecrypt` | **7.4 – 8.2 s**, and it does *not* improve when warm |
+| **per move** | **~10 s** |
+
+The decrypt dominates and is irreducible from the client side, so the game is built around
+it rather than pretending otherwise: the question is staged as a sequence of beats that name
+the real stage the wait is in ("they're choosing their words — the enclave is deciding"), the
+suspect performs through it, and a drone beats a minor second until the answer resolves it to
+unison. Ten seconds of a suspect refusing to answer is the tensest thing in an interrogation.
+Ten seconds of a progress bar is a bug report.
 
 The decrypt dominates by a wide margin, and an earlier draft of the frontend had guessed it
 at ~1.6 s — wrong by roughly 5×, with the animation budget built on top of that guess. The
