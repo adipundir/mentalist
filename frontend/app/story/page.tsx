@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -53,6 +53,8 @@ function StoryInner() {
   // The clock only means anything once a stake is down, because that is when the contract
   // starts counting. Until then it is just how long the case would stand.
   const [staked, setStaked] = useState<bigint | null>(null);
+  const [naming, setNaming] = useState<string | null>(null);
+  const pick = useRef<{ name: string | null; accuse: () => Promise<void> } | null>(null);
 
   useEffect(() => {
     setStaked(null);
@@ -186,8 +188,19 @@ function StoryInner() {
           variant={index}
           alibis={chapter.alibis}
           beforeHearing={claimSeat}
-          stakePanel={<Stake caseIndex={index} onStaked={() => setStaked(1n)} />}
-          staked={staked !== null}
+          onPick={(seat, name, accuse) => {
+            pick.current = { name, accuse };
+            setNaming(name);
+          }}
+          stakePanel={
+            <Stake
+              caseIndex={index}
+              naming={naming}
+              onStaked={async () => {
+                await pick.current?.accuse();
+              }}
+            />
+          }
           connect={
             oracle ? null : (
               <>

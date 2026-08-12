@@ -117,7 +117,7 @@ export function Room({
       <motion.div
         className="absolute inset-0"
         animate={camera}
-        transition={{ type: "spring", stiffness: 120, damping: 24, mass: 0.8 }}
+        transition={{ type: "spring", stiffness: 260, damping: 26, mass: 0.5 }}
       >
         {/* ── back wall ── */}
         <div

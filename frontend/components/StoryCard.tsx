@@ -43,7 +43,9 @@ export function StoryCard({
   // Type it out. ~28ms/char lands close to spoken pace for this register.
   useEffect(() => {
     if (done) return;
-    const id = setTimeout(() => setShown((n) => Math.min(body.length, n + 1)), 28);
+    // Three characters a tick at 12ms: still reads as typing, roughly seven times faster
+    // than one at a time, and a long opening lands in about two seconds instead of fifteen.
+    const id = setTimeout(() => setShown((n) => Math.min(body.length, n + 3)), 12);
     return () => clearTimeout(id);
   }, [shown, done, body.length]);
 
@@ -77,7 +79,7 @@ export function StoryCard({
       <motion.div
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.08, duration: 0.35 }}
+        transition={{ delay: 0.03, duration: 0.18 }}
         className="paper w-full max-w-[640px] border-2 border-ink-3 p-7 sm:p-9"
       >
         <div className="flex items-start justify-between gap-4">

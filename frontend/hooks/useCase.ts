@@ -146,7 +146,7 @@ export function useCase({
     drone.current = sfx.drone();
 
     try {
-      const { correct, truth: layout } = await atLeast(oracle.accuse(seat, setPhase), 1200);
+      const { correct, truth: layout } = await atLeast(oracle.accuse(seat, setPhase), 700);
       drone.current?.resolve();
       drone.current = null;
       setTruth({ killer: layout.killer, liars: layout.liars });
@@ -159,7 +159,7 @@ export function useCase({
         sfx.stingMissed();
       }
       setTimeout(() => sfx.stamp(), 260);
-      if (onResolved) setTimeout(() => onResolved(correct), 3000);
+      if (onResolved) setTimeout(() => onResolved(correct), 1800);
     } catch (e) {
       drone.current?.stop();
       drone.current = null;

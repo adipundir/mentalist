@@ -34,11 +34,14 @@ function parseUsdc(v: string): bigint | null {
 
 export function Stake({
   caseIndex,
+  naming,
   onStaked,
 }: {
   caseIndex: number;
-  /** Fires once the stake is down, so the room can let the player name someone. */
-  onStaked: (amount: bigint) => void;
+  /** The man about to be named, if the player has picked one yet. */
+  naming: string | null;
+  /** Fires once the stake is down. The room names him immediately afterwards. */
+  onStaked: (amount: bigint) => void | Promise<void>;
 }) {
   const { address } = useAccount();
   const pub = usePublicClient();
@@ -129,7 +132,7 @@ export function Stake({
       await pub.waitForTransactionReceipt({ hash });
 
       setStep("done");
-      onStaked(amount);
+      await onStaked(amount);
     } catch (e) {
       setStep("idle");
       setError(readable(e));
@@ -202,27 +205,38 @@ export function Stake({
 
       <div className="max-w-[280px]">
         <p className="font-body text-[13px] leading-snug text-bone">
-          Back the man whose story cannot be true.{" "}
-          <span className="text-blood-hot">The more you put down, the bigger your share</span>{" "}
-          of what the wrong answers leave behind.
+          {naming ? (
+            <>
+              You are naming <span className="font-type text-bone">{naming}</span>.{" "}
+              <span className="text-blood-hot">The more you put down, the bigger your share</span>{" "}
+              of what the wrong answers leave behind.
+            </>
+          ) : (
+            <>
+              <span className="text-blood-hot">Click the man whose story cannot be true</span>, then
+              put your money on it.
+            </>
+          )}
         </p>
       </div>
 
       <button
         type="button"
         onClick={place}
-        disabled={busy || short || outOfRange}
+        disabled={busy || short || outOfRange || !naming}
         className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2.5 font-mono text-[11px] tracking-file text-blood-hot transition-colors hover:bg-blood-hot/25 disabled:cursor-not-allowed disabled:border-ink-3 disabled:bg-transparent disabled:text-bone-dim/60"
       >
         {step === "approving"
           ? "APPROVING…"
           : step === "staking"
             ? "PLACING YOUR STAKE…"
-            : outOfRange
-              ? `BETWEEN $${usdc(MIN_STAKE)} AND $${usdc(MAX_STAKE)}`
-              : short
-                ? "NOT ENOUGH USDC"
-                : `PUT $${usdc(amount)} ON IT`}
+            : !naming
+              ? "PICK YOUR MAN"
+              : outOfRange
+                ? `BETWEEN $${usdc(MIN_STAKE)} AND $${usdc(MAX_STAKE)}`
+                : short
+                  ? "NOT ENOUGH USDC"
+                  : `NAME ${naming.toUpperCase()}, $${usdc(amount)} ON IT`}
       </button>
 
       {error && (

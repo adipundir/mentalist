@@ -47,7 +47,7 @@ export function Scene({
   alibis,
   beforeHearing,
   stakePanel,
-  staked = false,
+  onPick,
   onResolved,
 }: {
   config: CaseConfig;
@@ -71,8 +71,8 @@ export function Scene({
   beforeHearing?: (caseId: number) => Promise<void>;
   /** Shown once the whole room has spoken, so the stake is placed on an informed read. */
   stakePanel?: React.ReactNode;
-  /** True once the stake is down and the player may name someone. */
-  staked?: boolean;
+  /** Reports who the player has picked, and the call that names him. */
+  onPick?: (seat: number | null, name: string | null, accuse: () => Promise<void>) => void;
   onResolved?: (solved: boolean) => void;
 }) {
   const g = useCase({
@@ -107,7 +107,7 @@ export function Scene({
         `, and so will he.`,
       tone: "narrator",
     });
-    const id = setTimeout(() => setLine(null), 5200);
+    const id = setTimeout(() => setLine(null), 3200);
     return () => clearTimeout(id);
   }, [g.ready, config.liars, g.n]);
 
@@ -189,8 +189,20 @@ export function Scene({
 
   // You may name anyone once you have picked them. If the evidence has already narrowed to
   // a single man, he is offered by default so the obvious case does not need an extra click.
-  const only = g.deductions.candidates.length === 1 ? g.deductions.candidates[0] : null;
-  const nameable = chosen ?? only;
+  const nameable = chosen;
+
+  // Hand the choice up so the wager can be placed on it, and hand back the call that names
+  // him: the money and the accusation are one decision and go out together.
+  useEffect(() => {
+    onPick?.(
+      nameable,
+      nameable === null ? null : suspects[nameable]!.name,
+      async () => {
+        if (nameable !== null) await g.accuse(nameable);
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nameable, suspects]);
 
   return (
     <div className="fixed inset-0 overflow-hidden">
@@ -235,7 +247,7 @@ export function Scene({
           <motion.div
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 1.4 }}
+            transition={{ delay: 0.5 }}
             className="pointer-events-none absolute bottom-32 left-4 flex max-w-[300px] items-end gap-2 sm:left-7"
           >
             <div className="w-14 shrink-0 border border-ink-3 bg-ink">
@@ -262,7 +274,7 @@ export function Scene({
       >
         {connect ? (
           <div className="flex flex-wrap items-center justify-center gap-4 py-1">{connect}</div>
-        ) : g.allSpoken && !staked && stakePanel ? (
+        ) : g.allSpoken && !g.over && stakePanel ? (
           <div className="py-1">{stakePanel}</div>
         ) : (
         <div className="flex flex-wrap items-center gap-3">
@@ -298,15 +310,6 @@ export function Scene({
             ) : (
               <>
                 <Act onClick={() => setNotebook(true)}>WHAT I KNOW</Act>
-                <Act
-                  onClick={() => nameable !== null && void g.accuse(nameable)}
-                  disabled={g.busy || !g.ready || nameable === null || g.over || (!!stakePanel && !staked)}
-                  tone="blood"
-                >
-                  {nameable !== null
-                    ? `NAME ${lastName(suspects[nameable].name).toUpperCase()}`
-                    : "NAME HIM"}
-                </Act>
               </>
             )}
           </div>

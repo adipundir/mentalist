@@ -61,7 +61,7 @@ export const CASEBOOK: CaseFile[] = [
       "A Sunday house, a woman dead upstairs, a red face grinning off the wallpaper.",
     setting: "a shuttered Sunday parlour",
     opening:
-      "Sunday, and the roast is still warm on the table downstairs. Upstairs a woman lies with her hands folded, and above her a face grins off the wallpaper in her own blood, drawn slow, drawn with three fingers and all the time in the world. Four people wait in the parlour with wet shoes and dry eyes, and one of them did the drawing.",
+      "A woman is dead upstairs. Someone painted a smiling face on her wall in her own blood, which is how Red John signs his work. Four people were in the house all afternoon. Each of them will tell you where they were. One of them is describing something that could not have happened.",
     roster: ["partridge", "mashburn", "wagner", "ardiles"],
     alibis: [
       {
@@ -96,7 +96,7 @@ export const CASEBOOK: CaseFile[] = [
       "An informant dies in protective custody. Six alibis, and one of them puts its owner in two places at once.",
     setting: "a shuttered safe house",
     opening:
-      "Rain hammers the tin roof of a house that does not exist on any map, and the witness who was going to name Red John lies face down on the linoleum with his coffee still steaming. Above him, drawn on the plaster in something darker than paint, a smiling face waits for you to notice it. Six people were bolted in here with him, six mouths are about to move, and only one of them will say a thing that could not have happened.",
+      "The witness who was going to name Red John is dead on the floor of a safe house. Six people were locked in here with him. Nobody came in and nobody went out, so one of these six killed him, and there is a smiling face on the wall to prove whose work it was.",
     roster: ["partridge", "harken", "mars", "cooper", "molinari", "morning"],
     alibis: [
       {
@@ -137,7 +137,7 @@ export const CASEBOOK: CaseFile[] = [
       "Eight alibis in a half dead mall food court. One of them cannot be true.",
     setting: "a half dead mall food court",
     opening:
-      "Half the counters have their shutters down for good, but the burger place is still frying and the strip lights still buzz that sick custard yellow that makes an honest face look guilty. A man who spent six weeks telling this town he was Red John lies face down between the bolted tables with two holes in his coat and a smiley drawn above him in somebody else's ketchup. Eight of them stand very still around the fryers, and every one has a story about exactly where they were standing when the gun went off.",
+      "A man spent six weeks telling this town he was Red John. He is now dead on the floor of a mall food court, with a smiling face drawn above him. Eight people were standing around when the gun went off, and all eight say they were busy with something else.",
     roster: [
       "partridge",
       "bertram",
@@ -193,7 +193,7 @@ export const CASEBOOK: CaseFile[] = [
       "Seven alibis, one impossible. Find the crack in the clock, name Red John.",
     setting: "a shuttered hotel lounge",
     opening:
-      "Rain runs down the long window of a hotel lounge that stopped pouring drinks a decade ago. On the carpet there is a body, and above it on the wallpaper there is a smiley face three fingers wide, painted in something still tacky. Seven of them stand in a row against the wainscot, and all you have is what they say.",
+      "Seven names, and Red John is one of them. They are all sitting in a hotel lounge, and each of them will account for the last hour. Listen to the clock in each story. One of them is trying to fit far too much into far too little time.",
     roster: [
       "stiles",
       "bertram",
@@ -245,7 +245,7 @@ export const CASEBOOK: CaseFile[] = [
       "A red smile dries on a dead woman's cheek while six mouths swear they were elsewhere.",
     setting: "a dance hall's dirt cellar",
     opening:
-      "Rain comes down the stairwell in a grey rope and dies in the dirt. She lies where the folded tables live, arms flung out like a snow angel that never got its snow, and somebody took the time to paint a smile on her cheek in carmine, still wet, still shining under the one bulb. Six of them stand along the wall with their hats in their hands, and every one of them has a story ready.",
+      "A man died on a cellar floor and the smiling face is drying on the wall above him. Six people were in the building. Each will tell you where they stood and what they saw, and one of them claims to have seen something they could not possibly have seen from there.",
     roster: ["stiles", "bertram", "haffner", "smith", "kirkland", "mcallister"],
     alibis: [
       {
@@ -286,7 +286,7 @@ export const CASEBOOK: CaseFile[] = [
       "Five men, five alibis, one mark on every left shoulder. Only one of them is lying.",
     setting: "the parlour where it happened",
     opening:
-      "You come in out of the rain and the parlour smells of gun smoke and spilled claret. Five men stand along the wall with their left sleeves rolled up, and every one of them wears the same three little dots in ink. The sixth man is face down on the carpet, and he has stopped arguing.",
+      "Five men, and the house where it all started. The face is still on the bedroom wall, ten years old now. Each man will describe his evening. One of them describes an object in a state it could not have been in.",
     roster: ["stiles", "bertram", "haffner", "smith", "mcallister"],
     alibis: [
       {
@@ -324,7 +324,7 @@ export const CASEBOOK: CaseFile[] = [
       "The last room, the last three faces, and one alibi that cannot be true.",
     setting: "a chapel beside the graves",
     opening:
-      "Rain comes off the chapel roof in ropes and every candle has drowned but one. The body lies down the middle of the aisle with its arms flung wide, caught mid apology, and three faces hang over it in the dark without blinking. Two names off your list are already out there under the wet grass, so understand this: there is no next room.",
+      "Three left, and two of them are supposed to be dead already. A church at the edge of a cemetery, and Red John is sitting in one of these three chairs. Only one of them is going to tell you something that cannot be true.",
     roster: ["bertram", "smith", "mcallister"],
     alibis: [
       {
