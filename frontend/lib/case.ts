@@ -26,8 +26,6 @@ export const CONTROL_COST = 2;
 export const QUESTION_COST = 1;
 
 export interface CaseConfig {
-  /** Seat bitmask each suspect speaks about, one statement each. */
-  claims: number[];
   suspects: number;
   /** Question budget the contract opens with: one per suspect. Never shown to the player. */
   focus: number;

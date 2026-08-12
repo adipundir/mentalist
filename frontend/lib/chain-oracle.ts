@@ -64,6 +64,15 @@ export function getZap(): Promise<Zap> {
   return zapPromise;
 }
 
+/** The SDK returns a scheme-dependent plaintext wrapper; normalise it to a number. */
+function asNumber(plaintext: unknown): number {
+  const v =
+    plaintext && typeof plaintext === "object" && "value" in (plaintext as object)
+      ? (plaintext as { value: unknown }).value
+      : plaintext;
+  return Number(BigInt(v as string | number | bigint));
+}
+
 /** The SDK returns a scheme-dependent plaintext wrapper; normalise it to a boolean. */
 function asBool(plaintext: unknown): boolean {
   const v =
@@ -84,6 +93,8 @@ function asBool(plaintext: unknown): boolean {
  */
 export interface ChainOracle extends Oracle {
   caseId(): number | null;
+  /** Open the room and return, per seat, which written account that man gives. */
+  hearRoom(onPhase?: (p: Phase) => void): Promise<number[]>;
   /**
    * Play a case that already exists.
    *
@@ -137,7 +148,7 @@ export function chainOracle(opts: {
   }
 
   async function send(
-    functionName: "openCase" | "interrogate" | "accuse" | "settle",
+    functionName: "openCase" | "beginHearing" | "accuse" | "settle",
     args: readonly unknown[],
     value: bigint | undefined,
     label: string,
@@ -200,49 +211,47 @@ export function chainOracle(opts: {
       return { caseId: Number(caseId), killer: -1, liars: [] } satisfies DealtCase;
     },
 
-    async ask(witness, mask, onPhase): Promise<AskResult> {
+    /**
+     * Open the room, and read every account in it.
+     *
+     * One transaction and one decryption for the whole case. What comes back is a slot
+     * number per seat: which of the written accounts that man gives. The words themselves
+     * live in the casebook where anyone can read them, so nothing here is a secret except
+     * the casting, and the casting is the game.
+     *
+     * After this the interrogation is free. Clicking a suspect reveals what we already hold
+     * rather than sending a transaction and putting a wallet signature between the player
+     * and every single person in the room.
+     */
+    async hearRoom(onPhase): Promise<number[]> {
       if (caseId === null) throw new Error("no case open");
 
-      const receipt = await send(
-        "interrogate",
-        [caseId, witness, mask],
-        undefined,
-        "put the question",
-        onPhase,
-      );
+      const receipt = await send("beginHearing", [caseId], undefined, "opened the room", onPhase);
 
-      let answerHandle: Hex | null = null;
-      let turnedWitness: number | null = null;
-      let cost = 1;
-
+      let handles: Hex[] | null = null;
       for (const log of receipt.logs) {
         try {
           const parsed = decodeEventLog({ abi: MENTALIST_ABI, ...log });
-          if (parsed.eventName === "Interrogated") {
-            const a = parsed.args as { answerHandle: Hex; cost: number };
-            answerHandle = a.answerHandle;
-            cost = Number(a.cost);
-          }
-          if (parsed.eventName === "WitnessTurned") {
-            turnedWitness = Number((parsed.args as { witness: number }).witness);
+          if (parsed.eventName === "RoomOpened") {
+            handles = [...(parsed.args as { statementHandles: readonly Hex[] }).statementHandles];
           }
         } catch {
           /* not one of ours */
         }
       }
-      if (!answerHandle) throw new Error("no answer handle in the receipt");
+      if (!handles?.length) throw new Error("the room reported no accounts");
 
-      // Private decrypt, the handle was granted to this wallet and nobody else.
+      // Private decrypt: these were granted to this wallet and to nobody else.
       onPhase?.("reading");
       const zap = await getZap();
-      const [result] = await withPatience(() =>
-        zap.attestedDecrypt(walletClient as never, [answerHandle!], {
+      const results = await withPatience(() =>
+        zap.attestedDecrypt(walletClient as never, handles as never, {
           backoffConfig: BACKOFF,
         } as never),
       );
 
       onPhase?.("idle");
-      return { answer: asBool(result.plaintext), cost, turnedWitness };
+      return (results as { plaintext: unknown }[]).map((r) => asNumber(r.plaintext));
     },
 
     async accuse(seat, onPhase) {

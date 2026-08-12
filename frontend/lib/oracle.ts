@@ -29,7 +29,8 @@ export interface AskResult {
 export interface Oracle {
   readonly kind: "local" | "chain";
   open(config: CaseConfig, seed: number): Promise<DealtCase>;
-  ask(witness: number, mask: number, onPhase?: (p: Phase) => void): Promise<AskResult>;
+  /** Open the room and return, per seat, which written account that man gives. */
+  hearRoom(onPhase?: (p: Phase) => void): Promise<number[]>;
   /** Ends the case and returns the full layout for the post-mortem. */
   accuse(seat: number, onPhase?: (p: Phase) => void): Promise<{ correct: boolean; truth: DealtCase }>;
 }

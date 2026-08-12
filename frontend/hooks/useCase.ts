@@ -4,7 +4,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CaseConfig, Phase, Testimony } from "@/lib/case";
 import { deduce } from "@/lib/solver";
 import { atLeast, type Oracle } from "@/lib/oracle";
-import { statement } from "@/lib/script";
 import * as sfx from "@/lib/sound";
 import { narrate, unlockNarrator } from "@/lib/narrator";
 
@@ -18,12 +17,24 @@ export function useCase({
   config,
   oracle,
   names,
+  alibis,
+  beforeHearing,
   onResolved,
 }: {
   config: CaseConfig;
   oracle: Oracle | null;
-  /** Suspect surnames, in seat order, so a statement can name who it is about. */
+  /** Suspect surnames, in seat order. */
   names: string[];
+  /** Every account this case can produce, in written order. The impossible one is last. */
+  alibis: { text: string; impossible?: true }[];
+  /**
+   * Runs between dealing the case and opening the room.
+   *
+   * This is where the market claims the seat, and it has to be here: a seat can only be
+   * taken while the room is still shut, so nobody can read a room, dislike it, and go
+   * looking for an easier one to put money on.
+   */
+  beforeHearing?: (caseId: number) => Promise<void>;
   onResolved?: (solved: boolean) => void;
 }) {
   const n = config.suspects;
@@ -51,6 +62,8 @@ export function useCase({
   /** Set when the case was already dealt elsewhere, so opening it again would be a second bill. */
   const [adopted, setAdopted] = useState(false);
   const [spoken, setSpoken] = useState<number[]>([]);
+  /** seat -> which written account that man gives. Empty until the room is opened. */
+  const [slots, setSlots] = useState<number[]>([]);
 
   const start = useCallback(
     (already?: boolean) => {
@@ -63,19 +76,25 @@ export function useCase({
 
   useEffect(() => {
     if (!oracle || !started) return;
-    if (adopted) {
-      setReady(true);
-      return;
-    }
     let cancelled = false;
     setReady(false);
-    oracle
-      .open(config, 0)
-      .then(() => !cancelled && setReady(true))
-      .catch((e) => !cancelled && setError(inCharacter(e)));
+    void (async () => {
+      try {
+        if (!adopted) await oracle.open(config, 0);
+        const id = (oracle as { caseId?: () => number | null }).caseId?.();
+        if (beforeHearing && id != null) await beforeHearing(id);
+        const heard = await oracle.hearRoom(setPhase);
+        if (cancelled) return;
+        setSlots(heard);
+        setReady(true);
+      } catch (e) {
+        if (!cancelled) setError(inCharacter(e));
+      }
+    })();
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [oracle, config, started, adopted]);
 
   const deductions = useMemo(
@@ -94,58 +113,28 @@ export function useCase({
    */
   const interrogate = useCallback(
     (seat: number) => {
-      if (!oracle || over || busy || !started || spoken.includes(seat)) return;
+      if (over || busy || !ready || spoken.includes(seat)) return;
+      const slot = slots[seat];
+      if (slot === undefined) return;
+
       unlockNarrator();
       sfx.startRoomTone();
       sfx.knock(0.9 + (seat % 3) * 0.08);
       sfx.whoosh(); // rides under the camera push-in
+
+      // No transaction and no signature. The whole room was granted to this wallet when it
+      // was opened, so hearing a man out is just reading what we already hold.
+      const line = alibis[slot]?.text ?? "";
       setWitness(seat);
-      void fire(seat, config.claims[seat]);
+      setSpoken((v) => [...v, seat]);
+      setSaying({ seat, line, answer: false });
+      void narrate(line, { rate: 0.96, pitch: 0.97 });
+      sfx.pluck(300 + seat * 22);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [oracle, over, busy, started, spoken, config.claims],
+    [over, busy, ready, spoken, slots, alibis],
   );
 
-  async function fire(seat: number, m: number) {
-    if (!oracle) return;
-    setMask(m);
-    setBusy(true);
-    setError(null);
-    setSaying(null);
-    sfx.switchClick();
-    drone.current = sfx.drone();
-
-    try {
-      const result = await atLeast(oracle.ask(seat, m, setPhase), 900);
-      drone.current?.resolve();
-      drone.current = null;
-
-      const turn = testimony.length;
-      setTestimony((t) => [...t, { id: t.length, witness: seat, mask: m, cost: result.cost, answer: result.answer }]);
-      setSpoken((v) => [...v, seat]);
-
-      // The stab is the loud moment; it fires on the answer, never on navigation.
-      if (result.answer) sfx.stabYes();
-      else sfx.stabNo();
-
-      const about = names.filter((_, i) => ((m >> i) & 1) === 1);
-      const line = statement(result.answer, about, seat, turn);
-      setSaying({ seat, line, answer: result.answer });
-      void narrate(line, { rate: 0.95, pitch: result.answer ? 1.0 : 0.92 });
-      setWitness(null);
-    } catch (e) {
-      drone.current?.stop();
-      drone.current = null;
-      // Let go of the room. Leaving the camera pushed in on a suspect who never answered
-      // reads as though the question is still in flight.
-      setWitness(null);
-      setMask(0);
-      setError(inCharacter(e));
-    } finally {
-      setPhase("idle");
-      setBusy(false);
-    }
-  }
 
   async function accuse(seat: number) {
     if (!oracle || over || busy || !ready) return;
@@ -201,6 +190,7 @@ export function useCase({
     started,
     start,
     spoken,
+    slots,
     allSpoken: spoken.length === n,
     interrogate,
     accuse,

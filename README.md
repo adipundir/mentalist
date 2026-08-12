@@ -236,8 +236,8 @@ pnpm dev              # http://localhost:3000
 the room paints but cannot be played, because a simulated case would be a different game.
 
 ```
-NEXT_PUBLIC_MENTALIST_ADDRESS=0xCF72B6D36619861521BF1b04f3A64e3647aE9356
-NEXT_PUBLIC_MARKET_ADDRESS=0x8b1508f518e4a04961c5f57ad6734304574f05f7
+NEXT_PUBLIC_MENTALIST_ADDRESS=0xc93769517ff196330dfd9a6bf997adec0e322cf2
+NEXT_PUBLIC_MARKET_ADDRESS=0xbcf4b0ca661ecf415e382355cc05a5ec8ce8f653
 NEXT_PUBLIC_NETWORK=testnet
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=       # optional, enables mobile wallets
 ```
@@ -267,8 +267,8 @@ covalidator rather than a mock.
 
 | | |
 |---|---|
-| `Mentalist` | [`0xCF72B6D36619861521BF1b04f3A64e3647aE9356`](https://sepolia.basescan.org/address/0xCF72B6D36619861521BF1b04f3A64e3647aE9356) |
-| `CaseMarket` | [`0x8b1508f518e4a04961c5f57ad6734304574f05f7`](https://sepolia.basescan.org/address/0x8b1508f518e4a04961c5f57ad6734304574f05f7) |
+| `Mentalist` | [`0xc93769517ff196330dfd9a6bf997adec0e322cf2`](https://sepolia.basescan.org/address/0xCF72B6D36619861521BF1b04f3A64e3647aE9356) |
+| `CaseMarket` | [`0xbcf4b0ca661ecf415e382355cc05a5ec8ce8f653`](https://sepolia.basescan.org/address/0x8b1508f518e4a04961c5f57ad6734304574f05f7) |
 | Megapot `Jackpot` | [`0x465dA3c859f193A3807386387bEE941B2A4c3279`](https://sepolia.basescan.org/address/0x465dA3c859f193A3807386387bEE941B2A4c3279) |
 | Megapot `JackpotRandomTicketBuyer` | [`0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746`](https://sepolia.basescan.org/address/0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746) |
 | USDC | [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e) |

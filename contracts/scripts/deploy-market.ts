@@ -28,17 +28,17 @@ const MEGAPOT_BUYER = "0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746" as const;
 /**
  * The seven cases, as the market must see them.
  *
- * Mirrors `frontend/lib/story.ts`. `questions` is the contract's focus budget, which is one
- * per suspect now that every man speaks exactly once.
+ * Mirrors `frontend/lib/casebook.ts`. Every room has exactly one account that cannot be
+ * true, so `liars` is always one, and `questions` is one per seat.
  */
 const ROUNDS = [
-  { title: "Cinnabar Sunday", suspects: 4, liars: 1 },
-  { title: "The Vermilion Hour", suspects: 6, liars: 2 },
-  { title: "Oxblood Handshake", suspects: 8, liars: 3 },
-  { title: "Seven Shades of Crimson", suspects: 7, liars: 3 },
-  { title: "Carmine on Her Cheek", suspects: 6, liars: 4 },
-  { title: "Claret and Brimstone", suspects: 5, liars: 4 },
-  { title: "Sanguine", suspects: 3, liars: 2 },
+  { title: "Cinnabar Sunday", suspects: 4 },
+  { title: "The Vermilion Hour", suspects: 6 },
+  { title: "Oxblood Handshake", suspects: 8 },
+  { title: "Seven Shades of Crimson", suspects: 7 },
+  { title: "Carmine on Her Cheek", suspects: 6 },
+  { title: "Claret and Brimstone", suspects: 5 },
+  { title: "Sanguine", suspects: 3 },
 ] as const;
 
 function artifact(name: string): { abi: Abi; bytecode: Hex } {
@@ -91,10 +91,11 @@ async function main() {
       abi: market.abi,
       functionName: "configureRound",
       // suspects, liars, questions (one per suspect), turnAt (the turncoat is off)
-      args: [i, r.suspects, r.liars, r.suspects, 0],
+      // suspects, liars (always one impossible account), questions (one per seat), turncoat off
+      args: [i, r.suspects, 1, r.suspects, 0],
     });
     await pub.waitForTransactionReceipt({ hash: tx });
-    console.log(`round ${i} open: ${r.title} (${r.suspects} suspects, ${r.liars} lying)`);
+    console.log(`round ${i} open: ${r.title} (${r.suspects} suspects)`);
   }
 
   console.log("\nNEXT_PUBLIC_MENTALIST_ADDRESS=" + gameAddr);

@@ -1,20 +1,21 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { CHAPTERS, FINALE } from "@/lib/story";
+import { CASEBOOK } from "@/lib/casebook";
+import { FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
 import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
 import { CASE_WINDOW_MS } from "@/lib/market";
+import { MARKET_ABI, MARKET_ADDRESS } from "@/lib/contracts";
 import { releaseOf } from "@/lib/schedule";
 import { Scene } from "@/components/Scene";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { StoryCard } from "@/components/StoryCard";
 import { Finale } from "@/components/Finale";
-import { PoweredBy } from "@/components/PoweredBy";
 import { Settlement } from "@/components/Settlement";
 import { Stake } from "@/components/Stake";
 
@@ -36,7 +37,7 @@ function StoryInner() {
   const params = useSearchParams();
   const requested = Number(params.get("case") ?? 0);
   const [index, setIndex] = useState(
-    Number.isInteger(requested) && requested >= 0 && requested < CHAPTERS.length ? requested : 0,
+    Number.isInteger(requested) && requested >= 0 && requested < CASEBOOK.length ? requested : 0,
   );
   const [stage, setStage] = useState<Stage>("opening");
   const [solved, setSolved] = useState(false);
@@ -52,6 +53,7 @@ function StoryInner() {
   // The clock only means anything once a stake is down, because that is when the contract
   // starts counting. Until then it is just how long the case would stand.
   const [staked, setStaked] = useState<bigint | null>(null);
+
   useEffect(() => {
     setStaked(null);
     setClosesAt(Date.now() + CASE_WINDOW_MS);
@@ -69,7 +71,7 @@ function StoryInner() {
     void getZap().catch(() => {});
   }, []);
 
-  const chapter = CHAPTERS[index];
+  const chapter = CASEBOOK[index];
   const suspects = useMemo(() => lineup(chapter.roster), [chapter]);
 
   // Every case is dealt and answered on-chain. There is no local fallback: a simulation of
@@ -85,7 +87,29 @@ function StoryInner() {
     });
   }, [publicClient, walletClient, address, index, attempt]);
 
-  const isLast = index === CHAPTERS.length - 1;
+
+  /**
+   * Take the seat, before a word is spoken.
+   *
+   * This runs between dealing the case and opening the room, and it has to: a seat can only
+   * be claimed while the room is still shut, which is what stops a player reading a room,
+   * disliking it, and going to look for an easier one to bet on.
+   */
+  const claimSeat = useCallback(
+    async (caseId: number) => {
+      if (!walletClient || !publicClient) return;
+      const hash = await walletClient.writeContract({
+        address: MARKET_ADDRESS,
+        abi: MARKET_ABI,
+        functionName: "claimSeat",
+        args: [index, BigInt(caseId)],
+      });
+      await publicClient.waitForTransactionReceipt({ hash });
+    },
+    [walletClient, publicClient, index],
+  );
+
+  const isLast = index === CASEBOOK.length - 1;
 
   function finishChapter(didSolve: boolean) {
     setSolved(didSolve);
@@ -129,7 +153,7 @@ function StoryInner() {
         <span className="font-mono text-[10px] tracking-file text-blood-hot">THE RED JOHN CASES</span>
 
         <ol className="ml-1 flex flex-wrap items-center gap-1">
-          {CHAPTERS.map((c, i) => (
+          {CASEBOOK.map((c, i) => (
             <li
               key={c.title}
               title={`${c.label}, ${c.title}`}
@@ -152,7 +176,7 @@ function StoryInner() {
           oracle={oracle}
           suspects={suspects}
           title={chapter.title}
-          chapter={`CASE ${index + 1} OF ${CHAPTERS.length}`}
+          chapter={`CASE ${index + 1} OF ${CASEBOOK.length}`}
           nudge={{
             name: person(chapter.nudge.speaker).name,
             spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
@@ -160,21 +184,10 @@ function StoryInner() {
           }}
           closesAt={mounted ? closesAt : undefined}
           variant={index}
-          openedCaseId={staked}
-          entry={
-            !oracle || staked !== null ? null : (
-              <Stake
-                caseIndex={index}
-                chapter={chapter}
-                onEntered={(caseId, deadline) => {
-                  setStaked(caseId);
-                  // The contract owns the clock. Resuming a case mid-window must not hand
-                  // the player back a fresh twenty minutes it will not honour.
-                  setClosesAt(deadline ? Number(deadline) * 1000 : Date.now() + CASE_WINDOW_MS);
-                }}
-              />
-            )
-          }
+          alibis={chapter.alibis}
+          beforeHearing={claimSeat}
+          stakePanel={<Stake caseIndex={index} onStaked={() => setStaked(1n)} />}
+          staked={staked !== null}
           connect={
             oracle ? null : (
               <>
@@ -194,7 +207,7 @@ function StoryInner() {
         {stage === "opening" && oracle && (
           <StoryCard
             key={`open-${index}-${attempt}`}
-            chapter={`CASE ${index + 1} OF ${CHAPTERS.length}, ${chapter.n} SUSPECTS, ${chapter.liars} OF THEM LYING`}
+            chapter={`CASE ${index + 1} OF ${CASEBOOK.length}, ${chapter.suspects} SUSPECTS, ${chapter.liars} OF THEM LYING`}
             title={chapter.title}
             body={chapter.opening}
             onContinue={() => setStage("playing")}
@@ -226,8 +239,6 @@ function StoryInner() {
 
         {stage === "finale" && <Finale beats={FINALE} />}
       </AnimatePresence>
-
-      <PoweredBy fixed />
     </main>
   );
 }

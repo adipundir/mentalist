@@ -43,8 +43,11 @@ export function Scene({
   closesAt,
   variant = 0,
   connect,
-  entry,
   openedCaseId,
+  alibis,
+  beforeHearing,
+  stakePanel,
+  staked = false,
   onResolved,
 }: {
   config: CaseConfig;
@@ -60,13 +63,26 @@ export function Scene({
   variant?: number;
   /** Shown in place of the controls when there is no wallet yet. */
   connect?: React.ReactNode;
-  /** Shown in place of the controls until a stake is down. Null once the case is live. */
-  entry?: React.ReactNode;
   /** The case the market already dealt. Adopting it avoids opening (and paying for) a second. */
   openedCaseId?: bigint | null;
+  /** Every account this case can produce, in written order. */
+  alibis: { text: string; impossible?: true }[];
+  /** Claims the market seat between dealing the case and opening the room. */
+  beforeHearing?: (caseId: number) => Promise<void>;
+  /** Shown once the whole room has spoken, so the stake is placed on an informed read. */
+  stakePanel?: React.ReactNode;
+  /** True once the stake is down and the player may name someone. */
+  staked?: boolean;
   onResolved?: (solved: boolean) => void;
 }) {
-  const g = useCase({ config, oracle, names: useMemo(() => suspects.map((s) => lastName(s.name)), [suspects]), onResolved });
+  const g = useCase({
+    config,
+    oracle,
+    names: useMemo(() => suspects.map((s) => lastName(s.name)), [suspects]),
+    alibis,
+    beforeHearing,
+    onResolved,
+  });
   const [notebook, setNotebook] = useState(false);
   const [chosen, setChosen] = useState<number | null>(null);
   const [line, setLine] = useState<Line | null>(null);
@@ -246,8 +262,8 @@ export function Scene({
       >
         {connect ? (
           <div className="flex flex-wrap items-center justify-center gap-4 py-1">{connect}</div>
-        ) : entry ? (
-          <div className="py-1">{entry}</div>
+        ) : g.allSpoken && !staked && stakePanel ? (
+          <div className="py-1">{stakePanel}</div>
         ) : (
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1 font-body text-[15px] leading-snug text-bone">
@@ -284,7 +300,7 @@ export function Scene({
                 <Act onClick={() => setNotebook(true)}>WHAT I KNOW</Act>
                 <Act
                   onClick={() => nameable !== null && void g.accuse(nameable)}
-                  disabled={g.busy || !g.ready || nameable === null || g.over}
+                  disabled={g.busy || !g.ready || nameable === null || g.over || (!!stakePanel && !staked)}
                   tone="blood"
                 >
                   {nameable !== null

@@ -1,72 +1,63 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { parseEventLogs } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import {
-  MARKET_ABI,
-  MARKET_ADDRESS,
-  MEGAPOT,
-  MENTALIST_ABI,
-  MENTALIST_ADDRESS,
-  ERC20_ABI,
-} from "@/lib/contracts";
+import { ERC20_ABI, MARKET_ABI, MARKET_ADDRESS, MEGAPOT } from "@/lib/contracts";
 import { MAX_STAKE, MIN_STAKE, usdc } from "@/lib/market";
-import type { Chapter } from "@/lib/story";
 
 /**
- * The wager.
+ * Backing your read, after you have heard the whole room.
  *
- * Staking is what makes reading the room worth anything. Everyone who enters puts USDC into
- * one pot; everyone who names the wrong man leaves theirs behind. When the round closes, the
- * people who got it right split the whole pot **in proportion to what they staked**, and it
- * comes back as Megapot tickets rather than as cash. Conviction pays twice: once for being
- * right, and once for how much you were willing to put behind it.
+ * The seat was taken blind, before anyone spoke. This is the other half: now that every
+ * account is in front of you, decide what your judgement is worth.
  *
- * One entry per wallet per case. You get one read of each room.
+ * Everyone who enters puts USDC into one pot. Name the man whose account cannot be true and
+ * you are on the winning side; name anyone else and your stake stays. When the round closes
+ * the winners split the whole pot in proportion to what each of them put down, paid out as
+ * real Megapot tickets bought with the money of everyone who read the room wrong.
  *
- * The order of operations matters and is the reason this component exists rather than a
- * single contract call: the player opens their own case on `Mentalist`, so every answer is
- * granted to them and to nobody else, and only then do they hand the case id to the market.
- * The market never touches an encrypted handle.
+ * Once it is down it stays down. There is no withdrawing a live stake, because a bet you can
+ * take back after the fact is not a bet.
  */
 
-type Step = "idle" | "approving" | "opening" | "entering" | "done";
+type Step = "idle" | "approving" | "staking" | "done";
 
-const STAKES = [500_000n, 1_000_000n, 2_500_000n, 5_000_000n];
+const PRESETS = [500_000n, 1_000_000n, 2_500_000n, 5_000_000n];
+
+/** Parse a typed amount into USDC's six decimals, or null if it is not a usable number. */
+function parseUsdc(v: string): bigint | null {
+  const t = v.trim();
+  if (!/^\d*\.?\d{0,6}$/.test(t) || t === "" || t === ".") return null;
+  const [whole, frac = ""] = t.split(".");
+  return BigInt(whole || "0") * 1_000_000n + BigInt(frac.padEnd(6, "0"));
+}
 
 export function Stake({
   caseIndex,
-  chapter,
-  onEntered,
+  onStaked,
 }: {
   caseIndex: number;
-  chapter: Chapter;
-  /** Fires with the case id and the contract's own deadline once the stake is down. */
-  onEntered: (caseId: bigint, deadline?: bigint) => void;
+  /** Fires once the stake is down, so the room can let the player name someone. */
+  onStaked: (amount: bigint) => void;
 }) {
   const { address } = useAccount();
   const pub = usePublicClient();
   const { data: wallet } = useWalletClient();
 
-  const [stake, setStake] = useState<bigint>(1_000_000n);
+  const [amount, setAmount] = useState<bigint>(1_000_000n);
+  const [custom, setCustom] = useState("");
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
   const [pot, setPot] = useState<bigint>(0n);
   const [entrants, setEntrants] = useState(0);
   const [balance, setBalance] = useState<bigint | null>(null);
-  /** This wallet has already used its entry on a case that can no longer be played. */
-  const [resumeBlocked, setResumeBlocked] = useState(false);
-  /** A case already paid for whose stake did not land. Reused so a retry is not billed twice. */
-  const [orphan, setOrphan] = useState<bigint | null>(null);
 
-  // What the pot is worth right now, and whether this wallet has already had its go.
   useEffect(() => {
     if (!pub || !address) return;
     let live = true;
     const read = async () => {
       try {
-        const [round, entry, bal] = await Promise.all([
+        const [round, staked, bal] = await Promise.all([
           pub.readContract({
             address: MARKET_ADDRESS,
             abi: MARKET_ABI,
@@ -76,7 +67,7 @@ export function Stake({
           pub.readContract({
             address: MARKET_ADDRESS,
             abi: MARKET_ABI,
-            functionName: "entries",
+            functionName: "hasStaked",
             args: [caseIndex, address],
           }),
           pub.readContract({
@@ -90,23 +81,9 @@ export function Stake({
         setPot(round[1]);
         setEntrants(Number(round[3]));
         setBalance(bal);
-        // Only resume a case that is still open and genuinely untouched. Rejoining one
-        // that has questions already spent, or that was accused before a reload, hands the
-        // player a room where nothing they do can work.
-        if (entry[0] > 0n) {
-          const c = await pub.readContract({
-            address: MENTALIST_ADDRESS,
-            abi: MENTALIST_ABI,
-            functionName: "getCase",
-            args: [entry[1]],
-          });
-          if (!live) return;
-          if (c.status === 1 && c.questionsAsked === 0) {
-            setStep("done");
-            onEntered(entry[1], entry[2]);
-          } else {
-            setResumeBlocked(true);
-          }
+        if (staked) {
+          setStep("done");
+          onStaked(0n);
         }
       } catch {
         /* a cold RPC read is not worth a message to the player */
@@ -121,104 +98,49 @@ export function Stake({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pub, address, caseIndex]);
 
-  const enter = useCallback(async () => {
+  const place = useCallback(async () => {
     if (!wallet || !pub || !address) return;
     setError(null);
     try {
-      // 1. Let the market pull exactly this stake, and no more.
       const allowance = await pub.readContract({
         address: MEGAPOT.usdc,
         abi: ERC20_ABI,
         functionName: "allowance",
         args: [address, MARKET_ADDRESS],
       });
-      if (allowance < stake) {
+      if (allowance < amount) {
         setStep("approving");
         const hash = await wallet.writeContract({
           address: MEGAPOT.usdc,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [MARKET_ADDRESS, stake],
+          args: [MARKET_ADDRESS, amount],
         });
         await pub.waitForTransactionReceipt({ hash });
       }
 
-      // 2. Open the case yourself, so the answers are yours alone. If a previous attempt
-      //    already paid for one and only the stake failed, finish that case rather than
-      //    buying a second.
-      setStep("opening");
-      if (orphan !== null) {
-        setStep("entering");
-        const retry = await wallet.writeContract({
-          address: MARKET_ADDRESS, abi: MARKET_ABI, functionName: "enter",
-          args: [caseIndex, orphan, stake],
-        });
-        await pub.waitForTransactionReceipt({ hash: retry });
-        setOrphan(null);
-        setStep("done");
-        onEntered(orphan);
-        return;
-      }
-      const fee = await pub.readContract({
-        address: MENTALIST_ADDRESS,
-        abi: MENTALIST_ABI,
-        functionName: "quoteOpenFee",
-        args: [chapter.suspects],
-      });
-      const openHash = await wallet.writeContract({
-        address: MENTALIST_ADDRESS,
-        abi: MENTALIST_ABI,
-        functionName: "openCase",
-        args: [chapter.suspects, chapter.liars, chapter.focus, chapter.turnAt],
-        value: fee as bigint,
-      });
-      const receipt = await pub.waitForTransactionReceipt({ hash: openHash });
-
-      // Decode CaseOpened rather than trusting log order: dealing a case also emits Inco's
-      // own events from this address, and picking the first one is a coin flip.
-      const opened = parseEventLogs({
-        abi: MENTALIST_ABI,
-        eventName: "CaseOpened",
-        logs: receipt.logs,
-      });
-      const caseId = opened[0]?.args?.caseId;
-      if (caseId === undefined) throw new Error("could not read the case id");
-
-      // 3. Put the stake down against it.
-      setStep("entering");
-      setOrphan(caseId);
-      const enterHash = await wallet.writeContract({
+      setStep("staking");
+      const hash = await wallet.writeContract({
         address: MARKET_ADDRESS,
         abi: MARKET_ABI,
-        functionName: "enter",
-        args: [caseIndex, caseId, stake],
+        functionName: "stake",
+        args: [caseIndex, amount],
       });
-      await pub.waitForTransactionReceipt({ hash: enterHash });
+      await pub.waitForTransactionReceipt({ hash });
 
-      setOrphan(null);
       setStep("done");
-      onEntered(caseId);
+      onStaked(amount);
     } catch (e) {
       setStep("idle");
       setError(readable(e));
     }
-  }, [wallet, pub, address, stake, chapter, caseIndex, onEntered, orphan]);
+  }, [wallet, pub, address, amount, caseIndex, onStaked]);
 
   if (step === "done") return null;
 
-  if (resumeBlocked) {
-    return (
-      <p className="text-center font-body text-[15px] text-bone">
-        You have already had your go at this room.{" "}
-        <a href="/cases" className="text-blood-hot underline">
-          Pick another case.
-        </a>
-      </p>
-    );
-  }
-
   const busy = step !== "idle";
-  const short = balance !== null && balance < stake;
+  const short = balance !== null && balance < amount;
+  const outOfRange = amount < MIN_STAKE || amount > MAX_STAKE;
 
   return (
     <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
@@ -231,17 +153,23 @@ export function Stake({
       </div>
 
       <div>
-        <p className="font-mono text-[10px] tracking-file text-bone-dim">YOUR STAKE</p>
-        <div className="mt-1 flex gap-1">
-          {STAKES.map((v) => (
+        <p className="font-mono text-[10px] tracking-file text-bone-dim">
+          YOUR STAKE{" "}
+          {balance !== null && <span className="text-bone-dim/75">· ${usdc(balance)} AVAILABLE</span>}
+        </p>
+        <div className="mt-1 flex items-center gap-1">
+          {PRESETS.map((v) => (
             <button
               key={v.toString()}
               type="button"
               disabled={busy}
-              onClick={() => setStake(v)}
+              onClick={() => {
+                setAmount(v);
+                setCustom("");
+              }}
               className={[
                 "cursor-pointer border px-2.5 py-1 font-mono text-[11px] tracking-file transition-colors disabled:cursor-not-allowed",
-                v === stake
+                v === amount && custom === ""
                   ? "border-blood-hot bg-blood-hot/20 text-blood-hot"
                   : "border-ink-3 text-bone-dim hover:border-bone-dim hover:text-bone",
               ].join(" ")}
@@ -249,32 +177,52 @@ export function Stake({
               ${usdc(v)}
             </button>
           ))}
+          <span className="ml-1 font-mono text-[11px] text-bone-dim">$</span>
+          <input
+            inputMode="decimal"
+            placeholder="any"
+            value={custom}
+            disabled={busy}
+            onChange={(ev) => {
+              const v = ev.target.value;
+              if (!/^\d*\.?\d{0,6}$/.test(v)) return;
+              setCustom(v);
+              const parsed = parseUsdc(v);
+              if (parsed !== null) setAmount(parsed);
+            }}
+            className={[
+              "w-[74px] border bg-transparent px-2 py-1 font-mono text-[11px] tracking-file outline-none",
+              custom !== ""
+                ? "border-blood-hot text-blood-hot"
+                : "border-ink-3 text-bone-dim focus:border-bone-dim",
+            ].join(" ")}
+          />
         </div>
       </div>
 
-      <div className="max-w-[300px]">
+      <div className="max-w-[280px]">
         <p className="font-body text-[13px] leading-snug text-bone">
-          Name him and you take a share of the pot,{" "}
-          <span className="text-blood-hot">bigger the more you staked</span>. Name the wrong
-          man and your stake pays whoever got it right.
+          Back the man whose story cannot be true.{" "}
+          <span className="text-blood-hot">The more you put down, the bigger your share</span>{" "}
+          of what the wrong answers leave behind.
         </p>
       </div>
 
       <button
         type="button"
-        onClick={enter}
-        disabled={busy || short}
+        onClick={place}
+        disabled={busy || short || outOfRange}
         className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2.5 font-mono text-[11px] tracking-file text-blood-hot transition-colors hover:bg-blood-hot/25 disabled:cursor-not-allowed disabled:border-ink-3 disabled:bg-transparent disabled:text-bone-dim/60"
       >
         {step === "approving"
           ? "APPROVING…"
-          : step === "opening"
-            ? "DEALING THE CASE…"
-            : step === "entering"
-              ? "PLACING YOUR STAKE…"
+          : step === "staking"
+            ? "PLACING YOUR STAKE…"
+            : outOfRange
+              ? `BETWEEN $${usdc(MIN_STAKE)} AND $${usdc(MAX_STAKE)}`
               : short
                 ? "NOT ENOUGH USDC"
-                : `STAKE $${usdc(stake)} AND OPEN THE CASE`}
+                : `PUT $${usdc(amount)} ON IT`}
       </button>
 
       {error && (
@@ -288,10 +236,11 @@ export function Stake({
 
 function readable(e: unknown): string {
   const m = String((e as { shortMessage?: string })?.shortMessage ?? e);
-  if (/AlreadyEntered/.test(m)) return "THIS WALLET HAS ALREADY PLAYED THIS CASE";
+  if (/AlreadyStaked/.test(m)) return "YOU HAVE ALREADY BACKED THIS ONE";
+  if (/RoomNotHeard/.test(m)) return "HEAR EVERYONE OUT FIRST";
+  if (/TooLate/.test(m)) return "YOUR CLOCK RAN OUT";
+  if (/NoEntry/.test(m)) return "NO SEAT AT THIS CASE";
   if (/RoundClosed/.test(m)) return "THIS CASE HAS CLOSED";
-  if (/StakeOutOfRange/.test(m))
-    return `STAKE MUST BE BETWEEN $${usdc(MIN_STAKE)} AND $${usdc(MAX_STAKE)}`;
   if (/User rejected|denied/i.test(m)) return "CANCELLED";
   if (/insufficient funds/i.test(m)) return "NOT ENOUGH ETH FOR GAS";
   return m.slice(0, 120).toUpperCase();

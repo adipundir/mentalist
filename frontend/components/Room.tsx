@@ -268,6 +268,12 @@ export function Room({
                 style={{ background: "radial-gradient(ellipse, rgb(0 0 0 / 0.75), transparent 70%)" }}
               />
 
+              {/* The name stays on, always. A room of strangers you have to hover to
+                  identify is a room you cannot reason about. */}
+              <span className="name-tag pointer-events-none absolute -bottom-[13%] left-1/2 -translate-x-1/2 whitespace-nowrap border border-ink-3 bg-ink/90 px-1.5 py-[1px] font-mono text-[7px] tracking-file text-bone">
+                {s.suspect.name.toUpperCase()}
+              </span>
+
               <Character
                 spec={s.suspect.character}
                 expression={s.expression}

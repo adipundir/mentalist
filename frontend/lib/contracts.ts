@@ -47,14 +47,20 @@ export const MENTALIST_ABI = [
   },
   {
     type: "function",
-    name: "interrogate",
+    name: "beginHearing",
     stateMutability: "nonpayable",
+    inputs: [{ name: "caseId", type: "uint256" }],
+    outputs: [{ name: "handles", type: "bytes32[]" }],
+  },
+  {
+    type: "function",
+    name: "statementOf",
+    stateMutability: "view",
     inputs: [
       { name: "caseId", type: "uint256" },
-      { name: "witness", type: "uint8" },
-      { name: "mask", type: "uint16" },
+      { name: "seat", type: "uint8" },
     ],
-    outputs: [{ name: "answerHandle", type: "bytes32" }],
+    outputs: [{ name: "", type: "bytes32" }],
   },
   {
     type: "function",
@@ -173,23 +179,11 @@ export const MENTALIST_ABI = [
   },
   {
     type: "event",
-    name: "Interrogated",
+    name: "RoomOpened",
     inputs: [
       { name: "caseId", type: "uint256", indexed: true },
       { name: "detective", type: "address", indexed: true },
-      { name: "questionId", type: "uint16" },
-      { name: "witness", type: "uint8" },
-      { name: "mask", type: "uint16" },
-      { name: "cost", type: "uint8" },
-      { name: "answerHandle", type: "bytes32" },
-    ],
-  },
-  {
-    type: "event",
-    name: "WitnessTurned",
-    inputs: [
-      { name: "caseId", type: "uint256", indexed: true },
-      { name: "witness", type: "uint8" },
+      { name: "statementHandles", type: "bytes32[]" },
     ],
   },
   {
@@ -201,7 +195,6 @@ export const MENTALIST_ABI = [
       { name: "seat", type: "uint8" },
       { name: "verdict", type: "bytes32" },
       { name: "guiltHandles", type: "bytes32[]" },
-      { name: "liarHandles", type: "bytes32[]" },
     ],
   },
 ] as const;
@@ -218,14 +211,33 @@ export const MENTALIST_ABI = [
 export const MARKET_ABI = [
   {
     type: "function",
-    name: "enter",
+    name: "claimSeat",
     stateMutability: "nonpayable",
     inputs: [
       { name: "caseIndex", type: "uint8" },
       { name: "caseId", type: "uint256" },
-      { name: "stake", type: "uint256" },
     ],
     outputs: [],
+  },
+  {
+    type: "function",
+    name: "stake",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseIndex", type: "uint8" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "hasStaked",
+    stateMutability: "view",
+    inputs: [
+      { name: "caseIndex", type: "uint8" },
+      { name: "player", type: "address" },
+    ],
+    outputs: [{ name: "", type: "bool" }],
   },
   {
     type: "function",
