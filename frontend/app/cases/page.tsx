@@ -110,7 +110,7 @@ export default function Board() {
 
       <div className="mx-auto mt-8 w-full max-w-[1100px]">
         <h1 className="font-type text-[30px] leading-tight text-bone sm:text-[38px]">
-          Seven rooms. One of them is his.
+          Seven rooms. He was in all of them.
         </h1>
         <p className="mt-2 max-w-[620px] font-body text-[16px] leading-relaxed text-bone-dim">
           Red John is in every one of these rooms, and he always leaves the same mark: a

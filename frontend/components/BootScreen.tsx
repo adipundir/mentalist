@@ -63,10 +63,6 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
       }
       sfx.knock(0.7);
       setDone(true);
-      void narrate(
-        "Seven rooms, and Red John killed in every one of them. Find the story that cannot be true.",
-        { rate: 0.94 },
-      );
       // Do not hold the screen for the whole line: it carries on over the board.
       setTimeout(onReady, 650);
     })();
@@ -98,21 +94,10 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
           fill="none" stroke="#a81c1c" strokeWidth="7" strokeLinecap="round"
           initial={{ pathLength: 0 }}
           animate={{ pathLength: 1 }}
-          transition={{ duration: 0.7, delay: 1.15, ease: "easeOut" }}
+          transition={{ duration: 0.45, delay: 0.5, ease: "easeOut" }}
         />
       </svg>
 
-      <p className="mt-6 font-mono text-[10px] tracking-file text-bone-dim">
-        {done ? "READY" : (STEPS[Math.max(0, step)]?.label ?? "")}
-      </p>
-
-      <div className="mt-3 h-[2px] w-56 bg-ink-3">
-        <motion.div
-          className="h-full bg-blood-hot"
-          animate={{ width: `${((step + 1) / STEPS.length) * 100}%` }}
-          transition={{ duration: 0.4 }}
-        />
-      </div>
     </motion.div>
   );
 }

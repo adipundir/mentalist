@@ -3,6 +3,7 @@
 import { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig, http } from "wagmi";
+import { injected } from "wagmi/connectors";
 import { getDefaultConfig, RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
 import { activeChain } from "@/lib/network";
 
@@ -26,6 +27,13 @@ const config = projectId
       chains: [activeChain],
       transports: { [activeChain.id]: http() },
       ssr: true,
+      // EIP-6963 discovery is switched off deliberately. Some wallets announce themselves
+      // more than once, Phantom notably so, and RainbowKit keys its list on the announced
+      // id, which throws a duplicate-key error and can drop or duplicate entries. One
+      // explicit injected connector is both stabler and honest about what this build
+      // supports without a WalletConnect project id.
+      multiInjectedProviderDiscovery: false,
+      connectors: [injected()],
     });
 
 /**

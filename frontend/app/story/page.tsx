@@ -204,10 +204,6 @@ function StoryInner() {
           connect={
             oracle ? null : (
               <>
-                <p className="font-body text-[15px] text-bone">
-                  They&rsquo;re waiting.{" "}
-                  <span className="text-blood-hot">Connect to open the case.</span>
-                </p>
                 <ConnectButton showBalance={false} chainStatus="icon" />
               </>
             )
