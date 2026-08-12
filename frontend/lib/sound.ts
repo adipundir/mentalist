@@ -518,3 +518,54 @@ export function drone(): Drone {
     },
   };
 }
+
+/**
+ * Whether the browser will actually let us make a noise yet.
+ *
+ * An AudioContext starts suspended and only a real user gesture resumes it, so the title
+ * screen is silent on a cold visit no matter what we do. It is *not* silent when the player
+ * arrives there from somewhere else in the app, because the context is already running, and
+ * that is worth taking.
+ */
+export function audioReady(): boolean {
+  return !muted && ctx !== null && ctx.state === "running";
+}
+
+/**
+ * A door closing somewhere behind you.
+ *
+ * Played once when the player commits, under the knock, so pressing BEGIN lands as an event
+ * rather than as a click. Low, short, and mostly felt.
+ */
+export function thud() {
+  const ac = audio();
+  if (!ac) return;
+
+  const osc = ac.createOscillator();
+  osc.type = "sine";
+  osc.frequency.setValueAtTime(120, ac.currentTime);
+  osc.frequency.exponentialRampToValueAtTime(38, ac.currentTime + 0.28);
+
+  const g = ac.createGain();
+  g.gain.setValueAtTime(0.0001, ac.currentTime);
+  g.gain.exponentialRampToValueAtTime(0.5, ac.currentTime + 0.012);
+  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.5);
+
+  osc.connect(g);
+  toBus(g, 0.8);
+  osc.start();
+  osc.stop(ac.currentTime + 0.55);
+
+  // a little air moving with it
+  const n = noise(ac);
+  const bp = ac.createBiquadFilter();
+  bp.type = "bandpass";
+  bp.frequency.value = 220;
+  const ng = ac.createGain();
+  ng.gain.setValueAtTime(0.14, ac.currentTime);
+  ng.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 0.22);
+  n.connect(bp).connect(ng);
+  toBus(ng, 0.6);
+  n.start();
+  n.stop(ac.currentTime + 0.25);
+}

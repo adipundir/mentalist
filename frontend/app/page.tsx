@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
@@ -19,6 +19,14 @@ import { PoweredBy } from "@/components/PoweredBy";
 export default function Home() {
   const router = useRouter();
   const [booting, setBooting] = useState(false);
+
+  // If the player has already interacted with the app, the title screen keeps the room tone
+  // going instead of dropping to silence. On a first, cold visit the browser refuses and
+  // this does nothing, which is the correct and unavoidable behaviour.
+  useEffect(() => {
+    if (sfx.audioReady()) sfx.startRoomTone();
+    return () => sfx.stopRoomTone();
+  }, []);
 
   return (
     <main className="relative flex min-h-screen flex-col items-center justify-center px-6 text-center">
@@ -56,45 +64,31 @@ export default function Home() {
         ))}
       </div>
 
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.2 }}
-        className="font-mono text-[10px] tracking-file text-bone-dim"
-      >
-        CBI · SERIAL CRIMES · CASE FILE OPEN
-      </motion.p>
-
       <motion.h1
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.3, duration: 0.6 }}
-        className="mt-2 font-type text-[15vw] leading-[0.85] text-bone sm:text-[104px]"
+        className="font-type text-[15vw] leading-[0.85] text-bone sm:text-[104px]"
       >
         MENTALIST
       </motion.h1>
-
-      <motion.p
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.7 }}
-        className="mt-5 max-w-[30ch] font-body text-[19px] leading-snug text-bone sm:text-[22px]"
-      >
-        Everyone in this room knows who did it.
-        <br />
-        <span className="text-blood-hot">Not all of them will tell you.</span>
-      </motion.p>
 
       <motion.button
         type="button"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1 }}
+        onMouseEnter={() => sfx.tick(150, 0.05, 0.05)}
         onClick={() => {
+          // The click is also what unlocks audio, so this is the first sound most players
+          // hear. Give it some weight and start the room breathing underneath immediately,
+          // rather than letting the loading screen run in silence.
+          sfx.thud();
           sfx.knock();
+          sfx.startRoomTone();
           setBooting(true);
         }}
-        className="mt-10 cursor-pointer border-2 border-blood-hot bg-blood-hot/10 px-10 py-3 font-type text-[20px] tracking-wide text-blood-hot transition-colors hover:bg-blood-hot/25"
+        className="mt-9 cursor-pointer border-2 border-blood-hot bg-blood-hot/10 px-10 py-3 font-type text-[20px] tracking-wide text-blood-hot transition-colors hover:bg-blood-hot/25"
       >
         BEGIN
       </motion.button>
