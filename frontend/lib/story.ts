@@ -41,7 +41,7 @@ export const CHAPTERS: Chapter[] = [
     culprit: "wagner",
     roster: ["partridge", "mashburn", "wagner", "ardiles"],
     opening:
-      "Sunday. The house still smells of lemon polish. Upstairs there is a woman who was alive on Friday, and above her bed a face in three-finger strokes, drying to rust. Four men are standing in my room, and every one of them knows which of them painted it. That is the thing about his people — they always know."
+      "Sunday. The house still smells of lemon polish. Upstairs there is a woman who was alive on Friday, and above her bed a face in three-finger strokes, drying to rust. Four men are standing in my room, and every one of them knows which of them painted it. That is the thing about his people — they always know.",
     successText:
       "You say the name and he doesn't run — he beams, delighted to finally be seen. The strokes on the wall ran counter-clockwise. A copycat, then. Somewhere the original is reading about it, and is not amused.",
     failureText:
