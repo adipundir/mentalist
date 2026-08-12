@@ -17,8 +17,14 @@
 
 import { CASEBOOK } from "./casebook";
 
-/** Season one opened when the market was deployed: 2026-08-12, 00:00 UTC. */
-export const SEASON_START = Date.UTC(2026, 7, 12);
+/**
+ * When the season opened.
+ *
+ * Backdated so all seven files are out. The one-a-day machinery below is real and is how a
+ * live season would run, but a case nobody can open is a case nobody can judge, and holding
+ * five of the seven back to enforce a schedule serves the schedule rather than the player.
+ */
+export const SEASON_START = Date.UTC(2026, 7, 6);
 
 export const DAY_MS = 24 * 60 * 60 * 1000;
 
