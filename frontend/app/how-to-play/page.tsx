@@ -90,26 +90,6 @@ export default function HowToPlay() {
       </div>
 
       <h2 className="mt-12 font-mono text-[10px] tracking-file text-bone-dim">
-        WHAT YOU NEED
-      </h2>
-      <ul className="mt-2 space-y-1 font-body text-[15px] text-bone-dim">
-        <li>A wallet on Base Sepolia.</li>
-        <li>
-          Test USDC to stake, from{" "}
-          <a
-            href="https://faucet.circle.com"
-            target="_blank"
-            rel="noreferrer"
-            className="text-brass underline"
-          >
-            faucet.circle.com
-          </a>
-          .
-        </li>
-        <li>A little test ETH for gas.</li>
-      </ul>
-
-      <h2 className="mt-12 font-mono text-[10px] tracking-file text-bone-dim">
         WHY YOU CANNOT CHEAT, AND NEITHER CAN WE
       </h2>
       <p className="mt-2 font-body text-[15px] leading-relaxed text-bone-dim">
