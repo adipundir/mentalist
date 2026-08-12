@@ -365,3 +365,22 @@
     animation: none;
   }
 }
+
+/* ── his eye ──────────────────────────────────────────────────────────────────
+   One wink, a long way apart, and never on a schedule you could set a watch by.
+   The point is that you are not sure you saw it. */
+@keyframes rjWink {
+  0%, 96.4%, 100% { transform: scaleY(1); }
+  97.2% { transform: scaleY(0.08); }
+  98.2% { transform: scaleY(1); }
+}
+.rj-wink {
+  animation: rjWink 23s ease-in-out infinite;
+  transform-origin: 77px 48px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rj-wink {
+    animation: none;
+  }
+}

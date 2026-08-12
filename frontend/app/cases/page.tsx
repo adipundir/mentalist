@@ -137,9 +137,9 @@ export default function Board() {
           return (
             <motion.li
               key={c.title}
-              initial={{ opacity: 0, y: 12 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: Math.min(i * 0.06, 0.4) }}
+              transition={{ duration: 0.28 }}
             >
               <CaseCard
                 index={i}

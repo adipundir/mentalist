@@ -35,13 +35,41 @@ export default function Home() {
         viewBox="0 0 120 120"
         initial={{ opacity: 0, scale: 1.08 }}
         animate={{ opacity: 0.11, scale: 1 }}
-        transition={{ duration: 2.4, ease: "easeOut" }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
         className="pointer-events-none absolute left-1/2 top-1/2 h-[78vmin] w-[78vmin] -translate-x-1/2 -translate-y-1/2"
         aria-hidden
       >
-        <circle cx="60" cy="60" r="44" fill="none" stroke="#c1272d" strokeWidth="5" />
-        <path d="M44 48 L44 48 M76 48 L76 48" stroke="#c1272d" strokeWidth="12" strokeLinecap="round" />
-        <path d="M40 74 Q60 92 80 74" fill="none" stroke="#c1272d" strokeWidth="5" strokeLinecap="round" />
+        {/* Drawn with three fingers, in a hurry, on a wall. Every stroke wobbles, thins
+            where the hand lifted and pools where it pressed, and none of it closes cleanly:
+            a compass-perfect circle is the one thing this mark should never look like. */}
+        <g fill="none" stroke="#c1272d" strokeLinecap="round" strokeLinejoin="round">
+          <path
+            d="M60 15 C39 15 20 33 18 55 C16 76 30 98 51 104 C71 110 94 99 101 79 C108 60 99 33 78 21 C72 17 66 15.5 61 15.2"
+            strokeWidth="7.5"
+          />
+          {/* the overlap where he came back round and did not quite meet his own line */}
+          <path d="M61 15.2 C66 16 70 17.4 73 19" strokeWidth="5" opacity="0.85" />
+          {/* the smile, heavier at the bottom of the arc where the fingers dragged */}
+          <path d="M38 71 C45 87 60 93 72 89 C78 87 82 82 84 74" strokeWidth="7" />
+          <path d="M46 80 C54 88 64 90 72 87" strokeWidth="3.4" opacity="0.55" />
+        </g>
+
+        {/* the eyes: three-finger dabs, not dots */}
+        <g fill="#c1272d">
+          <ellipse cx="44" cy="49" rx="5.4" ry="7.2" transform="rotate(-9 44 49)" />
+          <g className="rj-wink">
+            <ellipse cx="77" cy="48" rx="5.2" ry="7" transform="rotate(7 77 48)" />
+          </g>
+        </g>
+
+        {/* what ran, before it dried */}
+        <g stroke="#a81f24" strokeLinecap="round" fill="none">
+          <path d="M44.6 56 q1.2 9 0.4 15.5" strokeWidth="2.2" opacity="0.75" />
+          <path d="M77.6 55 q-1 12 0.2 20" strokeWidth="1.9" opacity="0.6" />
+          <path d="M101 79 q3 11 1.5 19" strokeWidth="2.4" opacity="0.55" />
+          <path d="M18.4 55 q-2.4 8 -1 14" strokeWidth="2" opacity="0.5" />
+          <path d="M60 92.5 q1 9 -0.4 16" strokeWidth="2.6" opacity="0.65" />
+        </g>
       </motion.svg>
 
       {/* registration marks, the frame turns empty space into composition */}
@@ -58,7 +86,7 @@ export default function Home() {
             key={cls}
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 1.5, duration: 0.8 }}
+            transition={{ duration: 0.5 }}
             className={`absolute h-7 w-7 border-bone-dim/25 ${cls}`}
           />
         ))}
@@ -67,7 +95,7 @@ export default function Home() {
       <motion.h1
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.3, duration: 0.6 }}
+        transition={{ duration: 0.32 }}
         className="font-type text-[15vw] leading-[0.85] text-bone sm:text-[104px]"
       >
         MENTALIST
@@ -77,7 +105,7 @@ export default function Home() {
         type="button"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
+        transition={{ duration: 0.32 }}
         onMouseEnter={() => sfx.tick(150, 0.05, 0.05)}
         onClick={() => {
           // The click is also what unlocks audio, so this is the first sound most players
@@ -96,10 +124,10 @@ export default function Home() {
       <motion.nav
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 1.3 }}
+        transition={{ duration: 0.32 }}
         className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[10px] tracking-file text-bone-dim"
       >
-        <Link href="/about" className="hover:text-bone">HOW IT WORKS</Link>
+        <Link href="/how-to-play" className="hover:text-bone">HOW TO PLAY</Link>
         <a
           href="https://github.com/adipundir/mentalist"
           target="_blank"
@@ -110,7 +138,7 @@ export default function Home() {
         </a>
       </motion.nav>
 
-      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.8 }}>
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.32 }}>
         <PoweredBy fixed />
       </motion.div>
 
