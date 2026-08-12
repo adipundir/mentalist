@@ -1,15 +1,16 @@
 /**
  * Attribution, pinned to the bottom of the screen.
  *
- * All three marks are the official assets: Inco's own wordmark keeps its blue, Base ships a
- * white lockup in its brand kit, and Megapot's is near-black for light backgrounds so it
- * uses a bone variant, glyphs recoloured only, luminance mask untouched, which is the
- * standard monochrome treatment on a dark ground.
+ * All four marks are the official assets: Inco's own wordmark keeps its blue, Base ships a
+ * white lockup in its brand kit, USDC keeps Circle's blue, and Megapot's is near-black for
+ * light backgrounds so it uses a bone variant, glyphs recoloured only, luminance mask
+ * untouched, which is the standard monochrome treatment on a dark ground.
  */
 const MARKS = [
   { href: "https://inco.org", src: "/brand/inco.svg", alt: "Inco", h: "h-[19px]" },
   { href: "https://megapot.io", src: "/brand/megapot-light.svg", alt: "Megapot", h: "h-[14px]" },
   { href: "https://base.org", src: "/brand/base.svg", alt: "Base", h: "h-[15px]" },
+  { href: "https://www.circle.com/usdc", src: "/brand/usdc.svg", alt: "USDC", h: "h-[17px]" },
 ] as const;
 
 export function PoweredBy({
