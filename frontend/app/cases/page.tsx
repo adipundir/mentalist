@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useAccount, usePublicClient } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { CHAPTERS } from "@/lib/story";
+import { CASEBOOK } from "@/lib/casebook";
 import { lineup } from "@/lib/canon";
 import { MARKET_ABI, MARKET_ADDRESS } from "@/lib/contracts";
 import { usdc } from "@/lib/market";
@@ -52,7 +52,7 @@ export default function Board() {
     const read = async () => {
       const out: Record<number, Row> = {};
       await Promise.all(
-        CHAPTERS.map(async (_, i) => {
+        CASEBOOK.map(async (_, i) => {
           try {
             const round = await pub.readContract({
               address: MARKET_ADDRESS,
@@ -113,8 +113,11 @@ export default function Board() {
           Seven rooms. One of them is his.
         </h1>
         <p className="mt-2 max-w-[620px] font-body text-[16px] leading-relaxed text-bone-dim">
-          A new file lands every day. Stake on the man you think did it, and if you are right
-          you take a share of everything the people who were wrong put in, paid as{" "}
+          Red John is in every one of these rooms, and he always leaves the same mark: a
+          smiling face, drawn in his victim&rsquo;s blood. Everyone gives an account of where
+          they were. <span className="text-bone">One account in each room cannot be true</span>,
+          and that man is Red John. Back him with money and you take a share of everything the
+          people who were wrong put in, paid as{" "}
           <span className="text-brass">Megapot tickets</span>.
         </p>
         {next && (
@@ -125,7 +128,7 @@ export default function Board() {
       </div>
 
       <ol className="mx-auto mt-8 grid w-full max-w-[1100px] gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {CHAPTERS.map((c, i) => {
+        {CASEBOOK.map((c, i) => {
           const rel = releases[i]!;
           const row = rows[i];
           const closed = row ? now >= row.closesAt : false;
@@ -143,6 +146,7 @@ export default function Board() {
                 title={c.title}
                 label={c.label}
                 blurb={c.blurb}
+                setting={c.setting}
                 suspects={c.suspects}
                 liars={c.liars}
                 roster={c.roster}
@@ -167,6 +171,7 @@ function CaseCard({
   title,
   label,
   blurb,
+  setting,
   suspects,
   liars,
   roster,
@@ -180,6 +185,7 @@ function CaseCard({
   title: string;
   label: string;
   blurb: string;
+  setting: string;
   suspects: number;
   liars: number;
   roster: string[];
@@ -226,6 +232,9 @@ function CaseCard({
         {title}
       </h2>
       <p className="mt-1 min-h-[38px] font-body text-[13px] leading-snug text-bone-dim">{blurb}</p>
+      <p className="mt-1 font-mono text-[9px] tracking-file text-bone-dim/75">
+        {setting.toUpperCase()}
+      </p>
 
       {/* the lineup, in miniature */}
       <div className="mb-3 mt-3 flex -space-x-1.5">

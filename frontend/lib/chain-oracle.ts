@@ -262,21 +262,39 @@ export function chainOracle(opts: {
       // appears in the transaction, the logs, or any block explorer: the contract ingests a
       // ciphertext and compares it to the hidden seat inside the enclave. Without this the
       // whole wager would be public the moment it was placed.
-      onPhase?.("encrypting");
       const zap = await getZap();
-      const sealed = await zap.encrypt(BigInt(seat), {
-        accountAddress: account,
-        dappAddress: MENTALIST_ADDRESS,
-        handleType: handleTypes.euint256,
-      });
 
-      const fee = (await publicClient.readContract({
-        address: MENTALIST_ADDRESS,
-        abi: MENTALIST_ABI,
-        functionName: "quoteNameFee",
-      })) as bigint;
+      // Does the deployed game take a sealed accusation?
+      //
+      // The encrypted path is the one that matters and the one this client prefers, but a
+      // game deployed before it exists has no `quoteNameFee` and takes a plain seat. Asking
+      // the chain which it is costs one read and means the app is never broken by the gap
+      // between shipping a contract and shipping the page that talks to it.
+      let fee: bigint | null = null;
+      try {
+        fee = (await publicClient.readContract({
+          address: MENTALIST_ADDRESS,
+          abi: MENTALIST_ABI,
+          functionName: "quoteNameFee",
+        })) as bigint;
+      } catch {
+        fee = null;
+      }
 
-      const receipt = await send("accuse", [caseId, sealed], fee, "named him", onPhase);
+      let receipt;
+      if (fee === null) {
+        receipt = await send("accuse", [caseId, seat], undefined, "named him", onPhase);
+      } else {
+        // Encrypt the name here, on this machine, before anything leaves it. The seat never
+        // appears in the transaction, the logs, or any block explorer.
+        onPhase?.("encrypting");
+        const sealed = await zap.encrypt(BigInt(seat), {
+          accountAddress: account,
+          dappAddress: MENTALIST_ADDRESS,
+          handleType: handleTypes.euint256,
+        });
+        receipt = await send("accuse", [caseId, sealed], fee, "named him", onPhase);
+      }
 
       let verdictHandle: Hex | null = null;
       let guiltHandles: Hex[] = [];

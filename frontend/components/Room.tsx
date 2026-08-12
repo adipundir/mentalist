@@ -75,6 +75,30 @@ function baseWidth(n: number) {
   return Math.max(4.6, Math.min(7.4, 58 / n));
 }
 
+/**
+ * What each room is made of.
+ *
+ * Every case names its own setting, and a shuttered parlour should not look like a mall
+ * food court lit by strip lights. These are the two or three colours that actually change
+ * the read of a space: the wall, the floor, and what the one practical light is doing.
+ */
+const ROOMS = [
+  // a shuttered Sunday parlour: warm, papered, domestic
+  { wall: ["#241b1d", "#2c2124", "#38292c"], floor: ["#38292c", "#241b1d", "#160f11"], lamp: "#ffe9b8", grid: "#6b5a60" },
+  // a shuttered safe house: cold, institutional, damp
+  { wall: ["#171d22", "#1c242a", "#263139"], floor: ["#263139", "#192126", "#0f1519"], lamp: "#cfe3ef", grid: "#5f7684" },
+  // a half dead mall food court: sick custard strip lighting
+  { wall: ["#1f2018", "#26281d", "#333524"], floor: ["#333524", "#212318", "#14150e"], lamp: "#fff3c4", grid: "#7b7f5c" },
+  // a shuttered hotel lounge: green baize and old brass
+  { wall: ["#161f1b", "#1b2721", "#24332b"], floor: ["#24332b", "#17211c", "#0e1512"], lamp: "#f6e2b0", grid: "#5d7a6c" },
+  // a dance hall's dirt cellar: earth and low red
+  { wall: ["#20191a", "#291f1e", "#352725"], floor: ["#352725", "#221a19", "#140f0e"], lamp: "#ffd9a8", grid: "#6f5a52" },
+  // the parlour where it happened: ten years of dust
+  { wall: ["#1d1b22", "#242229", "#2f2b35"], floor: ["#2f2b35", "#1e1c23", "#121016"], lamp: "#ffe9b8", grid: "#6b6270" },
+  // a chapel beside the graves: stone and candlelight
+  { wall: ["#1c1a1e", "#232128", "#2e2b33"], floor: ["#2e2b33", "#1d1b21", "#111014"], lamp: "#ffdca6", grid: "#6d6875" },
+] as const;
+
 export function Room({
   subjects,
   focused,
@@ -93,6 +117,7 @@ export function Room({
   variant?: number;
 }) {
   const n = subjects.length;
+  const room = ROOMS[variant % ROOMS.length]!;
   const spots = useMemo(() => subjects.map((_, i) => placement(i, n)), [subjects, n]);
   const w = baseWidth(n);
 
@@ -123,16 +148,14 @@ export function Room({
         <div
           className="absolute inset-x-0 top-0 h-[54%]"
           style={{
-            background:
-              "linear-gradient(#191722 0%, #201d29 55%, #2b2531 100%)",
+            background: `linear-gradient(${room.wall[0]} 0%, ${room.wall[1]} 55%, ${room.wall[2]} 100%)`,
           }}
         >
           {/* tiled wall, receding */}
           <div
             className="absolute inset-0 opacity-[0.14]"
             style={{
-              backgroundImage:
-                "linear-gradient(90deg, #6b6270 1px, transparent 1px), linear-gradient(#6b6270 1px, transparent 1px)",
+              backgroundImage: `linear-gradient(90deg, ${room.grid} 1px, transparent 1px), linear-gradient(${room.grid} 1px, transparent 1px)`,
               backgroundSize: "7% 22%",
             }}
           />
@@ -162,7 +185,7 @@ export function Room({
         <div
           className="absolute inset-x-0 bottom-0 h-[46%]"
           style={{
-            background: "linear-gradient(#2b2531 0%, #1c1822 40%, #121017 100%)",
+            background: `linear-gradient(${room.floor[0]} 0%, ${room.floor[1]} 40%, ${room.floor[2]} 100%)`,
           }}
         >
           {/* perspective boards converging on the vanishing point */}
@@ -174,12 +197,12 @@ export function Room({
                 y1="100%"
                 x2={`${44 + (i / 14) * 12}%`}
                 y2="0%"
-                stroke="#6b6270"
+                stroke={room.grid}
                 strokeWidth="1"
               />
             ))}
             {[12, 28, 48, 72].map((y) => (
-              <line key={y} x1="0" y1={`${y}%`} x2="100%" y2={`${y}%`} stroke="#6b6270" strokeWidth="1" />
+              <line key={y} x1="0" y1={`${y}%`} x2="100%" y2={`${y}%`} stroke={room.grid} strokeWidth="1" />
             ))}
           </svg>
         </div>
@@ -195,7 +218,7 @@ export function Room({
               border: "1px solid #554e5c",
             }}
           />
-          <div className="mx-auto -mt-1 h-2.5 w-7 rounded-full bg-[#ffe9b8] blur-[2px]" />
+          <div className="mx-auto -mt-1 h-2.5 w-7 rounded-full blur-[2px]" style={{ background: room.lamp }} />
         </div>
 
         {/* light cone */}
@@ -205,7 +228,7 @@ export function Room({
             width: "68%",
             height: "78%",
             background:
-              "linear-gradient(#ffe9b8 0%, rgb(255 233 184 / 0.10) 42%, transparent 78%)",
+              `linear-gradient(${room.lamp} 0%, rgb(255 233 184 / 0.10) 42%, transparent 78%)`,
             clipPath: "polygon(44% 0, 56% 0, 100% 100%, 0 100%)",
             opacity: 0.3,
             filter: "blur(6px)",

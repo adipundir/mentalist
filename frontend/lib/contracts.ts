@@ -80,6 +80,18 @@ export const MENTALIST_ABI = [
     outputs: [],
   },
   {
+    // The pre-encryption shape, kept so the page still works against a game deployed
+    // before sealed accusations existed.
+    type: "function",
+    name: "accuse",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseId", type: "uint256" },
+      { name: "seat", type: "uint8" },
+    ],
+    outputs: [],
+  },
+  {
     type: "function",
     name: "settle",
     stateMutability: "nonpayable",
