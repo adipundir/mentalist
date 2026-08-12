@@ -15,7 +15,7 @@
  * case is open when the market would reject the entry.
  */
 
-import { CHAPTERS } from "./story";
+import { CASEBOOK } from "./casebook";
 
 /** Season one opened when the market was deployed: 2026-08-12, 00:00 UTC. */
 export const SEASON_START = Date.UTC(2026, 7, 12);
@@ -42,7 +42,7 @@ export function releaseOf(index: number, now: number = Date.now()): Release {
 }
 
 export function schedule(now: number = Date.now()): Release[] {
-  return CHAPTERS.map((_, i) => releaseOf(i, now));
+  return CASEBOOK.map((_, i) => releaseOf(i, now));
 }
 
 /** The newest case that has actually landed, or null before the season opens. */
