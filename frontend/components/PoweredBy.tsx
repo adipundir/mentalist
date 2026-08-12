@@ -10,7 +10,15 @@ const MARKS = [
   { href: "https://inco.org", src: "/brand/inco.svg", alt: "Inco", h: "h-[19px]" },
   { href: "https://megapot.io", src: "/brand/megapot-light.svg", alt: "Megapot", h: "h-[14px]" },
   { href: "https://base.org", src: "/brand/base.svg", alt: "Base", h: "h-[15px]" },
-  { href: "https://www.circle.com/usdc", src: "/brand/usdc.svg", alt: "USDC", h: "h-[17px]" },
+  // Circle ship the USDC glyph on its own, with no wordmark beside it, so next to three
+  // lockups it read as a stray blue coin. The name is set alongside it to match them.
+  {
+    href: "https://www.circle.com/usdc",
+    src: "/brand/usdc.svg",
+    alt: "USDC",
+    h: "h-[17px]",
+    word: "USDC",
+  },
 ] as const;
 
 export function PoweredBy({
@@ -41,10 +49,15 @@ export function PoweredBy({
             target="_blank"
             rel="noreferrer"
             aria-label={m.alt}
-            className="opacity-60 transition-opacity hover:opacity-100"
+            className="flex items-center gap-1.5 opacity-60 transition-opacity hover:opacity-100"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src={m.src} alt={m.alt} className={`${m.h} w-auto`} />
+            {"word" in m && (
+              <span className="font-type text-[15px] leading-none tracking-wide text-bone">
+                {m.word}
+              </span>
+            )}
           </a>
         ))}
       </div>
