@@ -5,11 +5,10 @@
  * what the place looks like, and every word any of them says.
  *
  * **The answer is not in this file, and cannot be.** Each case carries one account that is
- * logically impossible, and it is always written last. Which *suspect* is dealt that account
- * is decided by a bounded random draw inside Inco's enclave when the case is opened, granted
- * to that player's wallet alone. So two people playing the same case below are hunting
- * different men, and reading this file tells you the shape of the trap but never who walked
- * into it.
+ * logically impossible, and it is always written last. Which *person* gives that account is
+ * fixed per case and stored on chain as a ciphertext, so every player is hunting the same
+ * man and nobody, including whoever wrote the case, can read the answer off the repository
+ * or off the explorer.
  *
  * That is also why there is no database. The cases are content and belong in the repository.
  * The one secret worth keeping lives on chain, where keeping it actually means something.

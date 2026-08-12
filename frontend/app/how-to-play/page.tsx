@@ -89,21 +89,6 @@ export default function HowToPlay() {
         </p>
       </div>
 
-      <h2 className="mt-12 font-mono text-[10px] tracking-file text-bone-dim">
-        WHY YOU CANNOT CHEAT, AND NEITHER CAN WE
-      </h2>
-      <p className="mt-2 font-body text-[15px] leading-relaxed text-bone-dim">
-        Every word in every case is public, sitting in the source where anyone can read it.
-        What is <span className="text-bone">not</span> public is which man was dealt the
-        impossible account. That is decided by a random draw inside Inco&rsquo;s enclave when
-        you open the case, and granted to your wallet alone.
-      </p>
-      <p className="mt-2 font-body text-[15px] leading-relaxed text-bone-dim">
-        So two people playing the same case are hunting different men, reading the source
-        tells you the shape of the trap but never who walked into it, and nobody, including
-        us, can tell you the answer.
-      </p>
-
       <div className="mt-10 flex flex-wrap gap-2">
         <Link
           href="/cases"
