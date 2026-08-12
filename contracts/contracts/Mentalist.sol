@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.30;
 
-import { e, ebool, inco, elist, ETypes } from "@inco/lightning/src/Lib.sol";
+import { e, ebool, euint256, inco } from "@inco/lightning/src/Lib.sol";
 import { DecryptionAttestation } from "@inco/lightning/src/lightning-parts/DecryptionAttester.types.sol";
 import { asBool } from "@inco/lightning/src/shared/TypeUtils.sol";
 
@@ -32,8 +32,6 @@ contract Mentalist {
 
     /// @dev A control question (mask covers every suspect) is a guaranteed honesty test,
     ///      so it is deliberately the expensive move. This price is the whole economy.
-    uint8 public constant CONTROL_COST = 2;
-    uint8 public constant QUESTION_COST = 1;
 
     // ─────────────────────────────────────────── types
 
@@ -67,12 +65,13 @@ contract Mentalist {
     /// @dev caseId => seat => "is this suspect the Tyger". Never granted to anyone.
     mapping(uint256 => mapping(uint8 => ebool)) internal _guilt;
     /// @dev caseId => seat => "does this suspect lie". Never granted to anyone.
-    mapping(uint256 => mapping(uint8 => ebool)) internal _liar;
     /// @dev caseId => questionId => the answer, granted to the detective only.
-    mapping(uint256 => mapping(uint16 => ebool)) internal _testimony;
 
     /// @dev The handle settlement must attest over, the accused seat's guilt bit.
     mapping(uint256 => bytes32) public verdictHandle;
+
+    /// @dev seat -> the encrypted index of the account that seat gives.
+    mapping(uint256 => mapping(uint8 => euint256)) internal _statement;
 
     /// @dev The most recent case a detective opened. Used to force abandoned cases to
     ///      resolve as losses, see `openCase`.
@@ -94,29 +93,17 @@ contract Mentalist {
         uint8 turnAt
     );
 
-    /// @param answerHandle the encrypted answer; only `detective` can decrypt it
-    event Interrogated(
-        uint256 indexed caseId,
-        address indexed detective,
-        uint16 questionId,
-        uint8 witness,
-        uint16 mask,
-        uint8 cost,
-        bytes32 answerHandle
-    );
+    event RoomOpened(uint256 indexed caseId, address indexed detective, bytes32[] statementHandles);
 
     /// @notice the Tyger got to the last witness you spoke to. Their honesty bit flipped.
-    event WitnessTurned(uint256 indexed caseId, uint8 witness);
 
     /// @param guiltHandles every seat's guilt bit, revealed, the case is over
-    /// @param liarHandles  every seat's honesty bit, revealed, the post-mortem
     event Accused(
         uint256 indexed caseId,
         address indexed detective,
         uint8 seat,
         bytes32 verdict,
-        bytes32[] guiltHandles,
-        bytes32[] liarHandles
+        bytes32[] guiltHandles
     );
 
     /// @notice A case left unresolved when its detective opened a new one. Scored as a loss.
@@ -133,6 +120,8 @@ contract Mentalist {
     // ─────────────────────────────────────────── errors
 
     error BadConfig();
+    /// @dev He has already said his piece. Everyone speaks exactly once.
+    error AlreadyHeard();
     /// @dev You named someone and never filed the verdict. Settle it before opening another.
     error UnsettledCase(uint256 caseId);
     error NotYourCase();
@@ -154,12 +143,16 @@ contract Mentalist {
 
     // ─────────────────────────────────────────── fees
 
-    /// @notice Total Inco fee to open a case of `suspects` seats.
-    /// @dev Two encrypted lists (guilt, honesty), each created then shuffled: 4 list ops.
-    ///      Every other move in the game, getEbool, or, xor, not, allow, is fee-free,
-    ///      so interrogation is an ordinary cheap Base transaction.
-    function quoteOpenFee(uint8 suspects) public pure returns (uint256) {
-        return 4 * inco.getEListFee(uint16(suspects), ETypes.Bool);
+    /**
+     * @notice Total Inco fee to open a case of `suspects` seats.
+     *
+     * @dev One random draw decides which man is lying, and everything after it is
+     *      comparison and selection, which are fee-free. Quoted with headroom rather than
+     *      to the wei: the contract also carries its own float, so a rounding edge in the
+     *      fee schedule can never leave a player stranded mid-deal.
+     */
+    function quoteOpenFee(uint8 suspects) public view returns (uint256) {
+        return inco.getFee() * (uint256(suspects) + 2);
     }
 
     // ─────────────────────────────────────────── the game
@@ -259,130 +252,97 @@ contract Mentalist {
      *      economy, access control, the turncoat, settlement, while this real dealing
      *      path is covered against a live covalidator by the Hardhat integration test.
      */
-    function _deal(uint256 caseId, uint8 suspects, uint8 liars) internal virtual {
-        bytes32 yes = ebool.unwrap(e.asEbool(true));
-        bytes32 no = ebool.unwrap(e.asEbool(false));
-
-        bytes32[] memory guiltSeed = new bytes32[](suspects);
-        bytes32[] memory liarSeed = new bytes32[](suspects);
-        for (uint8 i = 0; i < suspects; i++) {
-            guiltSeed[i] = i == 0 ? yes : no;
-            liarSeed[i] = i < liars ? yes : no;
-        }
-
-        elist guiltList = e.shuffle(e.newEList(guiltSeed, ETypes.Bool));
-        elist liarList = e.shuffle(e.newEList(liarSeed, ETypes.Bool));
+    function _deal(uint256 caseId, uint8 suspects, uint8 /* liars */) internal {
+        // One seat holds the alibi that cannot be true, and which seat that is, is the only
+        // thing about this case that is secret. Everything else, the room, the people, the
+        // words they say, is written down in the open where anyone can read it.
+        euint256 tellSeat = e.randBounded(uint256(suspects));
 
         for (uint8 i = 0; i < suspects; i++) {
-            ebool g = e.getEbool(guiltList, uint16(i));
-            // the Tyger always lies. One encrypted OR welds guilt to dishonesty, which is
-            // also why the realised liar count is `liars` or `liars + 1`, denying the
-            // player an exact parity check on the liar population.
-            ebool l = e.or(e.getEbool(liarList, uint16(i)), g);
-            _seat(caseId, i, g, l);
-        }
-    }
+            euint256 seatIx = e.asEuint256(uint256(i));
+            ebool isTell = e.eq(tellSeat, seatIx);
 
-    /// @dev Persist one seat's secrets. `allowThis` is mandatory: without it the contract
-    ///      permanently loses access to its own case file on the next transaction.
-    function _seat(uint256 caseId, uint8 i, ebool guilty, ebool lies) internal {
-        _guilt[caseId][i] = guilty;
-        _liar[caseId][i] = lies;
-        e.allowThis(guilty);
-        e.allowThis(lies);
+            // The honest alibis are handed out in written order, skipping whoever holds the
+            // tell, so no two men ever give the same account of the evening. Seat i takes
+            // account i if it sits before the liar, and account i-1 if it sits after.
+            ebool before = e.lt(seatIx, tellSeat);
+            euint256 honest = e.select(
+                before,
+                seatIx,
+                e.asEuint256(i == 0 ? 0 : uint256(i) - 1)
+            );
+
+            // The impossible account is always written last, so the tell is the final slot.
+            euint256 slot = e.select(isTell, e.asEuint256(uint256(suspects) - 1), honest);
+
+            _guilt[caseId][i] = isTell;
+            _statement[caseId][i] = slot;
+            e.allowThis(isTell);
+            e.allowThis(slot);
+        }
     }
 
     /**
-     * @notice Ask witness `witness`: "is the killer one of these people?", where `mask` is
-     *         a plaintext bitmask over seats.
+     * @notice Open the room. Every account in it becomes readable, to you and to nobody else.
      *
-     * @dev    `mask` is deliberately public. *Which* suspects you asked about is
-     *         information an opponent and a spectator are entitled to see, that asymmetry
-     *         (public question, private answer) is the game. Only the answer is granted.
+     * @dev    One transaction, once, and then the interrogation itself is free.
      *
-     *         Not payable: no operation in this function charges an Inco fee.
+     *         An earlier version granted one account per click, which put a wallet signature
+     *         in front of every single suspect and turned a conversation into a queue of
+     *         confirmation dialogs. The confidentiality never needed that: what has to stay
+     *         secret is *which man gives which account*, and that is decided once when the
+     *         case is dealt. Granting the whole set at once reveals it to this detective
+     *         alone and lets the room be played at the speed of talking.
+     *
+     *         This is also the point of no return for the market. A seat has to be claimed
+     *         while `questionsAsked` is still zero, so a player cannot read a room, dislike
+     *         what it says, and go looking for an easier one to bet on.
      */
-    function interrogate(uint256 caseId, uint8 witness, uint16 mask) external returns (bytes32 answerHandle) {
+    function beginHearing(uint256 caseId) external returns (bytes32[] memory handles) {
         Case storage c = cases[caseId];
         if (c.status != Status.Open) revert WrongStatus();
         if (c.detective != msg.sender) revert NotYourCase();
-        if (witness >= c.suspects) revert BadWitness();
+        if (c.questionsAsked != 0) revert AlreadyHeard();
 
-        uint16 full = _fullMask(c.suspects);
-        if (mask == 0 || mask > full) revert BadMask();
-
-        uint8 cost = mask == full ? CONTROL_COST : QUESTION_COST;
-        if (c.focusLeft < cost) revert NoFocusLeft();
-        c.focusLeft -= cost;
-
-        // Is the killer inside the questioned set? Folded entirely in encrypted state.
-        ebool truth = e.asEbool(false);
+        handles = new bytes32[](c.suspects);
         for (uint8 i = 0; i < c.suspects; i++) {
-            if ((mask >> i) & 1 == 1) {
-                truth = e.or(truth, _guilt[caseId][i]);
-            }
+            euint256 slot = _statement[caseId][i];
+            e.allow(slot, msg.sender); // selective reveal: the detective, and nobody else
+            e.allowThis(slot);
+            handles[i] = euint256.unwrap(slot);
         }
 
-        // ── The encrypted lie.
-        // The witness's honesty bit flips the answer, in-enclave, without either secret
-        // ever becoming branchable. There is no if/else here and there cannot be: `truth`
-        // and `liar` are handles, not booleans.
-        ebool answer = e.xor(truth, _liar[caseId][witness]);
+        c.questionsAsked = c.suspects;
+        c.focusLeft = 0;
 
-        e.allow(answer, msg.sender); // selective reveal, the detective, and nobody else
-        e.allowThis(answer);
-
-        uint16 qid = c.questionsAsked;
-        _testimony[caseId][qid] = answer;
-        // Safe: `focus` is a uint8 and every question costs at least 1 Focus, so at most
-        // 255 questions can ever be asked and `qid + 1` cannot exceed 255.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        c.questionsAsked = uint8(qid + 1);
-
-        answerHandle = ebool.unwrap(answer);
-        emit Interrogated(caseId, msg.sender, qid, witness, mask, cost, answerHandle);
-
-        // ── the Tyger reacts.
-        // On harder cases he reaches the witness you just used and turns them: their
-        // honesty bit is negated *in place*. Encrypted state mutates, so intelligence you
-        // gathered three moves ago silently goes stale. A zk commitment cannot do this, // the commitment is frozen, and a trusted server doing it would *be* the game.
-        if (c.turnAt != 0 && !c.turned && c.questionsAsked >= c.turnAt) {
-            ebool flipped = e.not(_liar[caseId][witness]);
-            _liar[caseId][witness] = flipped;
-            e.allowThis(flipped);
-            c.turned = true;
-            emit WitnessTurned(caseId, witness);
-        }
+        emit RoomOpened(caseId, msg.sender, handles);
     }
 
-    /**
-     * @notice Name the Tyger. Free, and it ends the case.
-     * @dev    Reveals every seat's guilt and honesty bit: the case is over, so full
-     *         disclosure is the intended post-mortem rather than a leak. The frontend
-     *         pulls all of them in a single `attestedReveal` batch and paints the board.
-     */
+    /// @notice The encrypted account each seat gives. Readable only once you have begun.
+    function statementOf(uint256 caseId, uint8 seat) external view returns (euint256) {
+        return _statement[caseId][seat];
+    }
+
     function accuse(uint256 caseId, uint8 seat) external {
         Case storage c = cases[caseId];
         if (c.status != Status.Open) revert WrongStatus();
         if (c.detective != msg.sender) revert NotYourCase();
         if (seat >= c.suspects) revert BadSeat();
 
+        // The whole board opens at once, so the player can see who was actually lying and
+        // not merely be told they were wrong.
         bytes32[] memory guiltHandles = new bytes32[](c.suspects);
-        bytes32[] memory liarHandles = new bytes32[](c.suspects);
         for (uint8 i = 0; i < c.suspects; i++) {
             ebool g = _guilt[caseId][i];
-            ebool l = _liar[caseId][i];
             e.reveal(g);
-            e.reveal(l);
             guiltHandles[i] = ebool.unwrap(g);
-            liarHandles[i] = ebool.unwrap(l);
         }
 
         c.accusedSeat = seat;
         c.status = Status.Accused;
         verdictHandle[caseId] = guiltHandles[seat];
 
-        emit Accused(caseId, msg.sender, seat, guiltHandles[seat], guiltHandles, liarHandles);
+        emit Accused(caseId, msg.sender, seat, guiltHandles[seat], guiltHandles);
     }
 
     /**
@@ -422,9 +382,6 @@ contract Mentalist {
     // ─────────────────────────────────────────── views
 
     /// @notice The encrypted answer to question `questionId`. Only the detective may decrypt it.
-    function getTestimony(uint256 caseId, uint16 questionId) external view returns (ebool) {
-        return _testimony[caseId][questionId];
-    }
 
     /// @notice Handle for "is seat `i` the Tyger". Publishing the *handle* discloses
     ///         nothing, decryption requires an access grant, and this one is granted to
@@ -435,9 +392,6 @@ contract Mentalist {
     }
 
     /// @notice Handle for "does seat `i` lie". Same disclosure argument as `guiltOf`.
-    function liarOf(uint256 caseId, uint8 seat) external view returns (ebool) {
-        return _liar[caseId][seat];
-    }
 
     function getCase(uint256 caseId) external view returns (Case memory) {
         return cases[caseId];

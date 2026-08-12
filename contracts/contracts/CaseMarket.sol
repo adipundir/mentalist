@@ -107,12 +107,12 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────── events
 
     event RoundOpened(uint8 indexed caseIndex, uint64 closesAt);
-    event Entered(
+    event Seated(uint8 indexed caseIndex, address indexed player, uint256 caseId, uint64 deadline);
+    event Staked(
         uint8 indexed caseIndex,
         address indexed player,
         uint256 caseId,
-        uint256 stake,
-        uint64 deadline,
+        uint256 amount,
         uint128 pot
     );
     event Result(uint8 indexed caseIndex, address indexed player, bool won, bool inTime);
@@ -132,6 +132,10 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     error RoundNotSealed();
     error AlreadySealed();
     error AlreadyEntered();
+    error AlreadyStaked();
+    error TooLate();
+    /// @dev You have not heard every suspect yet, so there is nothing to back.
+    error RoomNotHeard();
     error NoEntry();
     error AlreadyRecorded();
     error AlreadyClaimed();
@@ -171,23 +175,34 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Enter a round: stake on a case you have just opened, and start the clock.
+     * @notice Take your seat at a case, before you know anything about it.
      *
-     * @dev Open the case on `Mentalist` first, then hand the id here. The case must be yours,
-     *      untouched, and match this round's spec, otherwise a player could enter with an
-     *      easy four-man lineup and take the pot off people who played the real one.
+     *         Free. This is the moment you commit to a room: the case you hand over is the
+     *         one you will be judged on, and it must be untouched when you do it.
+     *
+     * @dev    Why this is separate from staking, and why it has to come first.
+     *
+     *         The player wants to hear everyone out before deciding how much to put down,
+     *         which is right: a decision made before you have any information is not a
+     *         decision. But if the *case* were also chosen after the fact, you could open a
+     *         room, listen, and walk away from any deal that stayed ambiguous, opening
+     *         another until one resolved cleanly. Every stake would then be a certainty and
+     *         the pot would only ever pay people who could not lose.
+     *
+     *         Binding the case here closes that. You commit to a room blind, learn what it
+     *         has to say, and only then decide what your read is worth. The gamble is on
+     *         your judgement, which is the only thing worth gambling on.
      */
-    function enter(uint8 caseIndex, uint256 caseId, uint256 stake) external nonReentrant {
+    function claimSeat(uint8 caseIndex, uint256 caseId) external {
         Round storage r = rounds[caseIndex];
         Spec memory spec = specs[caseIndex];
         if (!spec.set) revert SpecNotSet();
         if (r.sealed_ || block.timestamp >= r.closesAt) revert RoundClosed();
-        if (entries[caseIndex][msg.sender].stake != 0) revert AlreadyEntered();
-        if (stake < minStake || stake > maxStake) revert StakeOutOfRange(minStake, maxStake);
+        if (entries[caseIndex][msg.sender].caseId != 0) revert AlreadyEntered();
 
         // The player opens their own case directly on Mentalist, which keeps this contract
         // out of the confidential path entirely: every answer is granted to the detective
-        // and nobody else, including here. All the market does is check the case is theirs,
+        // and nobody else, including here. All this does is check the case is theirs,
         // untouched, and the lineup this round actually calls for.
         Mentalist.Case memory c = game.getCase(caseId);
         if (c.detective != msg.sender) revert NotYourCase();
@@ -200,22 +215,50 @@ contract CaseMarket is Ownable, ReentrancyGuard {
             c.focusLeft != spec.questions
         ) revert WrongCase();
 
-        usdc.safeTransferFrom(msg.sender, address(this), stake);
-
+        uint64 deadline = uint64(block.timestamp) + playWindow;
         entries[caseIndex][msg.sender] = Entry({
-            stake: uint128(stake),
+            stake: 0,
             caseId: caseId,
-            deadline: uint64(block.timestamp) + playWindow,
+            deadline: deadline,
             recorded: false,
             won: false,
             claimed: false
         });
-
-        r.pot += uint128(stake);
         r.entrants += 1;
-        reserved += stake;
 
-        emit Entered(caseIndex, msg.sender, caseId, stake, uint64(block.timestamp) + playWindow, r.pot);
+        emit Seated(caseIndex, msg.sender, caseId, deadline);
+    }
+
+    /**
+     * @notice Back your read, once you have heard the whole room.
+     *
+     * @dev Only after every suspect has spoken, and only before you name anyone. Staking
+     *      with questions still unasked would let a player bet on a room they had not
+     *      finished reading, and staking after the accusation would be betting on a result
+     *      they already hold.
+     */
+    function stake(uint8 caseIndex, uint256 amount) external nonReentrant {
+        Round storage r = rounds[caseIndex];
+        Spec memory spec = specs[caseIndex];
+        Entry storage e = entries[caseIndex][msg.sender];
+
+        if (e.caseId == 0) revert NoEntry();
+        if (e.stake != 0) revert AlreadyStaked();
+        if (r.sealed_) revert RoundClosed();
+        if (block.timestamp > e.deadline) revert TooLate();
+        if (amount < minStake || amount > maxStake) revert StakeOutOfRange(minStake, maxStake);
+
+        Mentalist.Case memory c = game.getCase(e.caseId);
+        if (c.status != Mentalist.Status.Open) revert CaseNotOpen();
+        if (c.questionsAsked < spec.questions) revert RoomNotHeard();
+
+        usdc.safeTransferFrom(msg.sender, address(this), amount);
+
+        e.stake = uint128(amount);
+        r.pot += uint128(amount);
+        reserved += amount;
+
+        emit Staked(caseIndex, msg.sender, e.caseId, amount, r.pot);
     }
 
     /**
@@ -360,11 +403,17 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     /// @notice Seconds left on this player's clock, or zero if it has run out.
     function timeLeft(uint8 caseIndex, address player) external view returns (uint256) {
         Entry memory e = entries[caseIndex][player];
-        if (e.stake == 0 || block.timestamp >= e.deadline) return 0;
+        if (e.caseId == 0 || block.timestamp >= e.deadline) return 0;
         return e.deadline - block.timestamp;
     }
 
+    /// @notice Has this wallet already taken its one seat at this case?
     function hasPlayed(uint8 caseIndex, address player) external view returns (bool) {
+        return entries[caseIndex][player].caseId != 0;
+    }
+
+    /// @notice Has this wallet backed its read yet?
+    function hasStaked(uint8 caseIndex, address player) external view returns (bool) {
         return entries[caseIndex][player].stake != 0;
     }
 

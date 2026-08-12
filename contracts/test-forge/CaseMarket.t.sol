@@ -8,7 +8,6 @@ import { ERC20 } from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 import { Mentalist } from "../contracts/Mentalist.sol";
 import { CaseMarket } from "../contracts/CaseMarket.sol";
 import { IJackpot, IJackpotRandomTicketBuyer } from "../contracts/CaseRewards.sol";
-import { MentalistHarness } from "./MentalistHarness.sol";
 
 contract MockUSDC is ERC20 {
     constructor() ERC20("USD Coin", "USDC") {}
@@ -84,7 +83,7 @@ contract MockJackpot is IJackpot, IJackpotRandomTicketBuyer {
  *      you can miss, a pot divided by conviction, and no path that leaves USDC stranded.
  */
 contract CaseMarketTest is IncoTest {
-    MentalistHarness internal game;
+    Mentalist internal game;
     MockUSDC internal usdc;
     MockJackpot internal megapot;
     CaseMarket internal market;
@@ -96,12 +95,13 @@ contract CaseMarketTest is IncoTest {
     uint8 internal constant CASE_IX = 0;
     uint8 internal constant N = 4;
     uint8 internal constant LIARS = 1;
-    uint8 internal constant FOCUS = 5;
+    /// @dev One question per suspect, which is what every deployed round is configured with.
+    uint8 internal constant FOCUS = N;
     uint8 internal constant TURN_AT = 0;
 
     function setUp() public override {
         super.setUp();
-        game = new MentalistHarness();
+        game = new Mentalist();
         usdc = new MockUSDC();
         megapot = new MockJackpot(usdc);
         market = new CaseMarket(game, IJackpotRandomTicketBuyer(address(megapot)), address(this));
@@ -127,10 +127,20 @@ contract CaseMarketTest is IncoTest {
         processAllOperations();
     }
 
-    function _enter(address who, uint256 stake) internal returns (uint256 id) {
+    /// @dev The full entry: take a seat blind, hear the whole room, then back your read.
+    function _enter(address who, uint256 amount) internal returns (uint256 id) {
         id = _openCase(who);
         vm.prank(who);
-        market.enter(CASE_IX, id, stake);
+        market.claimSeat(CASE_IX, id);
+        _hearEveryone(who, id);
+        vm.prank(who);
+        market.stake(CASE_IX, amount);
+    }
+
+    function _hearEveryone(address who, uint256 id) internal {
+        vm.prank(who);
+        game.beginHearing(id);
+        processAllOperations();
     }
 
     function _killerOf(uint256 id) internal returns (uint8 killer) {
@@ -188,25 +198,32 @@ contract CaseMarketTest is IncoTest {
         uint256 second = _openCase(jane);
         vm.prank(jane);
         vm.expectRevert(CaseMarket.AlreadyEntered.selector);
-        market.enter(CASE_IX, second, 1_000_000);
+        market.claimSeat(CASE_IX, second);
     }
 
     function test_CannotEnterWithSomeoneElsesCase() public {
         uint256 id = _openCase(jane);
         vm.prank(lisbon);
         vm.expectRevert(CaseMarket.NotYourCase.selector);
-        market.enter(CASE_IX, id, 1_000_000);
+        market.claimSeat(CASE_IX, id);
     }
 
-    /// @dev Otherwise you could solve a case for free, then stake on the one you already cracked.
-    function test_CannotEnterWithACaseAlreadyInProgress() public {
+    /**
+     * @dev The seat has to be taken blind.
+     *
+     *      Once the room has been opened the player has every account in front of them, so
+     *      allowing a seat to be claimed afterwards would let someone read a room, dislike
+     *      what it says, and go shopping for an easier one to put money on.
+     */
+    function test_CannotTakeASeatAfterReadingTheRoom() public {
         uint256 id = _openCase(jane);
         vm.prank(jane);
-        game.interrogate(id, 0, uint16(1 << 1));
+        game.beginHearing(id);
+        processAllOperations();
 
         vm.prank(jane);
         vm.expectRevert(CaseMarket.CaseAlreadyPlayed.selector);
-        market.enter(CASE_IX, id, 1_000_000);
+        market.claimSeat(CASE_IX, id);
     }
 
     /// @dev And you cannot bring an easier lineup to a harder round.
@@ -218,27 +235,103 @@ contract CaseMarketTest is IncoTest {
 
         vm.prank(jane);
         vm.expectRevert(CaseMarket.WrongCase.selector);
-        market.enter(CASE_IX, easy, 1_000_000);
+        market.claimSeat(CASE_IX, easy);
     }
 
     function test_StakeMustSitInsideTheRange() public {
         uint256 id = _openCase(jane);
         vm.prank(jane);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                CaseMarket.StakeOutOfRange.selector,
-                market.minStake(),
-                market.maxStake()
-            )
-        );
-        market.enter(CASE_IX, id, 1);
+        market.claimSeat(CASE_IX, id);
+        _hearEveryone(jane, id);
+
+        // Read the bounds before pranking: an external call inside expectRevert's argument
+        // spends the prank, and the revert then comes from the wrong sender.
+        uint256 lo = market.minStake();
+        uint256 hi = market.maxStake();
+        vm.prank(jane);
+        vm.expectRevert(abi.encodeWithSelector(CaseMarket.StakeOutOfRange.selector, lo, hi));
+        market.stake(CASE_IX, 1);
+    }
+
+    /**
+     * @notice The reroll this design exists to prevent.
+     *
+     * @dev If the case could be chosen after listening, a player would open a room, hear it
+     *      out, and abandon any deal that stayed ambiguous until one resolved cleanly. Every
+     *      stake would be a certainty. The seat is claimed blind, so the second case is not
+     *      eligible no matter how much nicer it turns out to be.
+     */
+    function test_CannotRerollIntoAnEasierDeal() public {
+        uint256 first = _openCase(jane);
+        vm.prank(jane);
+        market.claimSeat(CASE_IX, first);
+        _hearEveryone(jane, first);
+
+        // Walk away and deal again. The new case is his, valid, and untouched.
+        uint256 second = _openCase(jane);
+        vm.prank(jane);
+        vm.expectRevert(CaseMarket.AlreadyEntered.selector);
+        market.claimSeat(CASE_IX, second);
+
+        // And the stake still settles against the room he actually committed to.
+        (, uint256 boundCase, , , , ) = market.entries(CASE_IX, jane);
+        assertEq(boundCase, first, "bound to the room he sat down in");
+    }
+
+    /// @dev You cannot back a read you have not formed. The room opens in one go, so this
+    ///      is the difference between having listened and not having bothered.
+    function test_CannotStakeBeforeHearingTheRoom() public {
+        uint256 id = _openCase(jane);
+        vm.prank(jane);
+        market.claimSeat(CASE_IX, id);
+
+        vm.prank(jane);
+        vm.expectRevert(CaseMarket.RoomNotHeard.selector);
+        market.stake(CASE_IX, 1_000_000);
+    }
+
+    /// @dev And you cannot back one you already know the answer to.
+    function test_CannotStakeAfterNamingSomeone() public {
+        uint256 id = _openCase(jane);
+        vm.prank(jane);
+        market.claimSeat(CASE_IX, id);
+        _hearEveryone(jane, id);
+
+        vm.prank(jane);
+        game.accuse(id, 0);
+        processAllOperations();
+
+        vm.prank(jane);
+        vm.expectRevert(CaseMarket.CaseNotOpen.selector);
+        market.stake(CASE_IX, 1_000_000);
+    }
+
+    function test_CannotStakeTwice() public {
+        uint256 id = _enter(jane, 1_000_000);
+        assertGt(id, 0);
+        vm.prank(jane);
+        vm.expectRevert(CaseMarket.AlreadyStaked.selector);
+        market.stake(CASE_IX, 1_000_000);
+    }
+
+    /// @dev The clock runs from the moment you sit down, not from the moment you pay.
+    function test_CannotStakeOnceYourClockHasRunOut() public {
+        uint256 id = _openCase(jane);
+        vm.prank(jane);
+        market.claimSeat(CASE_IX, id);
+        _hearEveryone(jane, id);
+
+        vm.warp(block.timestamp + market.playWindow() + 1);
+        vm.prank(jane);
+        vm.expectRevert(CaseMarket.TooLate.selector);
+        market.stake(CASE_IX, 1_000_000);
     }
 
     function test_CannotEnterAnUnconfiguredRound() public {
         uint256 id = _openCase(jane);
         vm.prank(jane);
         vm.expectRevert(CaseMarket.SpecNotSet.selector);
-        market.enter(9, id, 1_000_000);
+        market.claimSeat(9, id);
     }
 
     function test_CannotEnterOnceTheRoundHasClosed() public {
@@ -248,7 +341,7 @@ contract CaseMarketTest is IncoTest {
         uint256 id = _openCase(jane);
         vm.prank(jane);
         vm.expectRevert(CaseMarket.RoundClosed.selector);
-        market.enter(CASE_IX, id, 1_000_000);
+        market.claimSeat(CASE_IX, id);
     }
 
     // ── the clock ──────────────────────────────────────────────
@@ -550,7 +643,10 @@ contract CaseMarketTest is IncoTest {
 
         uint256 id = _openCase(lisbon);
         vm.prank(lisbon);
-        market.enter(1, id, 2_000_000);
+        market.claimSeat(1, id);
+        _hearEveryone(lisbon, id);
+        vm.prank(lisbon);
+        market.stake(1, 2_000_000);
 
         vm.expectRevert(bytes("nothing spare"));
         market.withdrawSurplus(address(this));
