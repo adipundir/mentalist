@@ -42,67 +42,6 @@ const INK = "#1c1613";
  * cartoon crosses: this is the reason everyone in the room is being questioned, and it
  * should land as a body rather than as a joke.
  */
-function Victim({ x, y, left }: { x: number; y: number; left: boolean }) {
-  const SKIN = "#e8bb96";
-  const DRESS = "#4a3f52";
-  const HAIR = "#3a2a22";
-  const flip = left ? 1 : -1;
-
-  return (
-    <g transform={`translate(${x} ${y}) scale(${0.26 * flip} 0.26) rotate(-6)`}>
-      {/* the leg that folded under, drawn first so the dress hem covers the hip */}
-      <path d="M2 4 q16 6 27 2 l2 7 q-14 6 -31 -2 Z" fill={DRESS} stroke={INK} strokeWidth="1.6" />
-      <path d="M26 5 q13 -3 21 -9 l4 6 q-9 7 -23 10 Z" fill={DRESS} stroke={INK} strokeWidth="1.6" />
-      {/* shoes */}
-      <ellipse cx="50" cy="-4" rx="5" ry="3.4" fill="#241c17" stroke={INK} strokeWidth="1.5" />
-      <ellipse cx="30" cy="12" rx="5" ry="3.4" fill="#241c17" stroke={INK} strokeWidth="1.5" />
-
-      {/* torso, lying on its back and slightly turned */}
-      <path
-        d="M-22 -4 q6 -12 20 -11 q14 -1 20 8 q2 6 -2 10 q-16 6 -34 1 Z"
-        fill={DRESS}
-        stroke={INK}
-        strokeWidth="1.8"
-      />
-      {/* collar */}
-      <path d="M-19 -9 q6 5 13 4" fill="none" stroke={INK} strokeWidth="1.4" opacity="0.6" />
-
-      {/* the arm thrown out into the pool */}
-      <path
-        d="M-8 -12 q6 -14 18 -19 l5 5 q-11 5 -16 17 Z"
-        fill={DRESS}
-        stroke={INK}
-        strokeWidth="1.6"
-      />
-      <circle cx="13" cy="-31" r="4.6" fill={SKIN} stroke={INK} strokeWidth="1.6" />
-      {/* fingers, slightly open */}
-      <path d="M15 -35 l3 -3 M17 -31 l4 -1 M16 -28 l3 2" stroke={INK} strokeWidth="1.2" fill="none" />
-
-      {/* the other arm, folded across */}
-      <path d="M-16 -6 q-9 4 -14 12 l5 4 q6 -8 13 -10 Z" fill={DRESS} stroke={INK} strokeWidth="1.6" />
-      <circle cx="-31" cy="8" r="4.2" fill={SKIN} stroke={INK} strokeWidth="1.6" />
-
-      {/* head, turned away from you */}
-      <g transform="translate(-31 -14) rotate(-24)">
-        <ellipse cx="0" cy="0" rx="9.5" ry="10.5" fill={SKIN} stroke={INK} strokeWidth="1.8" />
-        {/* hair, spread on the floor */}
-        <path
-          d="M-10 -3 q-2 -12 10 -12 q12 0 10 12 q-3 -6 -10 -6 q-7 0 -10 6 Z"
-          fill={HAIR}
-          stroke={INK}
-          strokeWidth="1.6"
-        />
-        <path d="M-9 -2 q-9 4 -13 12 q6 -2 9 -6" fill={HAIR} stroke={INK} strokeWidth="1.5" />
-        <path d="M9 -2 q8 5 11 13 q-6 -2 -9 -7" fill={HAIR} stroke={INK} strokeWidth="1.5" />
-        {/* closed eyes and a slack mouth */}
-        <path d="M-5.5 1 q2 2 4 0" fill="none" stroke={INK} strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M1.5 1 q2 2 4 0" fill="none" stroke={INK} strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M-1 6 q1.5 1 3 0" fill="none" stroke={INK} strokeWidth="1.3" strokeLinecap="round" />
-      </g>
-    </g>
-  );
-}
-
 /** An irregular blob, so nothing reads as a circle someone drew with a tool. */
 function blob(r: () => number, cx: number, cy: number, rad: number, points = 11) {
   const pts: string[] = [];
@@ -112,6 +51,91 @@ function blob(r: () => number, cx: number, cy: number, rad: number, points = 11)
     pts.push(`${(cx + Math.cos(a) * rr).toFixed(2)},${(cy + Math.sin(a) * rr * 0.58).toFixed(2)}`);
   }
   return `M${pts.join("L")}Z`;
+}
+
+function Victim({ x, y, left }: { x: number; y: number; left: boolean }) {
+  const SKIN = "#e8bb96";
+  const DRESS = "#5c4a63";
+  const DRESS_DARK = "#4a3a51";
+  const HAIR = "#3a2a22";
+  const flip = left ? 1 : -1;
+
+  /** A limb: one thick ink stroke for the outline, a thinner fill laid over it. */
+  const limb = (d: string, w: number, fill: string) => (
+    <>
+      <path d={d} fill="none" stroke={INK} strokeWidth={w + 3} strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={fill} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  );
+
+  return (
+    <g transform={`translate(${x} ${y}) scale(${0.3 * flip} 0.3) rotate(-4)`}>
+      {/* the far leg, folded under, drawn first so the near one reads as on top */}
+      {limb("M-4 -4 L-19 -12 L-31 -14", 11, DRESS_DARK)}
+      <ellipse cx="-34" cy="-15" rx="6" ry="4.5" fill="#241c17" stroke={INK} strokeWidth="2.2" transform="rotate(-26 -34 -15)" />
+
+      {/* the far arm, thrown out above her head */}
+      {limb("M15 -9 L8 -24 L17 -33", 9, DRESS_DARK)}
+      <circle cx="20" cy="-36" r="5.4" fill={SKIN} stroke={INK} strokeWidth="2.2" />
+
+      {/* the near leg */}
+      {limb("M-4 5 L-22 7 L-37 12", 11, DRESS)}
+      <ellipse cx="-40" cy="13" rx="6" ry="4.5" fill="#241c17" stroke={INK} strokeWidth="2.2" transform="rotate(16 -40 13)" />
+
+      {/* torso */}
+      <path
+        d="M20 -11 Q24 0 20 11 L-5 9 Q-9 0 -5 -9 Z"
+        fill={DRESS}
+        stroke={INK}
+        strokeWidth="2.4"
+        strokeLinejoin="round"
+      />
+      {/* a fold in the coat, so the torso is not one flat slab */}
+      <path d="M8 -8 Q5 0 8 8" fill="none" stroke={INK} strokeWidth="1.6" opacity="0.35" />
+
+      {/* the near arm, fallen across into her own blood */}
+      {limb("M15 9 L3 21 L-9 24", 9, DRESS)}
+      <circle cx="-13" cy="25" r="5.4" fill={SKIN} stroke={INK} strokeWidth="2.2" />
+      <path d="M-16 21 l-3 -3 M-18 25 l-4 1 M-16 29 l-2 3" stroke={INK} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+
+      {/* neck */}
+      <path d="M20 -6 L28 -5 L28 5 L20 6 Z" fill={SKIN} stroke={INK} strokeWidth="2.2" strokeLinejoin="round" />
+
+      {/* head, fallen to one side */}
+      <g transform="translate(37 1) rotate(16)">
+        {/* hair spread on the floor, behind the face */}
+        <path
+          d="M2 -11 Q16 -17 20 -4 Q23 8 12 14 Q19 3 13 -3 Q8 -9 2 -11 Z"
+          fill={HAIR}
+          stroke={INK}
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        <path
+          d="M-2 -12 Q-14 -14 -18 -4 Q-11 -8 -3 -7 Z"
+          fill={HAIR}
+          stroke={INK}
+          strokeWidth="1.8"
+          strokeLinejoin="round"
+        />
+        <ellipse cx="0" cy="0" rx="10.5" ry="11.5" fill={SKIN} stroke={INK} strokeWidth="2.4" />
+        {/* hairline over the top of the face */}
+        <path
+          d="M-10.5 -3 Q-9 -13 0 -13 Q9 -13 10.5 -3 Q6 -8 0 -8 Q-6 -8 -10.5 -3 Z"
+          fill={HAIR}
+          stroke={INK}
+          strokeWidth="2"
+          strokeLinejoin="round"
+        />
+        {/* eyes crossed out, mouth slack open */}
+        <g stroke={INK} strokeWidth="2.1" strokeLinecap="round">
+          <path d="M-7.4 -2.6 l4.4 4.4 M-3 -2.6 l-4.4 4.4" />
+          <path d="M3 -2.6 l4.4 4.4 M7.4 -2.6 l-4.4 4.4" />
+        </g>
+        <ellipse cx="0" cy="6.6" rx="2.4" ry="1.8" fill="#5b2b2b" stroke={INK} strokeWidth="1.6" />
+      </g>
+    </g>
+  );
 }
 
 export function CrimeScene({ variant, suspects }: { variant: number; suspects: number }) {
@@ -137,7 +161,7 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
     const bodyY = 66 + r() * 2;
     const exitX = left ? 6 + r() * 14 : 154 - r() * 14;
 
-    const pool = blob(r, bodyX - 2, bodyY + 1.2, 6.5 + r() * 2);
+    const pool = blob(r, bodyX + (r() < 0.5 ? 1.5 : -1.5), bodyY + 1.5, 7 + r() * 2);
 
     // Spatter: a scatter of small stains, denser near the body.
     const spatter = Array.from({ length: 8 + Math.floor(r() * 5) }, () => {
@@ -224,31 +248,6 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
         </g>
       ))}
 
-      {/* ── evidence markers ── */}
-      {[0, 1].map((i) => {
-        const x = scene.bodyX + (scene.left ? 12 + i * 10 : -12 - i * 10);
-        const y = scene.bodyY + 3 + i * 4;
-        return (
-          <g key={i} transform={`translate(${x} ${y}) scale(${0.62 + i * 0.12})`}>
-            {/* the shadow is what puts it on the floor rather than in the air */}
-            <ellipse cx="3" cy="0.4" rx="4.2" ry="1.1" fill="#000" opacity="0.4" />
-            {/* a folded card, so it has a lit face and a shaded one */}
-            <path d="M0 0 l3 -6 l3 6 Z" fill="#e8c34a" stroke="#8a6f16" strokeWidth="0.25" />
-            <path d="M3 -6 l3 6 l-1.4 0 l-1.6 -6 Z" fill="#c9a534" />
-            <text
-              x="2.4"
-              y="-1.1"
-              fontSize="2.7"
-              textAnchor="middle"
-              fill="#2a2008"
-              fontFamily="monospace"
-              fontWeight="bold"
-            >
-              {i + 1}
-            </text>
-          </g>
-        );
-      })}
     </svg>
   );
 }

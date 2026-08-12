@@ -229,6 +229,14 @@ export function Room({
           const isFocus = focused === s.suspect.seat;
           const dim = focused !== null && !isFocus;
 
+          // Nobody squares up to the camera. Each of them is turned a few degrees, and the
+          // ones out on the wings are angled inward, toward her, the way people standing
+          // round something on the floor actually orient themselves. Mirroring alternate
+          // figures stops the lineup reading as one man printed N times.
+          const inward = spot.x < 50 ? 1 : -1;
+          const turn = (1.5 + ((i * 7) % 5) * 0.9) * inward;
+          const facing = i % 3 === 1 ? -1 : 1;
+
           return (
             <motion.button
               key={s.suspect.seat}
@@ -243,7 +251,8 @@ export function Room({
                 bottom: `${spot.bottom}%`,
                 width: `${w * spot.scale}%`,
                 zIndex: spot.z + (s.saying ? 400 : isFocus ? 200 : 0),
-                transform: "translateX(-50%)",
+                transform: `translateX(-50%) rotate(${turn}deg)`,
+                transformOrigin: "50% 100%",
               }}
               animate={{
                 opacity: s.saying ? 1 : s.cleared ? 0.3 : dim ? 0.45 : 1,
@@ -266,6 +275,7 @@ export function Room({
                 fullBody
                 idle={s.idle}
                 className="h-auto w-full drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]"
+                style={{ transform: `scaleX(${facing})` }}
               />
 
               {/* speech bubble, the line comes out of the person, not just the caption bar */}

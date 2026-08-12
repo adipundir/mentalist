@@ -275,16 +275,18 @@
    four people are visibly performing is worse than a room where nobody moves.
    The delays are set per suspect so the room never pulses in unison. */
 
-/* Scratching his head at the whole business. The arm goes up, pauses, comes down. */
+/* The scratching itself. His hand is already on his head, so this is the small worrying
+   motion rather than the whole arm going up and down, which would need a shape morph. */
 @keyframes armScratch {
-  0%, 62%, 100% { transform: rotate(0deg); }
-  68% { transform: rotate(-118deg); }
-  72% { transform: rotate(-112deg); }
-  76% { transform: rotate(-120deg); }
-  80% { transform: rotate(-113deg); }
-  88% { transform: rotate(0deg); }
+  0%, 54%, 100% { transform: rotate(0deg) translateY(0); }
+  58% { transform: rotate(-2.6deg) translateY(-1.1px); }
+  62% { transform: rotate(1.4deg) translateY(0.4px); }
+  66% { transform: rotate(-2.4deg) translateY(-1px); }
+  70% { transform: rotate(1.2deg) translateY(0.3px); }
+  74% { transform: rotate(-2deg) translateY(-0.8px); }
+  80% { transform: rotate(0deg) translateY(0); }
 }
-.arm-scratch { animation: armScratch 9s ease-in-out infinite; }
+.arm-scratch { animation: armScratch 8s ease-in-out infinite; }
 
 /* Cannot keep still. A shiver, not a shake. */
 @keyframes idleScared {
@@ -330,6 +332,36 @@
   .idle-giggle,
   .idle-glance,
   .idle-shift {
+    animation: none;
+  }
+}
+
+/* ── eyes ─────────────────────────────────────────────────────────────────────
+   A room of people staring straight out of the screen is the deadest thing in
+   it. The pupils drift: down at her, off to whoever just moved, back to the
+   floor. Slow and small, because eyes that dart constantly read as cartoon
+   panic rather than as people avoiding looking at a body. */
+
+@keyframes eyesDrift {
+  0%, 18% { transform: translate(0, 0); }
+  24%, 40% { transform: translate(-1.8px, 1.4px); }
+  46%, 58% { transform: translate(0.4px, 2.2px); }
+  64%, 78% { transform: translate(2px, 0.6px); }
+  84%, 100% { transform: translate(0, 0); }
+}
+.eyes-drift { animation: eyesDrift 14s ease-in-out infinite; }
+
+/* The one who cannot stop checking the doorway. */
+@keyframes eyesFlick {
+  0%, 44% { transform: translate(0, 1.6px); }
+  50%, 56% { transform: translate(-2.4px, 0.4px); }
+  62%, 100% { transform: translate(0, 1.6px); }
+}
+.eyes-flick { animation: eyesFlick 9s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .eyes-drift,
+  .eyes-flick {
     animation: none;
   }
 }

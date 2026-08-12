@@ -185,9 +185,23 @@ function FacialHairPart({ style, color }: { style: FacialHair; color: string }) 
   const p = { fill: color, stroke: INK, strokeWidth: 2.2, strokeLinejoin: "round" as const };
   switch (style) {
     case "mustache":
-      return <path d="M38 71 Q44 67 50 70 Q56 67 62 71 Q56 74 50 72 Q44 74 38 71 Z" {...p} />;
+      // Sits in the gap between the nose and the mouth, with a dip under the septum and
+      // ends that turn down past the corners of the mouth.
+      return (
+        <path
+          d="M36 70 Q42 65 50 68 Q58 65 64 70 Q62 75 56 73 Q50 71 44 73 Q38 75 36 70 Z"
+          {...p}
+        />
+      );
     case "goatee":
-      return <path d="M44 71 Q50 69 56 71 Q57 82 50 86 Q43 82 44 71 Z" {...p} />;
+      // A Van Dyke: chin below the lip, thin moustache above it, and the mouth clear in
+      // between. Anything that crosses the mouth at this size reads as a smudge.
+      return (
+        <g {...p}>
+          <path d="M42 81 Q43 90 50 91 Q57 90 58 81 Q50 84.5 42 81 Z" />
+          <path d="M39 70 Q44 66 50 69 Q56 66 61 70 Q56 73.5 50 71.5 Q44 73.5 39 70 Z" />
+        </g>
+      );
     case "stubble":
       return (
         <path
@@ -271,10 +285,9 @@ function Body({
   expression: Expression;
   idle?: Idle;
 }) {
-  const tense = expression === "nervous" || expression === "caught" || expression === "shocked";
   const open = expression === "smug" || expression === "sinister";
 
-  const armIn = tense ? 5 : open ? -7 : 0; // arms tucked when anxious, loose when cocky
+  const armIn = armInFor(expression);
   const stance = open ? 5 : 0; // feet planted wider
 
   return (
@@ -301,6 +314,8 @@ function Body({
       <path d="M44 92 L50 126 L56 92 L56 152 L44 152 Z" fill={spec.shirt} stroke={INK} strokeWidth="2.2" />
       <path d="M50 100 L54.5 114 L50 148 L45.5 114 Z" fill={spec.tie} stroke={INK} strokeWidth="2" />
 
+      <Arms spec={spec} armIn={armIn} idle={idle} />
+
       {/* the jacket is TWO lapel panels meeting at the button, not one slab, a single
           closed shape buried the shirt and tie entirely */}
       <path
@@ -312,19 +327,106 @@ function Body({
         fill={spec.suit} stroke={INK} strokeWidth="2.7"
       />
 
-      {/* arms swing clear of the torso so the silhouette reads as a person, not a slab.
-          The left one is the one that goes up to scratch a head. */}
-      <g
-        transform={`rotate(${armIn} 29 104)`}
-        className={idle === "scratch" ? "arm-scratch" : undefined}
-        style={{ transformOrigin: "29px 104px" }}
-      >
-        <path d="M27 104 Q18 130 19 158 L30 159 Q29 130 33 106 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
-        <circle cx="24.5" cy="165" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
-      </g>
-      <g transform={`rotate(${-armIn} 71 104)`}>
-        <path d="M73 104 Q82 130 81 158 L70 159 Q71 130 67 106 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
-        <circle cx="75.5" cy="165" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+    </g>
+  );
+}
+
+/** Arms tuck in when anxious and hang loose when cocky. Shared so the raised arm agrees. */
+function armInFor(expression: Expression): number {
+  if (expression === "nervous" || expression === "caught" || expression === "shocked") return 5;
+  if (expression === "smug" || expression === "sinister") return -7;
+  return 0;
+}
+
+/**
+ * The arms, drawn *before* the jacket so its shoulder always covers where they join.
+ *
+ * They used to be drawn last and start at the shoulder line exactly, which meant any
+ * rotation opened a visible wedge of background between arm and body and the figure read as
+ * a torso with two sticks propped against it. Starting them up inside the shoulder and
+ * letting the jacket overlap makes the joint impossible to break, at any angle.
+ *
+ * The exception is an arm on its way to his head, which passes in front of the chest and
+ * has to be drawn after the jacket instead. `Body` renders that one itself.
+ */
+function HangingArm({ spec, armIn }: { spec: CharacterSpec; armIn: number }) {
+  return (
+    <g
+      transform={`rotate(${armIn} 31 99)`}
+      style={{ transformOrigin: "31px 99px" }}
+      strokeLinejoin="round"
+      strokeLinecap="round"
+    >
+      <path d="M31 94 Q18 126 19 158 L31 159 Q31 126 38 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+      <circle cx="25" cy="164" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+    </g>
+  );
+}
+
+/**
+ * The arm that has gone up to scratch his head.
+ *
+ * Drawn bent rather than swung: rotating the hanging arm about the shoulder is a rigid bar
+ * on a 60-unit radius, and every angle that got the hand near his head laid the whole limb
+ * diagonally across his face. A real scratch needs an elbow, so this is its own shape, with
+ * the elbow out to the side and the hand up on the hairline.
+ *
+ * He never puts it down. The animation is only the scratching itself, because cross-fading
+ * between two different arm shapes is a morph, and a man standing with his hand on his head
+ * is a perfectly good read.
+ */
+function ScratchArm({ spec }: { spec: CharacterSpec }) {
+  return (
+    <g className="arm-scratch" style={{ transformOrigin: "31px 99px" }}>
+      <path
+        d="M31 97 L15 71 L28 42"
+        fill="none"
+        stroke={INK}
+        strokeWidth="15"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      <path
+        d="M31 97 L15 71 L28 42"
+        fill="none"
+        stroke={spec.suit}
+        strokeWidth="11"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+      {/* cuff, so the hand does not look welded to the sleeve */}
+      <path d="M24 50 L34 55" stroke={INK} strokeWidth="1.8" strokeLinecap="round" opacity="0.5" />
+      <circle cx="30" cy="38" r="6.4" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+      {/* fingers in the hair */}
+      <path
+        d="M28 32 l-1.5 -4 M32 32 l0.5 -4 M35 34 l3 -3"
+        stroke={INK}
+        strokeWidth="1.9"
+        strokeLinecap="round"
+        fill="none"
+      />
+    </g>
+  );
+}
+
+function Arms({
+  spec,
+  armIn,
+  idle,
+}: {
+  spec: CharacterSpec;
+  armIn: number;
+  idle?: Idle;
+}) {
+  return (
+    <g strokeLinejoin="round" strokeLinecap="round">
+      {/* his right, screen left. Only drawn back here when it is hanging at his side: a
+          raised arm has to be in front of the jacket or it disappears into the torso. */}
+      {idle !== "scratch" && <HangingArm spec={spec} armIn={armIn} />}
+      {/* his left, screen right */}
+      <g transform={`rotate(${-armIn} 69 99)`} style={{ transformOrigin: "69px 99px" }}>
+        <path d="M69 94 Q82 126 81 158 L69 159 Q69 126 62 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <circle cx="75" cy="164" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
       </g>
     </g>
   );
@@ -342,6 +444,7 @@ export function Character({
   /** What they do when left alone. Only meaningful in `fullBody`. */
   idle = "still",
   className,
+  style,
 }: {
   spec: CharacterSpec;
   expression?: Expression;
@@ -349,6 +452,7 @@ export function Character({
   fullBody?: boolean;
   idle?: Idle;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const [blink, setBlink] = useState(false);
   const [talkFrame, setTalkFrame] = useState(0);
@@ -385,6 +489,14 @@ export function Character({
 
   const brow = BROWS[expression];
   const pupil = PUPILS[expression];
+  // Only idle figures let their eyes wander. Once someone is talking or has been caught,
+  // the expression owns the face and a drifting pupil fights it.
+  const gazeClass =
+    expression === "neutral" || expression === "smug"
+      ? idle === "scared" || idle === "glance"
+        ? "eyes-flick"
+        : "eyes-drift"
+      : undefined;
   const shut = blink && expression !== "shocked" && expression !== "caught";
 
   return (
@@ -395,6 +507,7 @@ export function Character({
         filter: cleared ? "grayscale(1)" : undefined,
         opacity: cleared ? 0.4 : 1,
         transition: "opacity 250ms, filter 250ms",
+        ...style,
       }}
       aria-hidden
     >
@@ -466,8 +579,10 @@ export function Character({
           <>
             <ellipse cx="39" cy="54" rx="6.5" ry="7" fill="#fdfbf6" stroke={INK} strokeWidth="2.2" />
             <ellipse cx="61" cy="54" rx="6.5" ry="7" fill="#fdfbf6" stroke={INK} strokeWidth="2.2" />
-            <circle cx={39 + pupil.x} cy={54 + pupil.y} r={pupil.r} fill={INK} />
-            <circle cx={61 + pupil.x} cy={54 + pupil.y} r={pupil.r} fill={INK} />
+            <g className={gazeClass}>
+              <circle cx={39 + pupil.x} cy={54 + pupil.y} r={pupil.r} fill={INK} />
+              <circle cx={61 + pupil.x} cy={54 + pupil.y} r={pupil.r} fill={INK} />
+            </g>
           </>
         )}
 
@@ -485,6 +600,10 @@ export function Character({
 
         <FacialHairPart style={spec.facialHair} color={spec.hairColor} />
         <AccessoryPart style={spec.accessory} suit={spec.suit} />
+
+        {/* The hand he is scratching with passes in front of his own head, so it is the
+            last thing drawn. Anywhere earlier and the pose is correct but invisible. */}
+        {fullBody && idle === "scratch" && <ScratchArm spec={spec} />}
 
         {/* sweat, the classic cartoon tell, and it only ever appears when it means something */}
         {(expression === "nervous" || expression === "caught") && (
