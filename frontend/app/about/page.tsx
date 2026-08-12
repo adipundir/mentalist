@@ -16,9 +16,14 @@ export default function About() {
       <h1 className="mt-6 font-type text-[34px] leading-tight text-bone">How it works</h1>
 
       <p className="mt-5 font-body text-[17px] leading-relaxed text-bone">
-        You ask a witness whether Red John is among a group of suspects. Their answer is
-        computed inside an encrypted enclave and passed through that witness&rsquo;s hidden
-        honesty bit before it reaches you.
+        Every suspect in the room belongs to the same circle, and every one of them knows
+        which of them is Red John. You point at a man and ask another whether it was him.
+        Some will tell you the truth; the rest are protecting him — and Red John is
+        protecting himself, so <span className="text-blood-hot">he always lies</span>.
+      </p>
+      <p className="mt-3 font-body text-[16px] leading-relaxed text-bone-dim">
+        The answer is computed inside an encrypted enclave and passed through that
+        witness&rsquo;s hidden honesty bit before it ever reaches you.
       </p>
 
       <figure className="mt-6 border-l-2 border-blood pl-4">
@@ -57,7 +62,7 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
       <h2 className="mt-10 font-mono text-[10px] tracking-file text-bone-dim">BUILT WITH</h2>
       <ul className="mt-2 space-y-1 font-body text-[15px] text-bone-dim">
         <li>Inco Lightning on Base Sepolia — encrypted state, attested settlement</li>
-        <li>Megapot — unspent Focus buys real lottery tickets</li>
+        <li>Megapot — the questions you don&rsquo;t spend buy real lottery tickets</li>
         <li>No art or audio assets: every character is drawn SVG, every sound is synthesised</li>
       </ul>
 

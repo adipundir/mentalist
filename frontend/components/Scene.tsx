@@ -50,7 +50,10 @@ export function Scene({
   useEffect(() => {
     if (!g.ready) return;
     setLine({
-      text: `${config.liars === 1 ? "One of these" : `${config.liars} of these`} ${g.n} ${config.liars === 1 ? "is" : "are"} lying to you. Red John always is.`,
+      text:
+        `Every one of these ${g.n} knows exactly who did it. ` +
+        `${config.liars === 1 ? "One of them will lie to protect him" : `${config.liars} of them will lie to protect him`}` +
+        ` — and so will he.`,
       tone: "narrator",
     });
     const id = setTimeout(() => setLine(null), 5200);

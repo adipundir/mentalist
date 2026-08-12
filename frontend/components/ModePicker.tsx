@@ -37,9 +37,13 @@ export function ModePicker({ onPick }: { onPick: (mode: PlayMode) => void }) {
         transition={{ delay: 0.08 }}
         className="w-full max-w-[720px]"
       >
-        <h2 className="text-center font-type text-[30px] leading-tight text-bone">
-          Pick how you play
-        </h2>
+        <div className="text-center">
+          <h2 className="font-type text-[30px] leading-tight text-bone">Pick how you play</h2>
+          <p className="mx-auto mt-2 max-w-[46ch] font-body text-[14px] leading-snug text-bone-dim">
+            They all belong to the same circle, and they all know which of them is Red John.
+            Some will tell you the truth. The rest are protecting him.
+          </p>
+        </div>
 
         <div className="mt-7 grid gap-3 sm:grid-cols-2">
           {/* ── the real thing ── */}

@@ -6,9 +6,9 @@
  * canonical rosters, eliminated in the canonical order.
  *
  * **Focus budgets are derived, not guessed.** A lineup of N needs at most `ceil(log2 N)`
- * splits to isolate one suspect, plus 2 for the control question that tells you whether to
- * believe your witness. Early chapters carry a little slack (which converts to Megapot
- * tickets); the last chapter has none at all.
+ * splits to isolate one suspect, plus 2 for the honesty test that tells you whether to
+ * believe your witness. Early cases carry a little slack (which converts to Megapot
+ * tickets); the last has none at all.
  */
 
 import type { CaseConfig } from "./case";
@@ -41,7 +41,7 @@ export const CHAPTERS: Chapter[] = [
     culprit: "wagner",
     roster: ["partridge", "mashburn", "wagner", "ardiles"],
     opening:
-      "Sunday. The house still smells of lemon polish. Upstairs there is a woman who was alive on Friday, and above her bed a face in three-finger strokes, drying to rust. Four people had keys. One of them is lying to me, and one of them did it.",
+      "Sunday. The house still smells of lemon polish. Upstairs there is a woman who was alive on Friday, and above her bed a face in three-finger strokes, drying to rust. Four men are standing in my room, and every one of them knows which of them painted it. That is the thing about his people — they always know."
     successText:
       "You say the name and he doesn't run — he beams, delighted to finally be seen. The strokes on the wall ran counter-clockwise. A copycat, then. Somewhere the original is reading about it, and is not amused.",
     failureText:

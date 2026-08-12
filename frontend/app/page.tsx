@@ -79,9 +79,9 @@ export default function Home() {
         transition={{ delay: 0.7 }}
         className="mt-5 max-w-[30ch] font-body text-[19px] leading-snug text-bone sm:text-[22px]"
       >
-        Everyone in the room is lying to you.
+        Everyone in this room knows who did it.
         <br />
-        <span className="text-blood-hot">Red John always does.</span>
+        <span className="text-blood-hot">Not all of them will tell you.</span>
       </motion.p>
 
       <motion.button
