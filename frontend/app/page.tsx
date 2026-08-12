@@ -116,13 +116,8 @@ export default function Home() {
         </a>
       </motion.nav>
 
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1.8 }}
-        className="absolute inset-x-0 bottom-8 px-6"
-      >
-        <PoweredBy />
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 1.8 }}>
+        <PoweredBy fixed />
       </motion.div>
 
       <AnimatePresence>

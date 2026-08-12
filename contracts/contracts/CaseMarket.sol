@@ -9,53 +9,75 @@ import { Mentalist } from "./Mentalist.sol";
 import { IJackpot, IJackpotRandomTicketBuyer } from "./CaseRewards.sol";
 
 /**
- * @title  CaseMarket — a prediction market on a secret
+ * @title  CaseMarket — a pari-mutuel pool on a secret nobody can read
  *
- * @notice You back a suspect with USDC before the contract will tell you anything, and the
- *         odds shorten with every question you buy.
+ * @notice Seven cases, each its own round with its own pot.
  *
- *         This is a prediction market whose outcome is not a future event but a *fact that
- *         already exists and cannot be read*. Red John's identity is sealed inside Inco's
- *         enclave at deal time — no oracle to front-run, no news to trade on, no operator
- *         who knows the answer. The only edge available is deduction, which is the entire
- *         point of the game sitting on top of it.
+ *         You stake USDC to enter a round. That opens a case whose culprit is sealed inside
+ *         Inco's enclave, and starts a clock. Name him before the clock runs out and you are
+ *         a winner; miss, or run out of time, and your stake stays in the pot. When the round
+ *         closes, **the winners split the entire pot in proportion to what they staked** —
+ *         so conviction is rewarded twice over, once for being right and once for how much
+ *         you were willing to put behind it.
  *
- *         **The tension.** Payout decays as `suspects / (questions + 1)`. Name him blind on
- *         a nine-man lineup and it pays 7.6×; spend four questions first and it pays 1.5×.
- *         Every question makes you safer and poorer, so every turn is a real decision rather
- *         than a free click.
+ *         Winnings are paid in **Megapot tickets**, never in cash. Reading a room correctly
+ *         buys you real lottery entries; the stakes of everyone who was wrong buy them for
+ *         you. Megapot is the rail the whole economy settles on.
  *
- *         **Winnings are paid in Megapot tickets, never in cash.** A correct call buys you
- *         real lottery entries — so the reward for reading a room is a shot at a jackpot,
- *         and the stake you lose funds the next player's. Megapot is the rail the whole
- *         economy runs on; remove it and there is nothing to win.
+ *         **One entry per wallet per round.** You get one read of each room. If you want
+ *         another go, there is another case.
  *
- * @dev    Deliberately separate from `Mentalist`, which stays a pure game and knows nothing
- *         about money. This contract only *reads* case state, so the game can be played
- *         with no stake at all and the market is opt-in.
+ * @dev    Why a pari-mutuel pool rather than fixed odds: fixed odds need a bookmaker with a
+ *         balance sheet, and any multiplier this contract set would be a number I invented.
+ *         A pool sets its own price — the payout is whatever the losers funded, divided by
+ *         conviction — and it can never be insolvent, because it only ever pays out what it
+ *         already holds.
+ *
+ *         `Mentalist` is untouched by this and knows nothing about money: the market only
+ *         *reads* case state. The game is fully playable with no stake at all.
  */
 contract CaseMarket is Ownable, ReentrancyGuard {
     using SafeERC20 for IERC20;
 
     // ─────────────────────────────────────────── tuning
 
-    /// @dev Basis points kept by the house. The odds are otherwise generous relative to
-    ///      what a good player can actually narrow the field to, so this is what keeps the
-    ///      treasury solvent across many cases rather than a profit motive.
-    uint256 public houseEdgeBps = 1_500; // 15%
+    /// @notice How long a player has to crack their case once they've entered.
+    uint64 public playWindow = 20 minutes;
 
-    /// @dev Payout can never be worse than breaking even, or a late correct call would
-    ///      punish the player for being careful.
-    uint256 public constant MIN_MULTIPLIER_BPS = 10_500; // 1.05x
+    /// @notice How long a round accepts new entries.
+    uint64 public roundLength = 7 days;
 
     uint256 public minStake = 100_000; // 0.10 USDC
-    uint256 public maxStake = 2_000_000; // 2.00 USDC
+    uint256 public maxStake = 5_000_000; // 5.00 USDC
 
     /// @dev Megapot's quick-pick buyer rejects counts outside 1..10.
-    uint256 public constant MAX_TICKETS_PER_WIN = 10;
-
+    uint256 public constant MAX_TICKETS_PER_CLAIM = 10;
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
     bytes32 public constant SOURCE = bytes32("mentalist");
+
+    // ─────────────────────────────────────────── types
+
+    struct Round {
+        uint64 closesAt;
+        /// @dev Everything staked into this round. The pot the winners divide.
+        uint128 pot;
+        /// @dev Sum of the stakes of everyone who solved in time — the denominator of every
+        ///      share. Grows until the last player reports in.
+        uint128 winningStake;
+        uint32 entrants;
+        uint32 winners;
+        /// @dev Once true, no more results may be recorded and claims are open.
+        bool sealed_;
+    }
+
+    struct Entry {
+        uint128 stake;
+        uint256 caseId;
+        uint64 deadline;
+        bool recorded;
+        bool won;
+        bool claimed;
+    }
 
     // ─────────────────────────────────────────── state
 
@@ -64,46 +86,43 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     IJackpot public immutable jackpot;
     IERC20 public immutable usdc;
 
-    struct Position {
-        address player;
-        uint128 stake;
-        uint8 suspect;
-        bool settled;
-        bool won;
-        /// @dev The multiplier is fixed at settlement, not at stake time — the whole point
-        ///      is that it moves while you play.
-        uint32 paidBps;
-    }
+    mapping(uint8 => Round) public rounds;
+    mapping(uint8 => mapping(address => Entry)) public entries;
 
-    mapping(uint256 => Position) public positions;
-
-    /// @dev Stake held against unsettled positions. Never withdrawable by the owner.
-    uint256 public lockedStake;
+    /// @dev Everything owed to open rounds. The owner can never withdraw it.
+    uint256 public reserved;
 
     // ─────────────────────────────────────────── events
 
-    event Backed(uint256 indexed caseId, address indexed player, uint8 suspect, uint256 stake, uint256 openingOddsBps);
-    event Settled(
-        uint256 indexed caseId,
+    event RoundOpened(uint8 indexed caseIndex, uint64 closesAt);
+    event Entered(
+        uint8 indexed caseIndex,
         address indexed player,
-        bool won,
-        uint256 multiplierBps,
-        uint256 tickets,
-        uint256[] ticketIds
+        uint256 caseId,
+        uint256 stake,
+        uint64 deadline,
+        uint128 pot
     );
+    event Result(uint8 indexed caseIndex, address indexed player, bool won, bool inTime);
+    event RoundSealed(uint8 indexed caseIndex, uint128 pot, uint128 winningStake, uint32 winners);
+    event Claimed(uint8 indexed caseIndex, address indexed player, uint256 share, uint256 tickets, uint256[] ticketIds);
+    event Refunded(uint8 indexed caseIndex, address indexed player, uint256 amount);
 
     // ─────────────────────────────────────────── errors
 
-    error NotYourCase();
-    error CaseNotOpen();
-    error CaseNotClosed();
-    error AlreadyBacked();
-    error NothingAtStake();
-    error AlreadySettled();
+    error RoundClosed();
+    error RoundNotClosed();
+    error RoundNotSealed();
+    error AlreadySealed();
+    error AlreadyEntered();
+    error NoEntry();
+    error AlreadyRecorded();
+    error AlreadyClaimed();
+    error NotAWinner();
     error StakeOutOfRange(uint256 min, uint256 max);
-    error BadSuspect();
-    error TreasuryShort(uint256 needed, uint256 available);
+    error CaseNotClosed();
     error PurchasesDisabled();
+    error NothingToPay();
 
     constructor(
         Mentalist _game,
@@ -116,113 +135,142 @@ contract CaseMarket is Ownable, ReentrancyGuard {
         usdc = IERC20(_ticketBuyer.usdc());
     }
 
-    // ─────────────────────────────────────────── odds
+    // ─────────────────────────────────────────── rounds
+
+    /// @notice Open a round so a case can start taking entries.
+    function openRound(uint8 caseIndex) public {
+        Round storage r = rounds[caseIndex];
+        if (r.closesAt != 0) return; // already open, or already run
+        r.closesAt = uint64(block.timestamp) + roundLength;
+        emit RoundOpened(caseIndex, r.closesAt);
+    }
 
     /**
-     * @notice What a correct call pays right now, in basis points.
+     * @notice Enter a round: stake, get a case, start the clock.
      *
-     * @dev `suspects / (questions + 1)`, less the house edge. A blind call on a nine-man
-     *      lineup pays about 7.6×; four questions in, about 1.5×. The decay is deliberately
-     *      gentler than the ~`N / 2^questions` a perfect binary search actually achieves,
-     *      because the point is to price *impatience* rather than to be an exact bookmaker —
-     *      and because a player who narrows the field faster than the odds decay is a player
-     *      who has genuinely outplayed the market.
+     * @dev The case is opened here rather than by the player so the market controls the
+     *      parameters — a player who could choose their own lineup could choose an easy one
+     *      and take the pot off people who played the real thing.
      */
-    function multiplierBps(uint256 suspects, uint256 questionsAsked) public view returns (uint256) {
-        uint256 raw = (suspects * 10_000) / (questionsAsked + 1);
-        uint256 net = (raw * (10_000 - houseEdgeBps)) / 10_000;
-        return net < MIN_MULTIPLIER_BPS ? MIN_MULTIPLIER_BPS : net;
-    }
+    function enter(
+        uint8 caseIndex,
+        uint8 suspects,
+        uint8 liars,
+        uint8 questions,
+        uint8 turnAt,
+        uint256 stake
+    ) external payable nonReentrant returns (uint256 caseId) {
+        openRound(caseIndex);
 
-    /// @notice The odds a player is looking at for a live case.
-    function currentOddsBps(uint256 caseId) external view returns (uint256) {
-        Mentalist.Case memory c = game.getCase(caseId);
-        return multiplierBps(c.suspects, c.questionsAsked);
-    }
-
-    /// @notice What this position would pay if the call lands right now.
-    function projectedPayout(uint256 caseId) external view returns (uint256) {
-        Position memory p = positions[caseId];
-        if (p.stake == 0) return 0;
-        Mentalist.Case memory c = game.getCase(caseId);
-        return (uint256(p.stake) * multiplierBps(c.suspects, c.questionsAsked)) / 10_000;
-    }
-
-    // ─────────────────────────────────────────── backing a hunch
-
-    /**
-     * @notice Put money on a suspect. Must be done while the case is still open, and the
-     *         odds you eventually get depend on how much you ask before calling it.
-     * @dev The suspect named here is *not* binding — the accusation the contract settles
-     *      against is the one made in `Mentalist.accuse`. This is the stake, not the guess.
-     */
-    function back(uint256 caseId, uint8 suspect, uint256 stake) external nonReentrant {
-        Mentalist.Case memory c = game.getCase(caseId);
-        if (c.detective != msg.sender) revert NotYourCase();
-        if (c.status != Mentalist.Status.Open) revert CaseNotOpen();
-        if (suspect >= c.suspects) revert BadSuspect();
-        if (positions[caseId].stake != 0) revert AlreadyBacked();
+        Round storage r = rounds[caseIndex];
+        if (r.sealed_ || block.timestamp >= r.closesAt) revert RoundClosed();
+        if (entries[caseIndex][msg.sender].stake != 0) revert AlreadyEntered();
         if (stake < minStake || stake > maxStake) revert StakeOutOfRange(minStake, maxStake);
 
         usdc.safeTransferFrom(msg.sender, address(this), stake);
-        lockedStake += stake;
 
-        positions[caseId] = Position({
-            player: msg.sender,
+        // The player is the detective, so every answer is granted to them and nobody else —
+        // including this contract.
+        caseId = game.openCase{ value: msg.value }(suspects, liars, questions, turnAt);
+        game.transferCase(caseId, msg.sender);
+
+        entries[caseIndex][msg.sender] = Entry({
             stake: uint128(stake),
-            suspect: suspect,
-            settled: false,
+            caseId: caseId,
+            deadline: uint64(block.timestamp) + playWindow,
+            recorded: false,
             won: false,
-            paidBps: 0
+            claimed: false
         });
 
-        emit Backed(caseId, msg.sender, suspect, stake, multiplierBps(c.suspects, c.questionsAsked));
+        r.pot += uint128(stake);
+        r.entrants += 1;
+        reserved += stake;
+
+        emit Entered(caseIndex, msg.sender, caseId, stake, uint64(block.timestamp) + playWindow, r.pot);
     }
 
     /**
-     * @notice Collect. A correct call buys Megapot tickets at the odds standing when the
-     *         case closed; a wrong one forfeits the stake to the treasury.
+     * @notice Report your result. Only a case the *contract* has ruled solved counts, and
+     *         only if you closed it before your clock ran out.
      *
-     * @dev Reads `solved` from `Mentalist`, which only becomes true once the *contract* has
-     *      verified a covalidator attestation over the accused seat's encrypted guilt bit.
-     *      So the market resolves against Inco's enclave, not against anything this contract
-     *      or its owner could influence.
+     * @dev `solved` on Mentalist only becomes true after it has verified a covalidator
+     *      attestation over the accused seat's encrypted guilt bit — so the pool settles
+     *      against Inco's enclave, not against anything a player or this contract could
+     *      assert.
      */
-    function settle(uint256 caseId) external nonReentrant returns (uint256[] memory ticketIds) {
-        Position storage p = positions[caseId];
-        if (p.stake == 0) revert NothingAtStake();
-        if (p.settled) revert AlreadySettled();
-        if (p.player != msg.sender) revert NotYourCase();
+    function recordResult(uint8 caseIndex) external nonReentrant {
+        Entry storage e = entries[caseIndex][msg.sender];
+        if (e.stake == 0) revert NoEntry();
+        if (e.recorded) revert AlreadyRecorded();
 
-        Mentalist.Case memory c = game.getCase(caseId);
+        Mentalist.Case memory c = game.getCase(e.caseId);
         if (c.status != Mentalist.Status.Closed) revert CaseNotClosed();
 
-        p.settled = true;
-        lockedStake -= p.stake;
+        bool inTime = uint64(block.timestamp) <= e.deadline;
+        bool won = c.solved && inTime;
 
-        if (!c.solved) {
-            // The stake stays and funds the next player's win.
-            emit Settled(caseId, msg.sender, false, 0, 0, new uint256[](0));
-            return new uint256[](0);
+        e.recorded = true;
+        e.won = won;
+
+        if (won) {
+            Round storage r = rounds[caseIndex];
+            r.winningStake += e.stake;
+            r.winners += 1;
         }
 
-        uint256 bps = multiplierBps(c.suspects, c.questionsAsked);
-        uint256 payout = (uint256(p.stake) * bps) / 10_000;
+        emit Result(caseIndex, msg.sender, won, inTime);
+    }
 
-        p.won = true;
-        p.paidBps = uint32(bps);
+    /// @notice Close a round for good once entries have stopped. Permissionless.
+    function sealRound(uint8 caseIndex) public {
+        Round storage r = rounds[caseIndex];
+        if (r.closesAt == 0 || block.timestamp < r.closesAt + playWindow) revert RoundNotClosed();
+        if (r.sealed_) revert AlreadySealed();
+        r.sealed_ = true;
+        emit RoundSealed(caseIndex, r.pot, r.winningStake, r.winners);
+    }
+
+    // ─────────────────────────────────────────── payout
+
+    /// @notice Your share of the pot: the whole pot, split by stake among those who solved it.
+    function shareOf(uint8 caseIndex, address player) public view returns (uint256) {
+        Round memory r = rounds[caseIndex];
+        Entry memory e = entries[caseIndex][player];
+        if (!e.won || r.winningStake == 0) return 0;
+        return (uint256(r.pot) * e.stake) / r.winningStake;
+    }
+
+    /**
+     * @notice Collect your share, paid in Megapot tickets.
+     *
+     * @dev Tickets rather than cash on purpose: the reward for reading a room is a real
+     *      lottery entry, funded by everyone who read it wrong. Any remainder below one
+     *      ticket is left in the contract rather than dust-transferred.
+     */
+    function claim(uint8 caseIndex) external nonReentrant returns (uint256[] memory ticketIds) {
+        Round storage r = rounds[caseIndex];
+        if (!r.sealed_) revert RoundNotSealed();
+
+        Entry storage e = entries[caseIndex][msg.sender];
+        if (e.stake == 0) revert NoEntry();
+        if (e.claimed) revert AlreadyClaimed();
+        if (!e.won) revert NotAWinner();
+
+        uint256 share = shareOf(caseIndex, msg.sender);
+        if (share == 0) revert NothingToPay();
+
+        e.claimed = true;
+        reserved -= e.stake;
 
         if (!jackpot.allowTicketPurchases()) revert PurchasesDisabled();
 
         uint256 price = jackpot.ticketPrice();
-        uint256 count = payout / price;
+        uint256 count = share / price;
         if (count == 0) count = 1;
-        if (count > MAX_TICKETS_PER_WIN) count = MAX_TICKETS_PER_WIN;
+        if (count > MAX_TICKETS_PER_CLAIM) count = MAX_TICKETS_PER_CLAIM;
 
         uint256 cost = price * count;
-        uint256 available = usdc.balanceOf(address(this));
-        if (available < cost) revert TreasuryShort(cost, available);
-
         usdc.forceApprove(address(ticketBuyer), cost);
 
         address[] memory referrers = new address[](1);
@@ -233,30 +281,53 @@ contract CaseMarket is Ownable, ReentrancyGuard {
         ticketIds = ticketBuyer.buyTickets(count, msg.sender, referrers, split, SOURCE);
         usdc.forceApprove(address(ticketBuyer), 0);
 
-        emit Settled(caseId, msg.sender, true, bps, count, ticketIds);
+        emit Claimed(caseIndex, msg.sender, share, count, ticketIds);
     }
 
-    // ─────────────────────────────────────────── treasury
+    /**
+     * @notice If a round sealed with nobody solving it, entrants get their stake back.
+     * @dev A pot with no winners has no one to divide it among, and keeping it would make
+     *      the house the beneficiary of everybody's failure.
+     */
+    function refund(uint8 caseIndex) external nonReentrant {
+        Round storage r = rounds[caseIndex];
+        if (!r.sealed_) revert RoundNotSealed();
+        if (r.winningStake != 0) revert NotAWinner();
 
-    /// @notice Sweep Megapot referral fees back in. Permissionless — anyone may refill the
-    ///         pot that pays other players.
+        Entry storage e = entries[caseIndex][msg.sender];
+        if (e.stake == 0) revert NoEntry();
+        if (e.claimed) revert AlreadyClaimed();
+
+        e.claimed = true;
+        reserved -= e.stake;
+        usdc.safeTransfer(msg.sender, e.stake);
+
+        emit Refunded(caseIndex, msg.sender, e.stake);
+    }
+
+    // ─────────────────────────────────────────── views
+
+    /// @notice Seconds left on this player's clock, or zero if it has run out.
+    function timeLeft(uint8 caseIndex, address player) external view returns (uint256) {
+        Entry memory e = entries[caseIndex][player];
+        if (e.stake == 0 || block.timestamp >= e.deadline) return 0;
+        return e.deadline - block.timestamp;
+    }
+
+    function hasPlayed(uint8 caseIndex, address player) external view returns (bool) {
+        return entries[caseIndex][player].stake != 0;
+    }
+
+    // ─────────────────────────────────────────── admin
+
     function sweepReferralFees() external {
         jackpot.claimReferralFees();
     }
 
-    function pendingReferralFees() external view returns (uint256) {
-        return jackpot.referralFees(address(this));
-    }
-
-    /// @notice Treasury not spoken for by an open position.
-    function freeBalance() public view returns (uint256) {
-        uint256 bal = usdc.balanceOf(address(this));
-        return bal > lockedStake ? bal - lockedStake : 0;
-    }
-
-    function setEdge(uint256 bps) external onlyOwner {
-        require(bps <= 3_000, "edge too high");
-        houseEdgeBps = bps;
+    function setWindows(uint64 play, uint64 round) external onlyOwner {
+        require(play >= 3 minutes && round >= 1 hours, "too short");
+        playWindow = play;
+        roundLength = round;
     }
 
     function setStakeRange(uint256 min, uint256 max) external onlyOwner {
@@ -265,9 +336,13 @@ contract CaseMarket is Ownable, ReentrancyGuard {
         maxStake = max;
     }
 
-    /// @dev Cannot touch stake locked against unsettled positions.
-    function withdraw(address to, uint256 amount) external onlyOwner {
-        require(amount <= freeBalance(), "would raid open positions");
-        usdc.safeTransfer(to, amount);
+    /// @dev Only ever the referral fees and rounding dust — never staked funds.
+    function withdrawSurplus(address to) external onlyOwner {
+        uint256 bal = usdc.balanceOf(address(this));
+        require(bal > reserved, "nothing spare");
+        usdc.safeTransfer(to, bal - reserved);
     }
+
+    /// @dev Inco fees for opening cases are drawn from this contract's balance.
+    receive() external payable {}
 }

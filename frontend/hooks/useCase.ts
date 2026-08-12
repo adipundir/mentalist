@@ -21,7 +21,7 @@ export function useCase({
   onResolved,
 }: {
   config: CaseConfig;
-  oracle: Oracle;
+  oracle: Oracle | null;
   onResolved?: (solved: boolean, focusLeft: number) => void;
 }) {
   const n = config.suspects;
@@ -43,6 +43,7 @@ export function useCase({
   const drone = useRef<sfx.Drone | null>(null);
 
   useEffect(() => {
+    if (!oracle) return;
     let cancelled = false;
     setReady(false);
     oracle
@@ -60,7 +61,7 @@ export function useCase({
   );
 
   const over = outcome !== "playing";
-  const canAsk = !over && !busy && ready && witness !== null;
+  const canAsk = !!oracle && !over && !busy && ready && witness !== null;
 
   const chooseWitness = useCallback(
     (seat: number) => {
@@ -89,7 +90,7 @@ export function useCase({
    */
   const askAbout = useCallback(
     (target: number) => {
-      if (over || busy || witness === null || focusLeft < 1) return;
+      if (!oracle || over || busy || witness === null || focusLeft < 1) return;
       void fire(1 << target);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,7 +100,7 @@ export function useCase({
   /** "Is he even in this room?" — always true, so the answer is purely whether they lie. */
   const askRoom = useCallback(
     () => {
-      if (over || busy || witness === null || focusLeft < CONTROL_COST) return;
+      if (!oracle || over || busy || witness === null || focusLeft < CONTROL_COST) return;
       void fire(fullMask(n));
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -107,7 +108,7 @@ export function useCase({
   );
 
   async function fire(m: number) {
-    if (witness === null) return;
+    if (!oracle || witness === null) return;
     setMask(m);
     setBusy(true);
     setError(null);
@@ -147,7 +148,7 @@ export function useCase({
   }
 
   async function accuse(seat: number) {
-    if (over || busy || !ready) return;
+    if (!oracle || over || busy || !ready) return;
     setBusy(true);
     setError(null);
     setAccused(seat);

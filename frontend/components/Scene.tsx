@@ -29,16 +29,20 @@ export function Scene({
   title,
   nudge,
   chainStatus,
+  connect,
   onResolved,
 }: {
   config: CaseConfig;
-  oracle: Oracle;
+  /** Null until a wallet is connected — the room still paints, it just can't be played. */
+  oracle: Oracle | null;
   suspects: Suspect[];
   chapter?: string;
   title: string;
   nudge?: { name: string; spec: CharacterSpec; line: string } | null;
   /** Rendered into the room — the on-chain provenance strip. */
   chainStatus?: React.ReactNode;
+  /** Shown in place of the controls when there is no wallet yet. */
+  connect?: React.ReactNode;
   onResolved?: (solved: boolean, focusLeft: number) => void;
 }) {
   const g = useCase({ config, oracle, onResolved });
@@ -212,6 +216,9 @@ export function Scene({
 
       {/* ── one instruction, always telling you the next click ── */}
       <div className="border-x-2 border-b-2 border-ink-3 bg-ink px-3 py-3 sm:px-5">
+        {connect ? (
+          <div className="flex flex-wrap items-center justify-center gap-4 py-1">{connect}</div>
+        ) : (
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1 font-body text-[15px] leading-snug text-bone">
             {g.busy ? (
@@ -250,6 +257,7 @@ export function Scene({
             </Act>
           </div>
         </div>
+        )}
 
         {g.error && (
           <p className="shake mt-1 font-mono text-[10px] tracking-file text-blood-hot">{g.error}</p>

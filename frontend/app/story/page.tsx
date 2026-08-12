@@ -9,13 +9,13 @@ import { lineup, person } from "@/lib/canon";
 import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
 import { MENTALIST_ADDRESS, addressUrl, txUrl } from "@/lib/contracts";
 import { Scene } from "@/components/Scene";
-import { Room } from "@/components/Room";
+import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { StoryCard } from "@/components/StoryCard";
 import { Finale } from "@/components/Finale";
-import { Gate } from "@/components/Gate";
+import { PoweredBy } from "@/components/PoweredBy";
 import { Settlement } from "@/components/Settlement";
 
-type Stage = "gate" | "opening" | "playing" | "closing" | "finale";
+type Stage = "opening" | "playing" | "closing" | "finale";
 
 /**
  * THE RED JOHN CASES — the game.
@@ -30,7 +30,7 @@ type Stage = "gate" | "opening" | "playing" | "closing" | "finale";
  */
 function StoryInner() {
   const [index, setIndex] = useState(0);
-  const [stage, setStage] = useState<Stage>("gate");
+  const [stage, setStage] = useState<Stage>("opening");
   const [solved, setSolved] = useState(false);
   const [focusLeft, setFocusLeft] = useState(0);
   const [attempt, setAttempt] = useState(0);
@@ -112,7 +112,6 @@ function StoryInner() {
       </div>
 
       <div className="px-2 pb-8 pt-3 sm:px-4">
-        {oracle ? (
         <Scene
           key={`${index}-${attempt}`}
           config={chapter}
@@ -149,34 +148,24 @@ function StoryInner() {
                 )}
             </div>
           }
+          connect={
+            oracle ? null : (
+              <>
+                <p className="font-body text-[15px] text-bone">
+                  They&rsquo;re waiting.{" "}
+                  <span className="text-blood-hot">Connect to open the case.</span>
+                </p>
+                <ConnectButton showBalance={false} chainStatus="icon" />
+              </>
+            )
+          }
           onResolved={finishChapter}
         />
-        ) : (
-          <div className="relative mx-auto w-full max-w-[1400px]">
-            <Room
-              subjects={suspects.map((sp, i) => ({
-                suspect: sp,
-                expression: i % 3 === 0 ? "smug" : "neutral",
-                cleared: false,
-                liar: false,
-                honest: false,
-                inQuestion: false,
-                turned: false,
-                saying: null,
-              }))}
-              focused={null}
-              onFocus={() => {}}
-              onToggle={() => {}}
-              disabled
-            />
-          </div>
-        )}
       </div>
 
       <AnimatePresence>
-        {stage === "gate" && <Gate onReady={() => setStage("opening")} />}
 
-        {stage === "opening" && (
+        {stage === "opening" && oracle && (
           <StoryCard
             key={`open-${index}-${attempt}`}
             chapter={`CASE ${index + 1} OF ${CHAPTERS.length} — ${chapter.n} SUSPECTS, ${chapter.liars} OF THEM LYING`}
@@ -205,6 +194,8 @@ function StoryInner() {
 
         {stage === "finale" && <Finale beats={FINALE} />}
       </AnimatePresence>
+
+      <PoweredBy fixed />
     </main>
   );
 }
