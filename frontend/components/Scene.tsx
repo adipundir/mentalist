@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { maskSeats, popcount, type CaseConfig } from "@/lib/case";
 import type { Suspect } from "@/lib/suspects";
 import type { Oracle } from "@/lib/oracle";
-import { Character, type CharacterSpec, type Expression } from "./Character";
+import { Character, type CharacterSpec, type Expression, type Idle } from "./Character";
 import { useCase } from "@/hooks/useCase";
 import { Room, type RoomSubject } from "./Room";
 import { Dialogue, type Line } from "./Dialogue";
@@ -22,6 +22,16 @@ import * as sfx from "@/lib/sound";
  * while you are talking to them.
  */
 export type SceneHandle = { begin: (caseId: bigint) => void };
+
+/**
+ * The room's behaviour, in the order it is dealt round the lineup.
+ *
+ * A murder has just happened and these people were in the house. Two of them cannot keep
+ * still, one keeps looking at her and away again, one scratches his head at the whole
+ * business, and one of them is enjoying it and keeps catching himself. Nobody stands to
+ * attention, because nobody stands to attention.
+ */
+const IDLES: Idle[] = ["scratch", "scared", "glance", "giggle", "shift"];
 
 export function Scene({
   config,
@@ -129,13 +139,22 @@ export function Scene({
             : "honest"
           : g.deductions.honesty[i];
 
+        // What they do while nobody is asking them anything. Fixed per seat rather than
+        // random, so a man who scratches his head keeps doing it and the room has faces you
+        // start to recognise. Spread across the lineup so no two neighbours match.
+        const idle: Idle = IDLES[i % IDLES.length]!;
+
         let expression: Expression = "neutral";
         if (g.truth) expression = isKiller ? "sinister" : "neutral";
         else if (g.saying?.seat === i) expression = "talking";
         else if (g.busy && g.witness === i) expression = "shifty";
         else if (honesty === "liar") expression = "caught";
         else if (g.witness === i) expression = "nervous";
-        else if (i % 3 === 0) expression = "smug";
+        // Idle behaviour drives the resting face too, or a man shaking with fear stares
+        // blankly out at you while he does it.
+        else if (idle === "scared") expression = "nervous";
+        else if (idle === "giggle") expression = "smug";
+        else if (idle === "glance") expression = "shifty";
 
         return {
           suspect: s,
@@ -145,6 +164,7 @@ export function Scene({
           honest: honesty === "honest",
           inQuestion: ((g.mask >> i) & 1) === 1,
           turned: g.turned.includes(i),
+          idle: g.truth || g.saying?.seat === i ? "still" : idle,
           saying: g.saying?.seat === i ? { line: g.saying.line, answer: g.saying.answer } : null,
         };
       }),

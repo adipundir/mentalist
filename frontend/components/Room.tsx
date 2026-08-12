@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Character, type Expression } from "./Character";
+import { Character, type Expression, type Idle } from "./Character";
 import { CrimeScene } from "./CrimeScene";
 import type { Suspect } from "@/lib/suspects";
 
@@ -36,6 +36,8 @@ export interface RoomSubject {
   turned: boolean;
   /** What they're saying right now, rendered as a bubble over their head. */
   saying?: { line: string; answer: boolean } | null;
+  /** What they do when nobody is questioning them. */
+  idle?: Idle;
 }
 
 /**
@@ -262,6 +264,7 @@ export function Room({
                 expression={s.expression}
                 cleared={s.cleared}
                 fullBody
+                idle={s.idle}
                 className="h-auto w-full drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]"
               />
 

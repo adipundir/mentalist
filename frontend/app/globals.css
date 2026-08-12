@@ -268,3 +268,68 @@
 @media (prefers-reduced-motion: reduce) {
   .mote { animation: none; opacity: 0.12 !important; }
 }
+
+/* ── what the suspects do while you are not looking at them ──────────────────
+   These are civilians who have just been in the same house as a murder, not a
+   lineup at attention. Everything here is deliberately small: a room where
+   four people are visibly performing is worse than a room where nobody moves.
+   The delays are set per suspect so the room never pulses in unison. */
+
+/* Scratching his head at the whole business. The arm goes up, pauses, comes down. */
+@keyframes armScratch {
+  0%, 62%, 100% { transform: rotate(0deg); }
+  68% { transform: rotate(-118deg); }
+  72% { transform: rotate(-112deg); }
+  76% { transform: rotate(-120deg); }
+  80% { transform: rotate(-113deg); }
+  88% { transform: rotate(0deg); }
+}
+.arm-scratch { animation: armScratch 9s ease-in-out infinite; }
+
+/* Cannot keep still. A shiver, not a shake. */
+@keyframes idleScared {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  25% { transform: translateX(-0.7px) rotate(-0.35deg); }
+  50% { transform: translateX(0.6px) rotate(0.3deg); }
+  75% { transform: translateX(-0.5px) rotate(-0.25deg); }
+}
+.idle-scared { animation: idleScared 0.42s ease-in-out infinite; }
+
+/* Enjoying this far too much, and catching himself doing it. */
+@keyframes idleGiggle {
+  0%, 70%, 100% { transform: translateY(0) rotate(0deg); }
+  73% { transform: translateY(-1.6px) rotate(0.6deg); }
+  76% { transform: translateY(0) rotate(0deg); }
+  79% { transform: translateY(-1.4px) rotate(0.5deg); }
+  82% { transform: translateY(0) rotate(0deg); }
+  85% { transform: translateY(-1.1px) rotate(0.4deg); }
+  90% { transform: translateY(0) rotate(0deg); }
+}
+.idle-giggle { animation: idleGiggle 11s ease-in-out infinite; }
+
+/* Looking down at her, then away, then back. Nobody can help it. */
+@keyframes idleGlance {
+  0%, 40%, 100% { transform: rotate(0deg); }
+  48% { transform: rotate(-3.2deg); }
+  62% { transform: rotate(-3deg); }
+  72% { transform: rotate(1.4deg); }
+}
+.idle-glance { animation: idleGlance 13s ease-in-out infinite; }
+
+/* Weight from one foot to the other, because standing still is hard. */
+@keyframes idleShift {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  35% { transform: translateX(1.3px) rotate(0.45deg); }
+  70% { transform: translateX(-1.1px) rotate(-0.4deg); }
+}
+.idle-shift { animation: idleShift 7.5s ease-in-out infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .arm-scratch,
+  .idle-scared,
+  .idle-giggle,
+  .idle-glance,
+  .idle-shift {
+    animation: none;
+  }
+}

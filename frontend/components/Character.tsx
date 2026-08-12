@@ -24,6 +24,16 @@ export type Expression =
   | "caught" // exposed as a liar
   | "sinister"; // unmasked as Red John
 
+/**
+ * What a suspect does while nobody is asking them anything.
+ *
+ * A room of people standing to attention facing the camera reads as a lineup at a police
+ * station. These are civilians who have just been in the same house as a murder, so they
+ * fidget: someone scratches his head at the whole business, someone cannot stop shaking,
+ * and one of them keeps almost smiling and catching himself.
+ */
+export type Idle = "still" | "scratch" | "scared" | "giggle" | "glance" | "shift";
+
 export type FaceShape = "oval" | "square" | "round" | "long";
 export type HairStyle =
   | "slick" | "side-part" | "bald" | "combover" | "wavy"
@@ -252,7 +262,15 @@ function AccessoryPart({ style, suit }: { style: Accessory; suit: string }) {
  * Posture carries as much as the face at full height, a nervous suspect draws his arms in,
  * a smug one plants his feet.
  */
-function Body({ spec, expression }: { spec: CharacterSpec; expression: Expression }) {
+function Body({
+  spec,
+  expression,
+  idle,
+}: {
+  spec: CharacterSpec;
+  expression: Expression;
+  idle?: Idle;
+}) {
   const tense = expression === "nervous" || expression === "caught" || expression === "shocked";
   const open = expression === "smug" || expression === "sinister";
 
@@ -294,8 +312,13 @@ function Body({ spec, expression }: { spec: CharacterSpec; expression: Expressio
         fill={spec.suit} stroke={INK} strokeWidth="2.7"
       />
 
-      {/* arms swing clear of the torso so the silhouette reads as a person, not a slab */}
-      <g transform={`rotate(${armIn} 29 104)`}>
+      {/* arms swing clear of the torso so the silhouette reads as a person, not a slab.
+          The left one is the one that goes up to scratch a head. */}
+      <g
+        transform={`rotate(${armIn} 29 104)`}
+        className={idle === "scratch" ? "arm-scratch" : undefined}
+        style={{ transformOrigin: "29px 104px" }}
+      >
         <path d="M27 104 Q18 130 19 158 L30 159 Q29 130 33 106 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
         <circle cx="24.5" cy="165" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
       </g>
@@ -316,12 +339,15 @@ export function Character({
   cleared = false,
   /** Draw the whole figure, standing, for the room scene. */
   fullBody = false,
+  /** What they do when left alone. Only meaningful in `fullBody`. */
+  idle = "still",
   className,
 }: {
   spec: CharacterSpec;
   expression?: Expression;
   cleared?: boolean;
   fullBody?: boolean;
+  idle?: Idle;
   className?: string;
 }) {
   const [blink, setBlink] = useState(false);
@@ -372,9 +398,23 @@ export function Character({
       }}
       aria-hidden
     >
-      <g transform={`rotate(${spec.tilt} 50 70)`}>
+      <g
+        transform={`rotate(${spec.tilt} 50 70)`}
+        className={
+          idle === "scared"
+            ? "idle-scared"
+            : idle === "giggle"
+              ? "idle-giggle"
+              : idle === "shift"
+                ? "idle-shift"
+                : idle === "glance"
+                  ? "idle-glance"
+                  : undefined
+        }
+        style={{ transformOrigin: "50px 240px" }}
+      >
         {fullBody ? (
-          <Body spec={spec} expression={expression} />
+          <Body spec={spec} expression={expression} idle={idle} />
         ) : (
           <>
             {/* portrait crop only: its own collar, so a bust reads as clothed */}
