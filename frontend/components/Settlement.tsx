@@ -10,7 +10,7 @@ type Step = "settle" | "settling" | "claim" | "claiming" | "done" | "nothing";
  * The end of an on-chain case, and the only place the two stacks meet.
  *
  * **Inco** decided the outcome: `accuse` revealed the board, and `settle` hands the
- * covalidator's attestation to the contract so the *contract* — not this client — rules on
+ * covalidator's attestation to the contract so the *contract*, not this client, rules on
  * whether the accusation was right. That is what makes the streak mean anything.
  *
  * **Megapot** pays it out: whatever Focus you didn't spend converts to real lottery
@@ -22,18 +22,16 @@ type Step = "settle" | "settling" | "claim" | "claiming" | "done" | "nothing";
 export function Settlement({
   oracle,
   solved,
-  focusLeft,
 }: {
   oracle: ChainOracle;
   solved: boolean;
-  focusLeft: number;
 }) {
   const [step, setStep] = useState<Step>("settle");
   const [tickets, setTickets] = useState<number | null>(null);
   const [hashes, setHashes] = useState<{ settle?: string; claim?: string }>({});
   const [error, setError] = useState<string | null>(null);
 
-  // A miss still has to be filed — that is what breaks the streak.
+  // A miss still has to be filed, that is what breaks the streak.
   useEffect(() => {
     if (!solved && step === "claim") setStep("nothing");
   }, [solved, step]);
@@ -81,7 +79,7 @@ export function Settlement({
           <p className="font-body text-[13px] leading-relaxed text-bone-dim">
             The board is revealed, but the contract hasn&rsquo;t ruled yet. File the
             covalidator&rsquo;s attestation and{" "}
-            <span className="text-bone">it</span> decides whether you were right — not this
+            <span className="text-bone">it</span> decides whether you were right, not this
             browser.
           </p>
           <button
@@ -99,12 +97,11 @@ export function Settlement({
       {step === "claim" && tickets !== null && (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone-dim">
-            Filed — the contract agrees. You finished with{" "}
-            <span className="text-blood-hot">{focusLeft} Focus</span> unspent, which is worth{" "}
+            Filed, and the contract agrees. Your share of the pot comes back as{" "}
             <span className="text-blood-hot">
               {tickets} Megapot ticket{tickets === 1 ? "" : "s"}
             </span>
-            . The treasury pays; the tickets mint to your wallet.
+            , bought for your wallet with the stakes of everyone who read the room wrong.
           </p>
           <button
             type="button"
@@ -128,7 +125,7 @@ export function Settlement({
       {step === "nothing" && (
         <p className="font-body text-[13px] leading-relaxed text-bone-dim">
           {solved
-            ? "Filed. No Focus left over, so no tickets this time — solve it in fewer reads."
+            ? "Filed. No Focus left over, so no tickets this time, solve it in fewer reads."
             : "Filed. A miss breaks the streak; the contract recorded it."}
         </p>
       )}
@@ -137,7 +134,7 @@ export function Settlement({
         <p className="shake mt-2 font-mono text-[10px] tracking-file text-blood-hot">{error}</p>
       )}
 
-      <div className="mt-3 space-y-0.5 font-mono text-[9px] tracking-file text-bone-dim/60">
+      <div className="mt-3 space-y-0.5 font-mono text-[9px] tracking-file text-bone-dim/75">
         {hashes.settle && (
           <p>
             VERDICT FILED ·{" "}

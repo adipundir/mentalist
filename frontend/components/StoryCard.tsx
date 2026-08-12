@@ -10,7 +10,7 @@ import { isNarratorMuted, narrate, setNarratorMuted, stopNarration, unlockNarrat
  *
  * Text types itself at reading speed while the narrator reads it aloud, so the two land
  * together instead of the eye racing ahead of the voice. Clicking once skips to the full
- * text; clicking again continues — impatient players are never held hostage by an
+ * text; clicking again continues, impatient players are never held hostage by an
  * animation, which is the single most common sin of story cards in games.
  */
 export function StoryCard({
@@ -25,11 +25,11 @@ export function StoryCard({
   chapter?: string;
   title: string;
   body: string;
-  /** Optional character portrait — used when a CBI voice is delivering the line. */
+  /** Optional character portrait, used when a CBI voice is delivering the line. */
   speaker?: { name: string; role: string; spec: CharacterSpec } | null;
   onContinue: () => void;
   continueLabel?: string;
-  /** Rendered above the continue row — the on-chain settle + Megapot claim. */
+  /** Rendered above the continue row, the on-chain settle + Megapot claim. */
   extra?: React.ReactNode;
 }) {
   const [shown, setShown] = useState(0);
@@ -125,7 +125,7 @@ export function StoryCard({
         {extra && <div onClick={(e) => e.stopPropagation()}>{extra}</div>}
 
         <div className="mt-6 flex items-center justify-between gap-3 border-t border-ink-3 pt-4">
-          <span className="font-mono text-[9px] tracking-file text-bone-dim/50">
+          <span className="font-mono text-[9px] tracking-file text-bone-dim/75">
             {!done ? "CLICK TO SKIP" : extra ? "" : "CLICK ANYWHERE TO CONTINUE"}
           </span>
           <button

@@ -9,14 +9,14 @@ const mono = IBM_Plex_Mono({
   weight: ["400", "500", "600"],
 });
 
-/** Typewriter — testimony, stamps, case headers. The voice of the file. */
+/** Typewriter, testimony, stamps, case headers. The voice of the file. */
 const typewriter = Special_Elite({
   subsets: ["latin"],
   variable: "--font-type",
   weight: "400",
 });
 
-/** Body serif — prose, dossier copy. */
+/** Body serif, prose, dossier copy. */
 const body = Crimson_Pro({
   subsets: ["latin"],
   variable: "--font-body",
@@ -24,9 +24,9 @@ const body = Crimson_Pro({
 });
 
 export const metadata: Metadata = {
-  title: "MENTALIST — everyone lies, Red John always does",
+  title: "MENTALIST, everyone lies, Red John always does",
   description:
-    "A confidential deduction game on Base. The evidence is encrypted, testimony passes through a hidden honesty bit, and nobody — not even the deployer — knows who Red John is.",
+    "A confidential deduction game on Base. The evidence is encrypted, testimony passes through a hidden honesty bit, and nobody, not even the deployer, knows who Red John is.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

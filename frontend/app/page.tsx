@@ -11,7 +11,7 @@ import { PoweredBy } from "@/components/PoweredBy";
 /**
  * The title card.
  *
- * A game's front door is a title, a promise, and a way in — not a README. Everything that
+ * A game's front door is a title, a promise, and a way in, not a README. Everything that
  * used to live here (how the mechanic works, why it needs confidential compute, the honest
  * TEE framing) is real and worth saying, but it belongs on /about, where someone who wants
  * it can go and find it.
@@ -36,7 +36,7 @@ export default function Home() {
         <path d="M40 74 Q60 92 80 74" fill="none" stroke="#c1272d" strokeWidth="5" strokeLinecap="round" />
       </motion.svg>
 
-      {/* registration marks — the frame turns empty space into composition */}
+      {/* registration marks, the frame turns empty space into composition */}
       <div className="pointer-events-none absolute inset-5 sm:inset-8">
         {(
           [

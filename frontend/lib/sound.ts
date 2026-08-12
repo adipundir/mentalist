@@ -4,12 +4,12 @@
  * Sound design.
  *
  * Every sound here is synthesised at runtime with the Web Audio API. No files, no asset
- * pipeline, no licensing — which matters for a game that has to open instantly on a cold
+ * pipeline, no licensing, which matters for a game that has to open instantly on a cold
  * browser, and matters more for one that ships its own source.
  *
  * Three rules the whole palette follows:
  *
- *   1. **No music.** A room tone, not a soundtrack — a barely-audible filtered noise bed
+ *   1. **No music.** A room tone, not a soundtrack, a barely-audible filtered noise bed
  *      that you notice only when it stops. Constant melody would fight the narrator and
  *      wear out in ninety seconds.
  *   2. **Quiet by default, loud on purpose.** Interaction sounds sit around -30dB. The
@@ -50,7 +50,7 @@ function buildRoomImpulse(ac: AudioContext): AudioBuffer {
       const decay = Math.pow(1 - t, 2.6);
       const slap = i < ac.sampleRate * 0.02 ? 0 : 1;
       const white = Math.random() * 2 - 1;
-      // A gentle lowpass on the tail — high frequencies die first in a real room.
+      // A gentle lowpass on the tail, high frequencies die first in a real room.
       lp += (white - lp) * 0.22;
       d[i] = lp * decay * slap * (ch === 0 ? 1 : 0.92);
     }
@@ -83,7 +83,7 @@ function audio(): AudioContext | null {
 
 /**
  * Connect a source to both the dry master and the room. `wet` scales how much of this
- * particular sound goes into the space — a switch click wants a little, a brass stab wants
+ * particular sound goes into the space, a switch click wants a little, a brass stab wants
  * a lot, because a loud sound excites a room more than a quiet one.
  */
 function toBus(node: AudioNode, wet = 1) {
@@ -113,7 +113,7 @@ export function isMuted() {
 
 // ── building blocks ─────────────────────────────────────────
 
-/** Noise buffer, cached — regenerating it per hit is wasteful and audibly identical. */
+/** Noise buffer, cached, regenerating it per hit is wasteful and audibly identical. */
 let noiseBuf: AudioBuffer | null = null;
 function noise(ac: AudioContext): AudioBufferSourceNode {
   if (!noiseBuf || noiseBuf.sampleRate !== ac.sampleRate) {
@@ -259,7 +259,7 @@ export function switchClick() {
   o.stop(ac.currentTime + 0.09);
 }
 
-/** The camera moving — a low air-swell under the push-in. */
+/** The camera moving, a low air-swell under the push-in. */
 export function whoosh() {
   const ac = audio();
   if (!ac) return;
@@ -276,7 +276,7 @@ export function whoosh() {
   n.stop(ac.currentTime + 0.7);
 }
 
-/** A single plucked string — the "tell" when a witness is proven a liar. */
+/** A single plucked string, the "tell" when a witness is proven a liar. */
 export function pluck(freq = 330) {
   const ac = audio();
   if (!ac) return;
@@ -300,7 +300,7 @@ export function pluck(freq = 330) {
  * A brass stab: detuned saws, a filter slammed shut, a fast envelope.
  *
  * This is the game's exclamation mark. It is genuinely loud, so it fires at exactly four
- * moments — a YES, an accusation, the unmasking, and a miss — and never on navigation.
+ * moments, a YES, an accusation, the unmasking, and a miss, and never on navigation.
  * Restraint is what keeps it hitting; a stab on every click is a car alarm.
  */
 function brass(
@@ -318,7 +318,7 @@ function brass(
 
   const lp = ac.createBiquadFilter();
   lp.type = "lowpass";
-  lp.Q.value = 1.4; // a gentler resonance — 2.5 whistled, and whistle reads as synth
+  lp.Q.value = 1.4; // a gentler resonance, 2.5 whistled, and whistle reads as synth
   lp.frequency.setValueAtTime(sweepFrom, ac.currentTime);
   lp.frequency.exponentialRampToValueAtTime(sweepTo, ac.currentTime + decay * 0.8);
 
@@ -355,7 +355,7 @@ function brass(
     }
   }
 
-  // The breath before the note — a short filtered noise transient. This is most of what
+  // The breath before the note, a short filtered noise transient. This is most of what
   // makes a brass patch sound blown rather than generated.
   const air = noise(ac);
   const airBp = ac.createBiquadFilter();
@@ -369,12 +369,12 @@ function brass(
   air.stop(ac.currentTime + 0.16);
 }
 
-/** A YES — the answer that narrows the room. Ominous, not triumphant. */
+/** A YES, the answer that narrows the room. Ominous, not triumphant. */
 export function stabYes() {
   brass([110, 165, 220], { peak: 0.17, decay: 0.45 });
 }
 
-/** A NO — duller, lower, closes a door. */
+/** A NO, duller, lower, closes a door. */
 export function stabNo() {
   brass([98, 131], { peak: 0.1, decay: 0.32, sweepFrom: 1400, sweepTo: 180 });
 }
@@ -384,7 +384,7 @@ export function stabAccuse() {
   brass([73.4, 110, 146.8], { peak: 0.22, decay: 0.9, sweepFrom: 3200, sweepTo: 150, detune: 11 });
 }
 
-/** Correct — a minor resolution. This is not a happy game. */
+/** Correct, a minor resolution. This is not a happy game. */
 export function stingSolved() {
   brass([110, 130.8, 164.8], { peak: 0.19, decay: 1.5, sweepFrom: 2800, sweepTo: 320 });
   const ac = audio();
@@ -401,7 +401,7 @@ export function stingSolved() {
   }, 240);
 }
 
-/** Wrong — a falling minor second, the sound of the door closing behind him. */
+/** Wrong, a falling minor second, the sound of the door closing behind him. */
 export function stingMissed() {
   brass([116.5, 110], { peak: 0.18, decay: 1.2, sweepFrom: 1800, sweepTo: 90, detune: 16 });
 }

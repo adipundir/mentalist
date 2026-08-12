@@ -9,15 +9,14 @@ import { Mentalist } from "./Mentalist.sol";
 import { IJackpot, IJackpotRandomTicketBuyer } from "./CaseRewards.sol";
 
 /**
- * @title  CaseMarket — a pari-mutuel pool on a secret nobody can read
+ * @title  CaseMarket: a pari-mutuel pool on a secret nobody can read
  *
  * @notice Seven cases, each its own round with its own pot.
  *
  *         You stake USDC to enter a round. That opens a case whose culprit is sealed inside
  *         Inco's enclave, and starts a clock. Name him before the clock runs out and you are
  *         a winner; miss, or run out of time, and your stake stays in the pot. When the round
- *         closes, **the winners split the entire pot in proportion to what they staked** —
- *         so conviction is rewarded twice over, once for being right and once for how much
+ *         closes, **the winners split the entire pot in proportion to what they staked**: *         so conviction is rewarded twice over, once for being right and once for how much
  *         you were willing to put behind it.
  *
  *         Winnings are paid in **Megapot tickets**, never in cash. Reading a room correctly
@@ -29,8 +28,8 @@ import { IJackpot, IJackpotRandomTicketBuyer } from "./CaseRewards.sol";
  *
  * @dev    Why a pari-mutuel pool rather than fixed odds: fixed odds need a bookmaker with a
  *         balance sheet, and any multiplier this contract set would be a number I invented.
- *         A pool sets its own price — the payout is whatever the losers funded, divided by
- *         conviction — and it can never be insolvent, because it only ever pays out what it
+ *         A pool sets its own price, the payout is whatever the losers funded, divided by
+ *         conviction, and it can never be insolvent, because it only ever pays out what it
  *         already holds.
  *
  *         `Mentalist` is untouched by this and knows nothing about money: the market only
@@ -50,18 +49,30 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     uint256 public minStake = 100_000; // 0.10 USDC
     uint256 public maxStake = 5_000_000; // 5.00 USDC
 
-    /// @dev Megapot's quick-pick buyer rejects counts outside 1..10.
-    uint256 public constant MAX_TICKETS_PER_CLAIM = 10;
+    /// @dev Megapot's quick-pick buyer rejects counts outside 1..10, so a large share is
+    ///      bought in batches. Bounded so a claim can never run out of gas.
+    uint256 public constant TICKETS_PER_BATCH = 10;
+    uint256 public constant MAX_BATCHES = 10;
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
     bytes32 public constant SOURCE = bytes32("mentalist");
 
     // ─────────────────────────────────────────── types
 
+    /// @dev The lineup a round demands. Checked on entry so nobody can walk in with a
+    ///      four-man case and take the pot off people who played the twelve-man one.
+    struct Spec {
+        uint8 suspects;
+        uint8 liars;
+        uint8 questions;
+        uint8 turnAt;
+        bool set;
+    }
+
     struct Round {
         uint64 closesAt;
         /// @dev Everything staked into this round. The pot the winners divide.
         uint128 pot;
-        /// @dev Sum of the stakes of everyone who solved in time — the denominator of every
+        /// @dev Sum of the stakes of everyone who solved in time, the denominator of every
         ///      share. Grows until the last player reports in.
         uint128 winningStake;
         uint32 entrants;
@@ -87,6 +98,7 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     IERC20 public immutable usdc;
 
     mapping(uint8 => Round) public rounds;
+    mapping(uint8 => Spec) public specs;
     mapping(uint8 => mapping(address => Entry)) public entries;
 
     /// @dev Everything owed to open rounds. The owner can never withdraw it.
@@ -111,6 +123,11 @@ contract CaseMarket is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────── errors
 
     error RoundClosed();
+    error SpecNotSet();
+    error WrongCase();
+    error CaseAlreadyPlayed();
+    error NotYourCase();
+    error CaseNotOpen();
     error RoundNotClosed();
     error RoundNotSealed();
     error AlreadySealed();
@@ -137,42 +154,53 @@ contract CaseMarket is Ownable, ReentrancyGuard {
 
     // ─────────────────────────────────────────── rounds
 
-    /// @notice Open a round so a case can start taking entries.
-    function openRound(uint8 caseIndex) public {
-        Round storage r = rounds[caseIndex];
-        if (r.closesAt != 0) return; // already open, or already run
-        r.closesAt = uint64(block.timestamp) + roundLength;
-        emit RoundOpened(caseIndex, r.closesAt);
-    }
-
-    /**
-     * @notice Enter a round: stake, get a case, start the clock.
-     *
-     * @dev The case is opened here rather than by the player so the market controls the
-     *      parameters — a player who could choose their own lineup could choose an easy one
-     *      and take the pot off people who played the real thing.
-     */
-    function enter(
+    /// @notice Fix the lineup a round requires, and open it for entries.
+    function configureRound(
         uint8 caseIndex,
         uint8 suspects,
         uint8 liars,
         uint8 questions,
-        uint8 turnAt,
-        uint256 stake
-    ) external payable nonReentrant returns (uint256 caseId) {
-        openRound(caseIndex);
-
+        uint8 turnAt
+    ) external onlyOwner {
+        specs[caseIndex] = Spec(suspects, liars, questions, turnAt, true);
         Round storage r = rounds[caseIndex];
+        if (r.closesAt == 0) {
+            r.closesAt = uint64(block.timestamp) + roundLength;
+            emit RoundOpened(caseIndex, r.closesAt);
+        }
+    }
+
+    /**
+     * @notice Enter a round: stake on a case you have just opened, and start the clock.
+     *
+     * @dev Open the case on `Mentalist` first, then hand the id here. The case must be yours,
+     *      untouched, and match this round's spec, otherwise a player could enter with an
+     *      easy four-man lineup and take the pot off people who played the real one.
+     */
+    function enter(uint8 caseIndex, uint256 caseId, uint256 stake) external nonReentrant {
+        Round storage r = rounds[caseIndex];
+        Spec memory spec = specs[caseIndex];
+        if (!spec.set) revert SpecNotSet();
         if (r.sealed_ || block.timestamp >= r.closesAt) revert RoundClosed();
         if (entries[caseIndex][msg.sender].stake != 0) revert AlreadyEntered();
         if (stake < minStake || stake > maxStake) revert StakeOutOfRange(minStake, maxStake);
 
-        usdc.safeTransferFrom(msg.sender, address(this), stake);
+        // The player opens their own case directly on Mentalist, which keeps this contract
+        // out of the confidential path entirely: every answer is granted to the detective
+        // and nobody else, including here. All the market does is check the case is theirs,
+        // untouched, and the lineup this round actually calls for.
+        Mentalist.Case memory c = game.getCase(caseId);
+        if (c.detective != msg.sender) revert NotYourCase();
+        if (c.status != Mentalist.Status.Open) revert CaseNotOpen();
+        if (c.questionsAsked != 0) revert CaseAlreadyPlayed();
+        if (
+            c.suspects != spec.suspects ||
+            c.liars != spec.liars ||
+            c.turnAt != spec.turnAt ||
+            c.focusLeft != spec.questions
+        ) revert WrongCase();
 
-        // The player is the detective, so every answer is granted to them and nobody else —
-        // including this contract.
-        caseId = game.openCase{ value: msg.value }(suspects, liars, questions, turnAt);
-        game.transferCase(caseId, msg.sender);
+        usdc.safeTransferFrom(msg.sender, address(this), stake);
 
         entries[caseIndex][msg.sender] = Entry({
             stake: uint128(stake),
@@ -195,7 +223,7 @@ contract CaseMarket is Ownable, ReentrancyGuard {
      *         only if you closed it before your clock ran out.
      *
      * @dev `solved` on Mentalist only becomes true after it has verified a covalidator
-     *      attestation over the accused seat's encrypted guilt bit — so the pool settles
+     *      attestation over the accused seat's encrypted guilt bit, so the pool settles
      *      against Inco's enclave, not against anything a player or this contract could
      *      assert.
      */
@@ -261,25 +289,43 @@ contract CaseMarket is Ownable, ReentrancyGuard {
         if (share == 0) revert NothingToPay();
 
         e.claimed = true;
-        reserved -= e.stake;
+        // Decrement by the *share*, not the stake: a winner leaves with the losers' money too,
+        // and reserving only what they put in would leave their winnings permanently locked.
+        reserved -= share;
 
         if (!jackpot.allowTicketPurchases()) revert PurchasesDisabled();
 
         uint256 price = jackpot.ticketPrice();
         uint256 count = share / price;
-        if (count == 0) count = 1;
-        if (count > MAX_TICKETS_PER_CLAIM) count = MAX_TICKETS_PER_CLAIM;
+        if (count > TICKETS_PER_BATCH * MAX_BATCHES) count = TICKETS_PER_BATCH * MAX_BATCHES;
 
         uint256 cost = price * count;
-        usdc.forceApprove(address(ticketBuyer), cost);
+        if (cost != 0) {
+            usdc.forceApprove(address(ticketBuyer), cost);
 
-        address[] memory referrers = new address[](1);
-        uint256[] memory split = new uint256[](1);
-        referrers[0] = address(this);
-        split[0] = FULL_REFERRAL_SPLIT;
+            address[] memory referrers = new address[](1);
+            uint256[] memory split = new uint256[](1);
+            referrers[0] = address(this);
+            split[0] = FULL_REFERRAL_SPLIT;
 
-        ticketIds = ticketBuyer.buyTickets(count, msg.sender, referrers, split, SOURCE);
-        usdc.forceApprove(address(ticketBuyer), 0);
+            ticketIds = new uint256[](count);
+            uint256 filled;
+            while (filled < count) {
+                uint256 batch = count - filled;
+                if (batch > TICKETS_PER_BATCH) batch = TICKETS_PER_BATCH;
+                uint256[] memory got = ticketBuyer.buyTickets(batch, msg.sender, referrers, split, SOURCE);
+                for (uint256 i; i < got.length; ++i) ticketIds[filled + i] = got[i];
+                filled += batch;
+            }
+            usdc.forceApprove(address(ticketBuyer), 0);
+        } else {
+            ticketIds = new uint256[](0);
+        }
+
+        // Whatever a whole ticket wouldn't buy goes back to the player rather than to the
+        // house. Silently keeping it would make the contract the beneficiary of rounding.
+        uint256 dust = share - cost;
+        if (dust != 0) usdc.safeTransfer(msg.sender, dust);
 
         emit Claimed(caseIndex, msg.sender, share, count, ticketIds);
     }
@@ -336,13 +382,10 @@ contract CaseMarket is Ownable, ReentrancyGuard {
         maxStake = max;
     }
 
-    /// @dev Only ever the referral fees and rounding dust — never staked funds.
+    /// @dev Only ever the referral fees and rounding dust, never staked funds.
     function withdrawSurplus(address to) external onlyOwner {
         uint256 bal = usdc.balanceOf(address(this));
         require(bal > reserved, "nothing spare");
         usdc.safeTransfer(to, bal - reserved);
     }
-
-    /// @dev Inco fees for opening cases are drawn from this contract's balance.
-    receive() external payable {}
 }

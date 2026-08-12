@@ -13,7 +13,7 @@ type Beat = { kind: "action" | "jane" | "redjohn"; text: string };
  * The blink code.
  *
  * Beats land one at a time, narrated, at the pace of someone reading them aloud rather than
- * a wall of text dumped at once. Jane and McAllister get different voices — pitch and rate
+ * a wall of text dumped at once. Jane and McAllister get different voices, pitch and rate
  * are the only handles `speechSynthesis` gives you, and they're enough.
  */
 export function Finale({ beats }: { beats: Beat[] }) {
@@ -59,7 +59,7 @@ export function Finale({ beats }: { beats: Beat[] }) {
       <div className="mx-auto max-w-[760px]">
         <header className="mb-8 flex items-end justify-between gap-6 border-b border-ink-3 pb-5">
           <div>
-            <p className="font-mono text-[10px] tracking-file text-blood-hot">CHAPTER VII — SANGUINE</p>
+            <p className="font-mono text-[10px] tracking-file text-blood-hot">CHAPTER VII, SANGUINE</p>
             <h1 className="font-type text-[38px] leading-tight text-bone sm:text-[52px]">
               The Blink Code
             </h1>
@@ -132,7 +132,7 @@ export function Finale({ beats }: { beats: Beat[] }) {
             </p>
             <div className="mt-5 flex flex-wrap gap-2">
               <Link
-                href="/case/play"
+                href="/story"
                 className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2 font-mono text-[10px] tracking-file text-blood-hot hover:bg-blood-hot/25"
               >
                 PLAY ON-CHAIN

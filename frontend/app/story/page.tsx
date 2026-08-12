@@ -7,7 +7,7 @@ import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { CHAPTERS, FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
 import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
-import { MENTALIST_ADDRESS, addressUrl, txUrl } from "@/lib/contracts";
+import { CASE_WINDOW_MS } from "@/lib/market";
 import { Scene } from "@/components/Scene";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { StoryCard } from "@/components/StoryCard";
@@ -18,7 +18,7 @@ import { Settlement } from "@/components/Settlement";
 type Stage = "opening" | "playing" | "closing" | "finale";
 
 /**
- * THE RED JOHN CASES — the game.
+ * THE RED JOHN CASES, the game.
  *
  * Seven cases following the real arc, the lineup shrinking the way the suspect list does.
  *
@@ -32,9 +32,13 @@ function StoryInner() {
   const [index, setIndex] = useState(0);
   const [stage, setStage] = useState<Stage>("opening");
   const [solved, setSolved] = useState(false);
-  const [focusLeft, setFocusLeft] = useState(0);
   const [attempt, setAttempt] = useState(0);
   const [txs, setTxs] = useState<{ hash: string; label: string }[]>([]);
+
+  // Each case stands for a fixed window. Set once per case so the clock does not restart
+  // every render.
+  const [closesAt, setClosesAt] = useState(() => Date.now() + CASE_WINDOW_MS);
+  useEffect(() => setClosesAt(Date.now() + CASE_WINDOW_MS), [index]);
 
   const { address } = useAccount();
   const publicClient = usePublicClient();
@@ -62,9 +66,8 @@ function StoryInner() {
 
   const isLast = index === CHAPTERS.length - 1;
 
-  function finishChapter(didSolve: boolean, left: number) {
+  function finishChapter(didSolve: boolean) {
     setSolved(didSolve);
-    setFocusLeft(left);
     setStage("closing");
   }
 
@@ -85,19 +88,23 @@ function StoryInner() {
   }
 
   return (
-    <main>
-      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center gap-3 px-4 pt-4 sm:px-6">
-        <Link href="/" className="font-type text-[15px] tracking-wide text-bone-dim hover:text-bone">
+    <main className="fixed inset-0 overflow-hidden">
+      {/* The masthead rides on top of the room rather than above it. */}
+      <div
+        className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex flex-wrap items-center gap-3 px-4 pb-6 pt-4 sm:px-7"
+        style={{ background: "linear-gradient(rgb(6 5 7 / 0.92), transparent)" }}
+      >
+        <Link href="/" className="pointer-events-auto font-type text-[15px] tracking-wide text-bone hover:text-blood-hot">
           MENTALIST
         </Link>
-        <span className="text-bone-dim/30">/</span>
-        <span className="font-mono text-[9px] tracking-file text-blood-hot">THE RED JOHN CASES</span>
+        <span className="text-bone-dim">/</span>
+        <span className="font-mono text-[10px] tracking-file text-blood-hot">THE RED JOHN CASES</span>
 
         <ol className="ml-1 flex flex-wrap items-center gap-1">
           {CHAPTERS.map((c, i) => (
             <li
               key={c.title}
-              title={`${c.label} — ${c.title}`}
+              title={`${c.label}, ${c.title}`}
               className={[
                 "h-1.5 w-6 border",
                 i < index ? "border-brass bg-brass" : i === index ? "border-blood-hot bg-blood-hot" : "border-ink-3",
@@ -106,13 +113,12 @@ function StoryInner() {
           ))}
         </ol>
 
-        <span className="ml-auto border border-blood-hot px-2 py-0.5 font-mono text-[9px] tracking-file text-blood-hot">
+        <span className="ml-auto border border-blood-hot/70 bg-blood-hot/15 px-2 py-1 font-mono text-[10px] tracking-file text-blood-hot">
           BASE SEPOLIA
         </span>
       </div>
 
-      <div className="px-2 pb-8 pt-3 sm:px-4">
-        <Scene
+      <Scene
           key={`${index}-${attempt}`}
           config={chapter}
           oracle={oracle}
@@ -124,30 +130,8 @@ function StoryInner() {
             spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
             line: chapter.nudge.line,
           }}
-          chainStatus={
-            <div className="crt max-w-[280px] border border-ink-3 p-2 font-mono text-[9px] leading-relaxed tracking-file">
-                <p>
-                  ENCRYPTED ON BASE ·{" "}
-                  <a href={addressUrl(MENTALIST_ADDRESS)} target="_blank" rel="noreferrer" className="underline">
-                    {MENTALIST_ADDRESS.slice(0, 8)}… ↗
-                  </a>
-                </p>
-                {txs.length === 0 ? (
-                  <p className="opacity-60">DEALING THE CASE…</p>
-                ) : (
-                  <ul className="space-y-0.5">
-                    {txs.map((t) => (
-                      <li key={t.hash} className="truncate">
-                        <a href={txUrl(t.hash)} target="_blank" rel="noreferrer" className="underline">
-                          {t.hash.slice(0, 10)}…
-                        </a>{" "}
-                        <span className="opacity-70">{t.label}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-            </div>
-          }
+          closesAt={closesAt}
+          variant={index}
           connect={
             oracle ? null : (
               <>
@@ -161,14 +145,13 @@ function StoryInner() {
           }
           onResolved={finishChapter}
         />
-      </div>
 
       <AnimatePresence>
 
         {stage === "opening" && oracle && (
           <StoryCard
             key={`open-${index}-${attempt}`}
-            chapter={`CASE ${index + 1} OF ${CHAPTERS.length} — ${chapter.n} SUSPECTS, ${chapter.liars} OF THEM LYING`}
+            chapter={`CASE ${index + 1} OF ${CHAPTERS.length}, ${chapter.n} SUSPECTS, ${chapter.liars} OF THEM LYING`}
             title={chapter.title}
             body={chapter.opening}
             onContinue={() => setStage("playing")}
@@ -186,7 +169,7 @@ function StoryInner() {
             continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CASE") : "TRY AGAIN"}
             extra={
               oracle ? (
-                <Settlement oracle={oracle} solved={solved} focusLeft={focusLeft} />
+                <Settlement oracle={oracle} solved={solved} />
               ) : null
             }
           />

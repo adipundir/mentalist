@@ -8,7 +8,7 @@ import { Character } from "./Character";
 const KIND: Record<string, string> = { control: "CONTROL", self: "SELF", split: "SPLIT" };
 
 /**
- * Jane's notebook — the deduction grid, pulled up over the scene.
+ * Jane's notebook, the deduction grid, pulled up over the scene.
  *
  * It used to live permanently in a sidebar, which meant the suspects were competing with a
  * spreadsheet for the player's eye. As a drawer it does the same work without ever taking
@@ -120,7 +120,7 @@ EVERYTHING THEY'VE TOLD ME · {testimony.length}
 
                 return (
                   <li key={t.id} className="grid grid-cols-[auto_1fr_auto] items-start gap-3 py-2">
-                    <span className="pt-0.5 font-mono text-[10px] text-bone-dim/50">
+                    <span className="pt-0.5 font-mono text-[10px] text-bone-dim/75">
                       {String(t.id + 1).padStart(2, "0")}
                     </span>
                     <div className="min-w-0">
@@ -129,7 +129,7 @@ EVERYTHING THEY'VE TOLD ME · {testimony.length}
                           {suspects[t.witness].name}
                         </span>
                         <span
-                          className={`font-mono text-[8px] tracking-file ${kind === "control" ? "text-brass" : "text-bone-dim/50"}`}
+                          className={`font-mono text-[8px] tracking-file ${kind === "control" ? "text-brass" : "text-bone-dim/75"}`}
                         >
                           {kind === "control" ? "HONESTY TEST" : kind === "self" ? "ABOUT HIMSELF" : ""}
                         </span>

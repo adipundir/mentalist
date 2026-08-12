@@ -6,7 +6,7 @@ import { DecryptionAttestation } from "@inco/lightning/src/lightning-parts/Decry
 import { asBool } from "@inco/lightning/src/shared/TypeUtils.sol";
 
 /**
- * @title  Mentalist — a confidential deduction game
+ * @title  Mentalist: a confidential deduction game
  * @notice Nine suspects. One is the Tyger. Some of them lie, and the Tyger always does.
  *         You interrogate witnesses with yes/no questions about subsets of the lineup.
  *
@@ -16,7 +16,7 @@ import { asBool } from "@inco/lightning/src/shared/TypeUtils.sol";
  *
  *         The answer you receive is the truth about a secret you're hunting, corrupted by
  *         a *second* secret you also can't see. No transparent chain can run that, and
- *         commit-reveal cannot emulate it — proving the answer was computed honestly would
+ *         commit-reveal cannot emulate it, proving the answer was computed honestly would
  *         mean opening the honesty bit, which is the very thing the game is about.
  *
  * @dev    Inco is TEE-based confidential compute, NOT FHE and NOT zk. "Secret" means
@@ -71,11 +71,11 @@ contract Mentalist {
     /// @dev caseId => questionId => the answer, granted to the detective only.
     mapping(uint256 => mapping(uint16 => ebool)) internal _testimony;
 
-    /// @dev The handle settlement must attest over — the accused seat's guilt bit.
+    /// @dev The handle settlement must attest over, the accused seat's guilt bit.
     mapping(uint256 => bytes32) public verdictHandle;
 
     /// @dev The most recent case a detective opened. Used to force abandoned cases to
-    ///      resolve as losses — see `openCase`.
+    ///      resolve as losses, see `openCase`.
     mapping(address => uint256) public latestCaseOf;
 
     mapping(address => uint32) public streak;
@@ -108,8 +108,8 @@ contract Mentalist {
     /// @notice the Tyger got to the last witness you spoke to. Their honesty bit flipped.
     event WitnessTurned(uint256 indexed caseId, uint8 witness);
 
-    /// @param guiltHandles every seat's guilt bit, revealed — the case is over
-    /// @param liarHandles  every seat's honesty bit, revealed — the post-mortem
+    /// @param guiltHandles every seat's guilt bit, revealed, the case is over
+    /// @param liarHandles  every seat's honesty bit, revealed, the post-mortem
     event Accused(
         uint256 indexed caseId,
         address indexed detective,
@@ -154,7 +154,7 @@ contract Mentalist {
 
     /// @notice Total Inco fee to open a case of `suspects` seats.
     /// @dev Two encrypted lists (guilt, honesty), each created then shuffled: 4 list ops.
-    ///      Every other move in the game — getEbool, or, xor, not, allow — is fee-free,
+    ///      Every other move in the game, getEbool, or, xor, not, allow, is fee-free,
     ///      so interrogation is an ordinary cheap Base transaction.
     function quoteOpenFee(uint8 suspects) public pure returns (uint256) {
         return 4 * inco.getEListFee(uint16(suspects), ETypes.Bool);
@@ -163,8 +163,8 @@ contract Mentalist {
     // ─────────────────────────────────────────── the game
 
     /**
-     * @notice Deal a fresh case. The TEE places the Tyger and the liars; nobody — not the
-     *         player, not this contract's deployer, not an observer — learns the layout.
+     * @notice Deal a fresh case. The TEE places the Tyger and the liars; nobody, not the
+     *         player, not this contract's deployer, not an observer, learns the layout.
      */
     function openCase(
         uint8 suspects,
@@ -215,7 +215,7 @@ contract Mentalist {
             turned: false,
             solved: false,
             status: Status.Open,
-            // Recorded for display only — never compared against, so validator drift is
+            // Recorded for display only, never compared against, so validator drift is
             // not a concern here.
             // forge-lint: disable-next-line(block-timestamp,unsafe-typecast)
             openedAt: uint64(block.timestamp)
@@ -240,8 +240,8 @@ contract Mentalist {
      *      choice: the Inco Lightning v1.0.0 package's in-process Foundry mock (`IncoTest`)
      *      implements the scalar operations but **not** the elist ops, so a contract that
      *      shuffles cannot run under `forge test` at all. Overriding just the dealer lets
-     *      the fast suite exercise every rule of the game — the encrypted lie, the Focus
-     *      economy, access control, the turncoat, settlement — while this real dealing
+     *      the fast suite exercise every rule of the game, the encrypted lie, the Focus
+     *      economy, access control, the turncoat, settlement, while this real dealing
      *      path is covered against a live covalidator by the Hardhat integration test.
      */
     function _deal(uint256 caseId, uint8 suspects, uint8 liars) internal virtual {
@@ -260,7 +260,7 @@ contract Mentalist {
 
         for (uint8 i = 0; i < suspects; i++) {
             ebool g = e.getEbool(guiltList, uint16(i));
-            // the Tyger always lies. One encrypted OR welds guilt to dishonesty — which is
+            // the Tyger always lies. One encrypted OR welds guilt to dishonesty, which is
             // also why the realised liar count is `liars` or `liars + 1`, denying the
             // player an exact parity check on the liar population.
             ebool l = e.or(e.getEbool(liarList, uint16(i)), g);
@@ -282,7 +282,7 @@ contract Mentalist {
      *         a plaintext bitmask over seats.
      *
      * @dev    `mask` is deliberately public. *Which* suspects you asked about is
-     *         information an opponent and a spectator are entitled to see — that asymmetry
+     *         information an opponent and a spectator are entitled to see, that asymmetry
      *         (public question, private answer) is the game. Only the answer is granted.
      *
      *         Not payable: no operation in this function charges an Inco fee.
@@ -314,7 +314,7 @@ contract Mentalist {
         // and `liar` are handles, not booleans.
         ebool answer = e.xor(truth, _liar[caseId][witness]);
 
-        e.allow(answer, msg.sender); // selective reveal — the detective, and nobody else
+        e.allow(answer, msg.sender); // selective reveal, the detective, and nobody else
         e.allowThis(answer);
 
         uint16 qid = c.questionsAsked;
@@ -330,8 +330,7 @@ contract Mentalist {
         // ── the Tyger reacts.
         // On harder cases he reaches the witness you just used and turns them: their
         // honesty bit is negated *in place*. Encrypted state mutates, so intelligence you
-        // gathered three moves ago silently goes stale. A zk commitment cannot do this —
-        // the commitment is frozen — and a trusted server doing it would *be* the game.
+        // gathered three moves ago silently goes stale. A zk commitment cannot do this, // the commitment is frozen, and a trusted server doing it would *be* the game.
         if (c.turnAt != 0 && !c.turned && c.questionsAsked >= c.turnAt) {
             ebool flipped = e.not(_liar[caseId][witness]);
             _liar[caseId][witness] = flipped;
@@ -375,7 +374,7 @@ contract Mentalist {
      * @notice Close the case by submitting the covalidator attestation for your verdict.
      * @dev    Model A settlement: the *contract* decides whether you were right, because
      *         a streak (and, with the Megapot layer, tickets) rides on the answer. The
-     *         handle-match check is load-bearing — a signature alone only proves the TEE
+     *         handle-match check is load-bearing, a signature alone only proves the TEE
      *         decrypted *some* handle, so without it a player could settle on a different,
      *         conveniently-true bit.
      */
@@ -413,7 +412,7 @@ contract Mentalist {
     }
 
     /// @notice Handle for "is seat `i` the Tyger". Publishing the *handle* discloses
-    ///         nothing — decryption requires an access grant, and this one is granted to
+    ///         nothing, decryption requires an access grant, and this one is granted to
     ///         nobody until `accuse` reveals the board. The frontend needs it to paint the
     ///         post-mortem; tests need it to assert against ground truth.
     function guiltOf(uint256 caseId, uint8 seat) external view returns (ebool) {
@@ -429,7 +428,7 @@ contract Mentalist {
         return cases[caseId];
     }
 
-    /// @notice The full-lineup mask for a case — the control question.
+    /// @notice The full-lineup mask for a case, the control question.
     function controlMask(uint256 caseId) external view returns (uint16) {
         return _fullMask(cases[caseId].suspects);
     }

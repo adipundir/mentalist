@@ -17,7 +17,7 @@ export interface Line {
  * The dialogue bar.
  *
  * Visual-novel furniture: portrait on the left, nameplate, text that types itself. It sits
- * across the bottom of the scene so the room stays visible above it — the character you are
+ * across the bottom of the scene so the room stays visible above it, the character you are
  * talking to should still be on screen, reacting, while they speak.
  *
  * The YES/NO chip is deliberately separate from the prose. The line is performance; the chip
@@ -71,13 +71,13 @@ export function Dialogue({ line, onDone }: { line: Line | null; onDone?: () => v
                     line.tone === "jane"
                       ? "text-brass"
                       : line.tone === "narrator"
-                        ? "text-bone-dim/60"
+                        ? "text-bone-dim/75"
                         : "text-blood-hot",
                   ].join(" ")}
                 >
-                  {line.speaker ? line.speaker.name.toUpperCase() : "———"}
+                  {line.speaker ? line.speaker.name.toUpperCase() : ",, "}
                   {line.speaker?.role && (
-                    <span className="ml-2 text-bone-dim/50">{line.speaker.role}</span>
+                    <span className="ml-2 text-bone-dim/75">{line.speaker.role}</span>
                   )}
                 </span>
 

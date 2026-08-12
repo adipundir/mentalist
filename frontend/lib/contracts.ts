@@ -21,7 +21,7 @@ export const txUrl = (hash: string) => `${EXPLORER}/tx/${hash}`;
 export const addressUrl = (addr: string) => `${EXPLORER}/address/${addr}`;
 
 /**
- * Megapot V2 on Base Sepolia — verified live by RPC on 2026-08-11. Note that V1
+ * Megapot V2 on Base Sepolia, verified live by RPC on 2026-08-11. Note that V1
  * (`BaseJackpot`, `purchaseTickets`) is archived at v1.docs.megapot.io and is a different,
  * incompatible protocol; these are the current contracts.
  */

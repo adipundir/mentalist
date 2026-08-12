@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { CONTROL_COST, fullMask, maskSeats, popcount, type CaseConfig } from "@/lib/case";
+import { maskSeats, popcount, type CaseConfig } from "@/lib/case";
 import type { Suspect } from "@/lib/suspects";
 import type { Oracle } from "@/lib/oracle";
 import { Character, type CharacterSpec, type Expression } from "./Character";
@@ -17,8 +17,8 @@ import * as sfx from "@/lib/sound";
 /**
  * The game, played in a room.
  *
- * The whole screen is the scene. Everything else — the transcript, the deduction grid, the
- * question builder — is furniture that slides over it, so the suspects are never off screen
+ * The whole screen is the scene. Everything else, the transcript, the deduction grid, the
+ * question builder, is furniture that slides over it, so the suspects are never off screen
  * while you are talking to them.
  */
 export function Scene({
@@ -28,25 +28,29 @@ export function Scene({
   chapter,
   title,
   nudge,
-  chainStatus,
+  closesAt,
+  variant = 0,
   connect,
   onResolved,
 }: {
   config: CaseConfig;
-  /** Null until a wallet is connected — the room still paints, it just can't be played. */
+  /** Null until a wallet is connected, the room still paints, it just can't be played. */
   oracle: Oracle | null;
   suspects: Suspect[];
   chapter?: string;
   title: string;
   nudge?: { name: string; spec: CharacterSpec; line: string } | null;
-  /** Rendered into the room — the on-chain provenance strip. */
-  chainStatus?: React.ReactNode;
+  /** Unix ms this case stops accepting entries. Drives the clock in the middle of the HUD. */
+  closesAt?: number;
+  /** Which crime scene this case is set in. */
+  variant?: number;
   /** Shown in place of the controls when there is no wallet yet. */
   connect?: React.ReactNode;
-  onResolved?: (solved: boolean, focusLeft: number) => void;
+  onResolved?: (solved: boolean) => void;
 }) {
-  const g = useCase({ config, oracle, onResolved });
+  const g = useCase({ config, oracle, names: useMemo(() => suspects.map((s) => lastName(s.name)), [suspects]), onResolved });
   const [notebook, setNotebook] = useState(false);
+  const [chosen, setChosen] = useState<number | null>(null);
   const [line, setLine] = useState<Line | null>(null);
 
   // Open on the room, then a beat of narration so the player reads the space before the
@@ -57,14 +61,14 @@ export function Scene({
       text:
         `Every one of these ${g.n} knows exactly who did it. ` +
         `${config.liars === 1 ? "One of them will lie to protect him" : `${config.liars} of them will lie to protect him`}` +
-        ` — and so will he.`,
+        `, and so will he.`,
       tone: "narrator",
     });
     const id = setTimeout(() => setLine(null), 5200);
     return () => clearTimeout(id);
   }, [g.ready, config.liars, g.n]);
 
-  // A newly proven liar gets a plucked string — the "tell". Tracked so it fires once per
+  // A newly proven liar gets a plucked string, the "tell". Tracked so it fires once per
   // suspect rather than on every re-render that recomputes the same deduction.
   const flagged = useRef(new Set<number>());
   useEffect(() => {
@@ -130,64 +134,48 @@ export function Scene({
     [suspects, g.truth, g.deductions, g.saying, g.busy, g.witness, g.mask, g.turned],
   );
 
-  const control = fullMask(g.n);
+  // You may name anyone once you have picked them. If the evidence has already narrowed to
+  // a single man, he is offered by default so the obvious case does not need an extra click.
   const only = g.deductions.candidates.length === 1 ? g.deductions.candidates[0] : null;
-  const marked = popcount(g.mask) === 1 ? maskSeats(g.mask, g.n)[0] : null;
-  const nameable = only ?? marked;
+  const nameable = chosen ?? only;
 
   return (
-    <div className="relative mx-auto w-full max-w-[1400px]">
-      {/* ── the scene ── */}
-      <div className="relative">
+    <div className="fixed inset-0 overflow-hidden">
+      {/* ── the room is the page: one background, edge to edge ── */}
+      <div className="absolute inset-0">
         <Room
           subjects={subjects}
-          focused={g.witness}
-          onFocus={(seat) => (g.witness === null || g.witness === seat ? g.chooseWitness(seat) : g.askAbout(seat))}
-          onToggle={(seat) => (g.witness === null ? g.chooseWitness(seat) : g.askAbout(seat))}
-          disabled={g.over || g.busy || !g.ready}
+          focused={g.witness ?? chosen}
+          onFocus={(seat) => (g.allSpoken ? setChosen(seat) : g.interrogate(seat))}
+          onToggle={(seat) => (g.allSpoken ? setChosen(seat) : g.interrogate(seat))}
+          disabled={g.over || g.busy || !g.ready || !g.started}
+          variant={variant}
         />
 
-        {/* HUD: case, focus, possibility space */}
-        <div className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 p-3 sm:p-5">
+        {/* HUD: which case this is, and how long it stands. */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 px-4 pb-12 pt-14 sm:px-7 sm:pt-16"
+          style={{ background: "linear-gradient(rgb(6 5 7 / 0.92), rgb(6 5 7 / 0.55) 55%, transparent)" }}
+        >
           <div>
             {chapter && (
-              <p className="font-mono text-[9px] tracking-file text-blood-hot">{chapter}</p>
+              <p className="font-mono text-[10px] tracking-file text-blood-hot">{chapter}</p>
             )}
-            <h1 className="font-type text-[20px] leading-tight text-bone drop-shadow sm:text-[26px]">
+            <h1 className="font-type text-[22px] leading-tight text-bone drop-shadow sm:text-[28px]">
               {title}
             </h1>
           </div>
 
-          <div className="flex items-start gap-4">
-            <div className="text-right">
-              <p className="font-mono text-[9px] tracking-file text-bone-dim">QUESTIONS LEFT</p>
-              <div className="mt-1 flex justify-end gap-1">
-                {Array.from({ length: config.focus }, (_, i) => (
-                  <span
-                    key={i}
-                    className={[
-                      "h-4 w-[6px] border",
-                      i < g.focusLeft ? "border-blood-hot bg-blood-hot/80" : "border-ink-3",
-                    ].join(" ")}
-                  />
-                ))}
-              </div>
-            </div>
-            <div className="text-right">
-              <p className="font-mono text-[9px] tracking-file text-bone-dim">COULD STILL BE HIM</p>
-              <p
-                className={`font-type text-[24px] leading-none ${g.deductions.candidates.length === 1 ? "text-blood-hot" : "text-bone"}`}
-              >
-                {g.deductions.candidates.length}
-                <span className="text-[13px] text-bone-dim">/{g.n}</span>
-              </p>
-            </div>
+          {closesAt !== undefined && <Countdown closesAt={closesAt} />}
+
+          <div className="text-right">
+            <p className="font-mono text-[10px] tracking-file text-bone-dim">SPOKEN TO</p>
+            <p className="font-type text-[26px] leading-none text-bone">
+              {g.spoken.length}
+              <span className="text-[14px] text-bone-dim">/{g.n}</span>
+            </p>
           </div>
         </div>
-
-        {chainStatus && (
-          <div className="pointer-events-auto absolute left-3 top-16 sm:left-5 sm:top-20">{chainStatus}</div>
-        )}
 
         {/* the team, leaning in */}
         {nudge && !g.over && !line && (
@@ -195,16 +183,16 @@ export function Scene({
             initial={{ x: -20, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             transition={{ delay: 1.4 }}
-            className="pointer-events-none absolute bottom-4 left-4 flex max-w-[300px] items-end gap-2"
+            className="pointer-events-none absolute bottom-32 left-4 flex max-w-[300px] items-end gap-2 sm:left-7"
           >
-            <div className="w-14 shrink-0 border border-ink-3 bg-ink/80">
+            <div className="w-14 shrink-0 border border-ink-3 bg-ink">
               <Character spec={nudge.spec} expression="talking" className="h-16 w-full" />
             </div>
-            <div className="border border-ink-3 bg-ink/90 px-2 py-1.5">
-              <p className="font-mono text-[8px] tracking-file text-brass">
+            <div className="border border-ink-3 bg-ink px-2.5 py-2">
+              <p className="font-mono text-[9px] tracking-file text-brass">
                 {nudge.name.toUpperCase()}
               </p>
-              <p className="font-body text-[11px] leading-snug text-bone-dim">
+              <p className="font-body text-[12px] leading-snug text-bone">
                 &ldquo;{nudge.line}&rdquo;
               </p>
             </div>
@@ -215,13 +203,21 @@ export function Scene({
       </div>
 
       {/* ── one instruction, always telling you the next click ── */}
-      <div className="border-x-2 border-b-2 border-ink-3 bg-ink px-3 py-3 sm:px-5">
+      <div
+        className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-12 sm:px-7"
+        style={{ background: "linear-gradient(transparent, rgb(8 7 9 / 0.88) 45%)" }}
+      >
         {connect ? (
           <div className="flex flex-wrap items-center justify-center gap-4 py-1">{connect}</div>
         ) : (
         <div className="flex flex-wrap items-center gap-3">
           <div className="min-w-0 flex-1 font-body text-[15px] leading-snug text-bone">
-            {g.busy ? (
+            {!g.started ? (
+              <>
+                They&rsquo;re in the room and they&rsquo;re waiting.{" "}
+                <span className="text-blood-hot">Open the case when you&rsquo;re ready.</span>
+              </>
+            ) : g.busy ? (
               <Waiting phase={g.phase} />
             ) : g.witness === null ? (
               <>
@@ -230,7 +226,7 @@ export function Scene({
             ) : (
               <>
                 Asking <span className="font-type text-bone">{suspects[g.witness].name}</span>
-                {" — "}
+                {", "}
                 <span className="text-blood-hot">click who you want to ask about.</span>
                 <span className="ml-2 text-bone-dim">
                   (Click {lastName(suspects[g.witness].name)} again to ask about himself.)
@@ -240,21 +236,24 @@ export function Scene({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Act
-              onClick={g.askRoom}
-              disabled={g.over || g.busy || g.witness === null || g.focusLeft < CONTROL_COST}
-              tone="brass"
-            >
-              &ldquo;IS HE EVEN IN THIS ROOM?&rdquo; · 2
-            </Act>
-            <Act onClick={() => setNotebook(true)}>WHAT I KNOW</Act>
-            <Act
-              onClick={() => nameable !== null && void g.accuse(nameable)}
-              disabled={g.busy || !g.ready || nameable === null || g.over}
-              tone="blood"
-            >
-              {nameable !== null ? `ARREST ${lastName(suspects[nameable].name).toUpperCase()}` : "ARREST"}
-            </Act>
+            {!g.started ? (
+              <Act onClick={g.start} tone="blood">
+                OPEN THE CASE
+              </Act>
+            ) : (
+              <>
+                <Act onClick={() => setNotebook(true)}>WHAT I KNOW</Act>
+                <Act
+                  onClick={() => nameable !== null && void g.accuse(nameable)}
+                  disabled={g.busy || !g.ready || nameable === null || g.over}
+                  tone="blood"
+                >
+                  {nameable !== null
+                    ? `NAME ${lastName(suspects[nameable].name).toUpperCase()}`
+                    : "NAME HIM"}
+                </Act>
+              </>
+            )}
           </div>
         </div>
         )}
@@ -280,7 +279,7 @@ export function Scene({
   );
 }
 
-/** Surname only — the room is small and full names crowd every label. */
+/** Surname only, the room is small and full names crowd every label. */
 function lastName(name: string): string {
   const parts = name.split(" ");
   return parts[parts.length - 1] ?? name;
@@ -303,7 +302,7 @@ function Act({
       onClick={onClick}
       disabled={disabled}
       className={[
-        "cursor-pointer border px-3 py-2 font-mono text-[10px] tracking-file transition-colors disabled:cursor-not-allowed disabled:border-ink-3 disabled:text-bone-dim/30",
+        "cursor-pointer border px-3 py-2 font-mono text-[10px] tracking-file transition-colors disabled:cursor-not-allowed disabled:border-ink-3 disabled:text-bone-dim/75",
         tone === "blood"
           ? "border-blood-hot bg-blood-hot/15 text-blood-hot hover:bg-blood-hot/25"
           : tone === "brass"
@@ -316,3 +315,41 @@ function Act({
   );
 }
 
+
+/**
+ * How long this case stands.
+ *
+ * A case is open for a fixed window and then it settles, so the clock is the one piece of
+ * state that is always worth a glance. It sits in the middle of the screen because it
+ * belongs to the room rather than to any one suspect.
+ */
+function Countdown({ closesAt }: { closesAt: number }) {
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
+
+  const left = Math.max(0, closesAt - now);
+  const h = Math.floor(left / 3_600_000);
+  const m = Math.floor((left % 3_600_000) / 60_000);
+  const sec = Math.floor((left % 60_000) / 1000);
+  const pad = (x: number) => String(x).padStart(2, "0");
+  const urgent = left < 5 * 60_000;
+
+  return (
+    <div className="pointer-events-none text-center">
+      <p className="font-mono text-[10px] tracking-file text-bone-dim">
+        {left === 0 ? "CASE CLOSED" : "CLOSES IN"}
+      </p>
+      <p
+        className={`font-mono text-[30px] leading-none tabular-nums ${urgent ? "text-blood-hot" : "text-bone"}`}
+        style={{ textShadow: "0 2px 12px rgb(0 0 0 / 0.9)" }}
+      >
+        {h > 0 ? `${pad(h)}:` : ""}
+        {pad(m)}:{pad(sec)}
+      </p>
+    </div>
+  );
+}

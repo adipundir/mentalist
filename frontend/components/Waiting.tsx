@@ -12,7 +12,7 @@ import type { Phase } from "@/lib/case";
  * away, so it has to become part of the game rather than a stall in front of it.
  *
  * Two things make it work. First, the copy stays inside the fiction and *names the real
- * stage* — a player who knows the enclave is deciding is waiting on something, whereas a
+ * stage*, a player who knows the enclave is deciding is waiting on something, whereas a
  * player watching a spinner is waiting on nothing. Second, the beats are staged: the room
  * files the question, the witness takes their time, the answer comes back sealed. Ten
  * seconds of a suspect refusing to answer is the tensest thing in an interrogation; ten
@@ -28,7 +28,7 @@ const BEATS: Record<Exclude<Phase, "idle">, { line: string; note: string }[]> = 
   ],
   reading: [
     { line: "They're choosing their words", note: "the enclave is deciding" },
-    { line: "Nobody else will hear this", note: "decrypting — for you alone" },
+    { line: "Nobody else will hear this", note: "decrypting, for you alone" },
     { line: "Still choosing", note: "covalidator attesting" },
   ],
   revealing: [
@@ -61,7 +61,7 @@ export function Waiting({ phase }: { phase: Phase }) {
       exit={{ opacity: 0 }}
       className="flex items-center gap-3"
     >
-      {/* a pulse, not a spinner — a spinner says "loading", a pulse says "thinking" */}
+      {/* a pulse, not a spinner, a spinner says "loading", a pulse says "thinking" */}
       <span className="relative flex h-2 w-2 shrink-0">
         <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blood-hot opacity-70" />
         <span className="relative inline-flex h-2 w-2 rounded-full bg-blood-hot" />
@@ -69,7 +69,7 @@ export function Waiting({ phase }: { phase: Phase }) {
 
       <motion.span key={line} initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="min-w-0">
         <span className="font-body text-[14px] italic text-bone">{line}</span>
-        <span className="ml-2 font-mono text-[9px] tracking-file text-bone-dim/60">{note}</span>
+        <span className="ml-2 font-mono text-[9px] tracking-file text-bone-dim/75">{note}</span>
       </motion.span>
     </motion.div>
   );

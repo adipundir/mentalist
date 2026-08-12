@@ -1,32 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { CONTROL_COST, fullMask, type CaseConfig, type Phase, type Testimony } from "@/lib/case";
+import type { CaseConfig, Phase, Testimony } from "@/lib/case";
 import { deduce } from "@/lib/solver";
 import { atLeast, type Oracle } from "@/lib/oracle";
-import { replyLine } from "@/lib/script";
+import { statement } from "@/lib/script";
 import * as sfx from "@/lib/sound";
 import { narrate, unlockNarrator } from "@/lib/narrator";
 
 /**
  * All of the game's rules and state, independent of how it is drawn.
  *
- * Extracted so the room scene and any other presentation share one implementation —
- * two copies of "what does a control question cost" is exactly how a game ends up with a
+ * Extracted so the room scene and any other presentation share one implementation, * two copies of "what does a control question cost" is exactly how a game ends up with a
  * UI that disagrees with itself.
  */
 export function useCase({
   config,
   oracle,
+  names,
   onResolved,
 }: {
   config: CaseConfig;
   oracle: Oracle | null;
-  onResolved?: (solved: boolean, focusLeft: number) => void;
+  /** Suspect surnames, in seat order, so a statement can name who it is about. */
+  names: string[];
+  onResolved?: (solved: boolean) => void;
 }) {
   const n = config.suspects;
 
-  const [focusLeft, setFocusLeft] = useState(config.focus);
   const [testimony, setTestimony] = useState<Testimony[]>([]);
   const [turned, setTurned] = useState<number[]>([]);
   const [witness, setWitness] = useState<number | null>(null);
@@ -42,8 +43,19 @@ export function useCase({
 
   const drone = useRef<sfx.Drone | null>(null);
 
+  // Dealing a case is a real transaction, so it waits for the player to actually commit.
+  // Connecting a wallet is not consent to spend from it: an earlier version opened the case
+  // the instant the oracle existed, which put a signature prompt in front of anyone who
+  // merely connected to look around.
+  const [started, setStarted] = useState(false);
+  const [spoken, setSpoken] = useState<number[]>([]);
+
+  const start = useCallback(() => {
+    if (oracle) setStarted(true);
+  }, [oracle]);
+
   useEffect(() => {
-    if (!oracle) return;
+    if (!oracle || !started) return;
     let cancelled = false;
     setReady(false);
     oracle
@@ -53,7 +65,7 @@ export function useCase({
     return () => {
       cancelled = true;
     };
-  }, [oracle, config]);
+  }, [oracle, config, started]);
 
   const deductions = useMemo(
     () => deduce(n, config.liars, testimony, turned),
@@ -61,54 +73,30 @@ export function useCase({
   );
 
   const over = outcome !== "playing";
-  const canAsk = !!oracle && !over && !busy && ready && witness !== null;
-
-  const chooseWitness = useCallback(
-    (seat: number) => {
-      if (over || busy) return;
-      unlockNarrator();
-      sfx.startRoomTone();
-      setWitness((w) => {
-        const next = w === seat ? null : seat;
-        if (next !== null) {
-          sfx.knock(0.9 + (seat % 3) * 0.08);
-          sfx.whoosh(); // rides under the camera push-in
-        }
-        return next;
-      });
-    },
-    [over, busy],
-  );
 
   /**
-   * Ask the chosen witness about one person, and fire immediately.
+   * Question one suspect. That is the whole interaction.
    *
-   * The old flow was: pick a witness, double-click others to assemble a bitmask, then press
-   * a third button. That is a query builder, not an interrogation — nobody would guess it,
-   * and it buried a mechanic that is genuinely one sentence long. Now it is two clicks:
-   * who you are asking, and who you are asking about.
+   * Each of them has exactly one thing to say and they always say it about the same people,
+   * so there is nothing to assemble and nothing to spend. You walk up, they talk, and what
+   * you do with it is your problem. Everyone gets asked once.
    */
-  const askAbout = useCallback(
-    (target: number) => {
-      if (!oracle || over || busy || witness === null || focusLeft < 1) return;
-      void fire(1 << target);
+  const interrogate = useCallback(
+    (seat: number) => {
+      if (!oracle || over || busy || !started || spoken.includes(seat)) return;
+      unlockNarrator();
+      sfx.startRoomTone();
+      sfx.knock(0.9 + (seat % 3) * 0.08);
+      sfx.whoosh(); // rides under the camera push-in
+      setWitness(seat);
+      void fire(seat, config.claims[seat]);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [over, busy, witness, focusLeft],
+    [oracle, over, busy, started, spoken, config.claims],
   );
 
-  /** "Is he even in this room?" — always true, so the answer is purely whether they lie. */
-  const askRoom = useCallback(
-    () => {
-      if (!oracle || over || busy || witness === null || focusLeft < CONTROL_COST) return;
-      void fire(fullMask(n));
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [over, busy, witness, focusLeft, n],
-  );
-
-  async function fire(m: number) {
-    if (!oracle || witness === null) return;
+  async function fire(seat: number, m: number) {
+    if (!oracle) return;
     setMask(m);
     setBusy(true);
     setError(null);
@@ -117,26 +105,23 @@ export function useCase({
     drone.current = sfx.drone();
 
     try {
-      const result = await atLeast(oracle.ask(witness, m, setPhase), 900);
+      const result = await atLeast(oracle.ask(seat, m, setPhase), 900);
       drone.current?.resolve();
       drone.current = null;
 
       const turn = testimony.length;
-      setTestimony((t) => [...t, { id: t.length, witness, mask: m, cost: result.cost, answer: result.answer }]);
-      setFocusLeft((f) => f - result.cost);
-      if (result.turnedWitness !== null) {
-        setTurned((t) => [...t, result.turnedWitness!]);
-        sfx.scratch();
-      }
+      setTestimony((t) => [...t, { id: t.length, witness: seat, mask: m, cost: result.cost, answer: result.answer }]);
+      setSpoken((v) => [...v, seat]);
 
       // The stab is the loud moment; it fires on the answer, never on navigation.
       if (result.answer) sfx.stabYes();
       else sfx.stabNo();
 
-      const line = replyLine(result.answer, witness, turn);
-      setSaying({ seat: witness, line, answer: result.answer });
+      const about = names.filter((_, i) => ((m >> i) & 1) === 1);
+      const line = statement(result.answer, about, seat, turn);
+      setSaying({ seat, line, answer: result.answer });
       void narrate(line, { rate: 0.95, pitch: result.answer ? 1.0 : 0.92 });
-      setMask(0);
+      setWitness(null);
     } catch (e) {
       drone.current?.stop();
       drone.current = null;
@@ -170,7 +155,7 @@ export function useCase({
         sfx.stingMissed();
       }
       setTimeout(() => sfx.stamp(), 260);
-      if (onResolved) setTimeout(() => onResolved(correct, focusLeft), 3000);
+      if (onResolved) setTimeout(() => onResolved(correct), 3000);
     } catch (e) {
       drone.current?.stop();
       drone.current = null;
@@ -184,7 +169,6 @@ export function useCase({
 
   return {
     n,
-    focusLeft,
     testimony,
     turned,
     witness,
@@ -199,10 +183,11 @@ export function useCase({
     saying,
     error,
     deductions,
-    canAsk,
-    chooseWitness,
-    askAbout,
-    askRoom,
+    started,
+    start,
+    spoken,
+    allSpoken: spoken.length === n,
+    interrogate,
     accuse,
     dismissSaying: () => setSaying(null),
   };
@@ -210,7 +195,7 @@ export function useCase({
 
 /**
  * Judges hit error paths constantly on hackathon builds. Being the one team whose failure
- * states stay in fiction is disproportionately memorable — and it never hides what happened.
+ * states stay in fiction is disproportionately memorable, and it never hides what happened.
  */
 export function inCharacter(e: unknown): string {
   const msg = String((e as Error)?.message ?? e);

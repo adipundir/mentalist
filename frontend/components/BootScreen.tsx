@@ -9,7 +9,7 @@ import * as sfx from "@/lib/sound";
  * The boot sequence.
  *
  * It is not a fake progress bar. Each step does real work that has to happen before the
- * first scene anyway — waking the audio context, waiting for the browser's speech voices
+ * first scene anyway, waking the audio context, waiting for the browser's speech voices
  * (which populate asynchronously and would otherwise make the first narrated line silent),
  * and letting the webfonts settle so the opening card doesn't reflow mid-sentence.
  *

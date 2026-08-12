@@ -1,49 +1,61 @@
 /**
  * What the suspects say.
  *
- * The spoken line is flavour; the YES/NO badge under it is the actual bit. That split is
- * deliberate — a player should never have to parse prose to know what they were told, but
- * a bare "NO" from a cartoon face is a spreadsheet, not an interrogation.
+ * Each of them has one statement in them, and it is always about the same people. What the
+ * enclave decides is whether that statement comes out as an accusation or a denial, because
+ * it passes through the speaker's hidden honesty bit on the way. So the words are theirs and
+ * the direction is not.
  *
- * Lines are picked deterministically from (seat, question index) rather than at random, so
- * a suspect keeps a consistent voice across a case instead of code-switching every turn.
+ * The spoken line is flavour; the badge under it is the actual bit. A player should never
+ * have to parse prose to know what they were told, but a bare "NO" from a cartoon face is a
+ * spreadsheet, not an interrogation.
+ *
+ * Lines are picked deterministically from (seat, turn) rather than at random, so a suspect
+ * keeps a consistent voice instead of code-switching every time you look at them.
  */
 
-const YES = [
-  "Yes. One of them. I'd stake my badge on it.",
-  "Yes — and you knew that before you asked me.",
-  "Yes. Look at that little group and tell me you're surprised.",
-  "Yeah. He's standing right there in your crowd.",
-  "Yes. I'd say so. I'd very definitely say so.",
-  "Yes. Now ask me something that actually costs you.",
-  "Yes, Mr. Jane. Warm. You're getting warm.",
-  "Yes. Somewhere in that huddle, that's your man.",
-  "Yes. And I hope it ruins your sleep the way it ruins mine.",
-  "Yes — that's where I'd look, if I were the looking kind.",
-  "Yes. You can stop pacing now.",
-  "Yes. Write it down. You'll want it later.",
+/** Accusations. `{n}` is the name or names the speaker is talking about. */
+const ACCUSE_ONE = [
+  "It was {n}. I'd stake my badge on it.",
+  "{n}. That's your man, and I think you already knew.",
+  "It was {n}. I saw enough that night to be certain.",
+  "{n} did it. I've been waiting a long time for someone to ask me.",
+  "Your man is {n}. I'd swear to that in any room you like.",
+  "It was {n}. And I hope it ruins your sleep the way it ruins mine.",
 ];
 
-const NO = [
-  "No. Not one of them. Try again.",
-  "No. You're burning daylight on those men.",
-  "No — you're not close, and it's painful to watch.",
-  "No. Clean, all of them. Whatever that's worth to you.",
-  "No. Wrong pond, wrong fish.",
-  "No. And that one's free. The next one isn't.",
-  "No. He is not in that little group of yours.",
-  "No. I'd have felt it. I'd have known.",
-  "No, Mr. Jane. Not there. Keep digging.",
-  "No. You're circling something else entirely.",
-  "No. Not among that lot, and you know it.",
-  "No. Ask better questions.",
+const ACCUSE_MANY = [
+  "It was one of them. {n}. I'd stake my badge on it.",
+  "{n}. Look at those two and tell me you're surprised.",
+  "One of them did it. {n}. Ask me again and I'll say it again.",
+  "It's {n}. Somewhere in there, that's your man.",
+  "{n}. That's where I'd look, if I were the looking kind.",
+  "One of them. {n}. You can stop pacing now.",
+];
+
+const CLEAR_ONE = [
+  "Not {n}. I'd have known.",
+  "{n}? No. Clean, whatever that's worth to you.",
+  "It wasn't {n}. You're burning daylight.",
+  "Not {n}. Wrong pond, wrong fish.",
+  "{n} had nothing to do with it. Look somewhere else.",
+  "It wasn't {n}, and it's painful watching you try.",
+];
+
+const CLEAR_MANY = [
+  "Not {n}. Neither of them. Try again.",
+  "{n}? No. You're burning daylight on those men.",
+  "It wasn't {n}. Clean, all of them, whatever that's worth.",
+  "Not {n}. He is not in that little group of yours.",
+  "{n}, no. I'd have felt it. I'd have known.",
+  "It wasn't {n}. You're circling something else entirely.",
 ];
 
 const CAUGHT = [
   "His mouth's still going. His hands already confessed.",
   "That answer cost him a swallow. He's lying to you.",
   "Flip everything he's told you. All of it.",
-  "There it is — the half-beat before the word. He lies.",
+  "There it is, the half-beat before the word. He lies.",
   "He blinked on the wrong syllable. Nothing he says is worth its weight.",
   "Caught. Invert his answers and move along.",
   "A liar. Not even a good one. That's almost insulting.",
@@ -74,13 +86,28 @@ export const JANEISMS = [
   "Tea first. Then the terrible part.",
 ];
 
-/** Deterministic pick — same seat, same turn, same line. */
+/** Deterministic pick, same seat, same turn, same line. */
 function pick(bank: string[], seat: number, turn: number): string {
   return bank[(seat * 7 + turn * 3) % bank.length];
 }
 
-export function replyLine(answer: boolean, seat: number, turn: number): string {
-  return pick(answer ? YES : NO, seat, turn);
+/** "Wagner", "Wagner or Ardiles", "Wagner, Ardiles or Mashburn". */
+function nameList(names: string[]): string {
+  if (names.length <= 1) return names[0] ?? "nobody";
+  return `${names.slice(0, -1).join(", ")} or ${names[names.length - 1]}`;
+}
+
+/**
+ * One suspect's statement about the people they were always going to talk about.
+ *
+ * `answer` is the bit that came back from the enclave: true means they are putting the
+ * killer inside that group, false means they are clearing it. Whether that is the truth
+ * depends entirely on them.
+ */
+export function statement(answer: boolean, about: string[], seat: number, turn: number): string {
+  const many = about.length > 1;
+  const bank = answer ? (many ? ACCUSE_MANY : ACCUSE_ONE) : many ? CLEAR_MANY : CLEAR_ONE;
+  return pick(bank, seat, turn).replace("{n}", nameList(about));
 }
 
 export function caughtLine(seat: number, turn: number): string {

@@ -3,13 +3,14 @@
 import { useMemo } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Character, type Expression } from "./Character";
+import { CrimeScene } from "./CrimeScene";
 import type { Suspect } from "@/lib/suspects";
 
 /**
  * THE ROOM.
  *
  * The scene the game is actually set in, rather than a grid of cards that represents one.
- * Everything here is drawn with SVG and CSS — no canvas, no WebGL, no assets — because the
+ * Everything here is drawn with SVG and CSS, no canvas, no WebGL, no assets, because the
  * whole app has to stay something a judge can open instantly on a cold browser.
  *
  * Three things do the heavy lifting:
@@ -21,7 +22,7 @@ import type { Suspect } from "@/lib/suspects";
  *      there is exactly one source, every shadow agrees with it, which is most of what
  *      makes a flat scene look lit.
  *   3. **A camera.** Focusing a suspect translates and scales the whole scene toward them
- *      while the rest fall into shadow — the push-in is what turns a lineup into an
+ *      while the rest fall into shadow, the push-in is what turns a lineup into an
  *      interrogation.
  */
 
@@ -33,14 +34,14 @@ export interface RoomSubject {
   honest: boolean;
   inQuestion: boolean;
   turned: boolean;
-  /** What they're saying right now — rendered as a bubble over their head. */
+  /** What they're saying right now, rendered as a bubble over their head. */
   saying?: { line: string; answer: boolean } | null;
 }
 
 /**
  * Where each figure stands.
  *
- * Positioned by the **feet**, not the head — they are standing on a floor, and anchoring by
+ * Positioned by the **feet**, not the head, they are standing on a floor, and anchoring by
  * the baseline is the only way the contact shadows land where the light says they should.
  * The lineup bows: the middle of the room is further from camera, so those figures sit
  * higher on screen and smaller, which is what sells the depth.
@@ -50,11 +51,13 @@ function placement(i: number, n: number) {
   const bow = Math.sin(t * Math.PI); // 0 at the ends, 1 in the middle
 
   return {
-    x: 10 + t * 80,
-    /** Percent up from the bottom of the scene — further back stands higher. */
-    bottom: 17 + bow * 10,
-    scale: 1 - bow * 0.26,
-    /** Painter's algorithm — nearer figures draw over further ones. */
+    // Held well inside the frame: at full bleed the old 10..90 spread ran the end figures
+    // off both edges, and a lineup with its outermost men cropped reads as a bug.
+    x: 19 + t * 62,
+    /** Percent up from the bottom of the scene, further back stands higher. */
+    bottom: 26 + bow * 8,
+    scale: 1 - bow * 0.24,
+    /** Painter's algorithm, nearer figures draw over further ones. */
     z: Math.round((1 - bow) * 100),
   };
 }
@@ -62,12 +65,12 @@ function placement(i: number, n: number) {
 /**
  * Figure width as a share of the scene.
  *
- * Capped at 11 rather than scaling freely: a four-person lineup was rendering figures so
- * large that the camera push-in cropped their legs, which is worse than a slightly empty
- * room. Ten still fit without a scrum.
+ * Deliberately small. These men are standing at the back of a room you are looking into,
+ * not posing for a lineup photograph, and the crime scene in the foreground needs the space
+ * more than they do. Capped so a four-man case does not balloon.
  */
 function baseWidth(n: number) {
-  return Math.max(6.5, Math.min(11, 80 / n));
+  return Math.max(4.6, Math.min(7.4, 58 / n));
 }
 
 export function Room({
@@ -76,6 +79,7 @@ export function Room({
   onFocus,
   onToggle,
   disabled,
+  variant = 0,
 }: {
   subjects: RoomSubject[];
   /** Seat the camera is pushed in on, or null for the wide shot. */
@@ -83,12 +87,14 @@ export function Room({
   onFocus: (seat: number) => void;
   onToggle: (seat: number) => void;
   disabled: boolean;
+  /** Which crime scene to lay out. One per case. */
+  variant?: number;
 }) {
   const n = subjects.length;
   const spots = useMemo(() => subjects.map((_, i) => placement(i, n)), [subjects, n]);
   const w = baseWidth(n);
 
-  // Camera: push toward the focused figure. Kept gentle — a hard zoom loses the room, and
+  // Camera: push toward the focused figure. Kept gentle, a hard zoom loses the room, and
   // in a small lineup the figures are already large, so the push scales down with the count.
   const target = focused !== null ? spots[focused] : null;
   const zoom = n <= 5 ? 1.1 : n <= 7 ? 1.18 : 1.24;
@@ -105,7 +111,7 @@ export function Room({
     : { x: "0%", y: "0%", scale: 1 };
 
   return (
-    <div className="relative w-full overflow-hidden bg-[#0d0c0e]" style={{ aspectRatio: "16 / 9" }}>
+    <div className="relative h-full w-full overflow-hidden bg-[#0d0c0e]">
       <motion.div
         className="absolute inset-0"
         animate={camera}
@@ -130,12 +136,24 @@ export function Room({
           />
           {/* the one-way mirror */}
           <div
-            className="absolute right-[6%] top-[18%] h-[46%] w-[26%] border-2 border-[#2c2731]"
+            className="absolute right-[8%] top-[22%] h-[38%] w-[21%]"
             style={{
-              background: "linear-gradient(150deg, #1d222b 0%, #14171d 60%, #10131a 100%)",
-              boxShadow: "inset 0 0 40px rgb(0 0 0 / 0.8)",
+              background:
+                "linear-gradient(148deg, rgb(88 96 118 / 0.26) 0%, rgb(24 27 34 / 0.5) 42%, rgb(14 17 23 / 0.62) 100%)",
+              border: "3px solid rgb(58 52 64 / 0.9)",
+              boxShadow:
+                "inset 0 0 50px rgb(0 0 0 / 0.7), inset 0 2px 0 rgb(150 142 164 / 0.10), 0 0 22px rgb(0 0 0 / 0.4)",
             }}
-          />
+          >
+            {/* the sheen across the glass */}
+            <div
+              className="absolute inset-0"
+              style={{
+                background:
+                  "linear-gradient(118deg, transparent 34%, rgb(196 204 226 / 0.07) 44%, transparent 52%)",
+              }}
+            />
+          </div>
         </div>
 
         {/* ── floor ── */}
@@ -166,7 +184,7 @@ export function Room({
 
         {/* ── the practical: one hanging lamp ── */}
         <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2">
-          <div className="mx-auto h-[9vh] w-[2px] bg-[#3a343f]" />
+          <div className="mx-auto h-[8%] w-[2px] bg-[#3a343f]" />
           <div
             className="mx-auto h-5 w-16"
             style={{
@@ -180,7 +198,7 @@ export function Room({
 
         {/* light cone */}
         <div
-          className="pointer-events-none absolute left-1/2 top-[11vh] -translate-x-1/2"
+          className="pointer-events-none absolute left-1/2 top-[10%] -translate-x-1/2"
           style={{
             width: "68%",
             height: "78%",
@@ -191,6 +209,8 @@ export function Room({
             filter: "blur(6px)",
           }}
         />
+
+        <CrimeScene variant={variant} suspects={n} />
 
         {/* pool of light on the floor */}
         <div
@@ -245,7 +265,7 @@ export function Room({
                 className="h-auto w-full drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]"
               />
 
-              {/* speech bubble — the line comes out of the person, not just the caption bar */}
+              {/* speech bubble, the line comes out of the person, not just the caption bar */}
               <AnimatePresence>
                 {s.saying && (
                   <motion.div
@@ -286,7 +306,7 @@ export function Room({
                 )}
               </AnimatePresence>
 
-              {/* nameplate — only for the figure under the light */}
+              {/* nameplate, only for the figure under the light */}
               <motion.div
                 animate={{ opacity: isFocus ? 1 : 0, y: isFocus ? 0 : 6 }}
                 transition={{ duration: 0.2 }}
@@ -324,7 +344,7 @@ export function Room({
           );
         })}
 
-        {/* dust in the beam — cheap, and it makes the light feel like it's in the air */}
+        {/* dust in the beam, cheap, and it makes the light feel like it's in the air */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           {Array.from({ length: 16 }, (_, i) => (
             <span

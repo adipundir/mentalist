@@ -6,7 +6,7 @@ dotenv.config(); // Load environment variables
 
 const PRIVATE_KEY = process.env.PRIVATE_KEY_BASE_SEPOLIA || "";
 const PRIVATE_KEY_ANVIL = process.env.PRIVATE_KEY_ANVIL || "";
-// No fallback to the Sepolia key — mainnet must use its own key, otherwise the `base`
+// No fallback to the Sepolia key, mainnet must use its own key, otherwise the `base`
 // network has no signer and Hardhat fails clearly (prevents accidental mainnet deploys).
 const PRIVATE_KEY_BASE = process.env.PRIVATE_KEY_BASE || "";
 

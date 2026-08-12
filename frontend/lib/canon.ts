@@ -1,7 +1,7 @@
 /**
  * The canonical cast of the Red John arc, drawn to the character system.
  *
- * Each is designed to be unmistakable at 48px — the silhouette (hair shape) and the palette
+ * Each is designed to be unmistakable at 48px, the silhouette (hair shape) and the palette
  * do the work, because in a lineup of seven the player identifies people by colour and
  * outline long before they read a name.
  *
@@ -75,7 +75,7 @@ export const CAST: Record<string, CanonPerson> = {
     "Raymond Haffner",
     "Private investigator",
     "Visualize member since adolescence. Ran Jane's unit for six weeks. Competent, humourless, resents being outthought publicly.",
-    "Squares his shoulders in every doorway and clocks the exits — then flinches from a cobweb like a much smaller man.",
+    "Squares his shoulders in every doorway and clocks the exits, then flinches from a cobweb like a much smaller man.",
     { skin: "#e8b083", hairColor: "#c9a05c", hair: "crew", face: "square", nose: "broad",
       facialHair: "none", accessory: "none", suit: "#5c6b3f", shirt: "#2b2b2b", tie: "#3f4a2c", tilt: -2 },
   ),

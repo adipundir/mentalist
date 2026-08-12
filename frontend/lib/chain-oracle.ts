@@ -1,13 +1,13 @@
 "use client";
 
 /**
- * The on-chain oracle: the same `Oracle` interface the demo implements, backed by real
+ * The on-chain oracle: the `Oracle` interface the whole game runs on, backed by real
  * encrypted state.
  *
  * The two Inco read paths are used exactly where they belong:
  *
  *   - **Loop B, private decrypt** for testimony. `interrogate` grants the answer to the
- *     detective with `e.allow`, so it is read with `attestedDecrypt` — which needs the
+ *     detective with `e.allow`, so it is read with `attestedDecrypt`: which needs the
  *     wallet to sign, because the handle is private. Nobody else can read it, not even by
  *     watching the chain.
  *   - **Loop A, public reveal** for the verdict. `accuse` calls `e.reveal` on the whole
@@ -27,7 +27,7 @@ export const BACKOFF = { maxRetries: 12, baseDelayInMs: 350, backoffFactor: 1.4 
 
 /**
  * The SDK's backoff retries "ciphertext not found", but treats PermissionDenied
- * ("acl disallowed") as terminal — and that one is not actually terminal here.
+ * ("acl disallowed") as terminal, and that one is not actually terminal here.
  *
  * Measured on Base Sepolia: for a second or two after `interrogate` lands, the covalidator
  * can see the answer handle before it has indexed the `e.allow` that came with it. The
@@ -57,7 +57,7 @@ let zapPromise: Promise<Zap> | null = null;
 
 /**
  * Cold-init costs hundreds of milliseconds, so warm it on mount rather than on the first
- * question — otherwise the very first reveal in a session is the slowest one.
+ * question, otherwise the very first reveal in a session is the slowest one.
  */
 export function getZap(): Promise<Zap> {
   if (!zapPromise) zapPromise = Lightning.baseSepoliaTestnet();
@@ -78,9 +78,8 @@ function asBool(plaintext: unknown): boolean {
 }
 
 /**
- * The on-chain oracle exposes two actions the demo has no equivalent for: Model A
- * settlement, and converting the result into Megapot tickets. Both are part of the loop —
- * a case that is never settled never advances a streak, and a streak that never advances
+ * The on-chain oracle exposes two actions that exist only against a chain: Model A
+ * settlement, and converting the result into Megapot tickets. Both are part of the loop, * a case that is never settled never advances a streak, and a streak that never advances
  * never earns a ticket.
  */
 export interface ChainOracle extends Oracle {
@@ -107,7 +106,7 @@ export function chainOracle(opts: {
    * The verdict attestation, captured during `accuse`.
    *
    * `accuse` already pays for a public reveal of the whole board, and the verdict bit is
-   * one of the handles that comes back — so settlement costs no extra covalidator
+   * one of the handles that comes back, so settlement costs no extra covalidator
    * round-trip. The value is re-encoded to the canonical padded bytes32 the covalidator
    * signed over; inventing it would fail `isValidDecryptionAttestation`.
    */
@@ -116,8 +115,7 @@ export function chainOracle(opts: {
   /**
    * sepolia.base.org is load-balanced: a receipt confirmed by one node does not mean the
    * next eth_call reaches a node that has the block. viem also simulates before every
-   * write. So after any state transition, wait until the new state is actually readable —
-   * otherwise the next call either reverts against stale state or reads a stale answer.
+   * write. So after any state transition, wait until the new state is actually readable, * otherwise the next call either reverts against stale state or reads a stale answer.
    */
   async function waitForStatus(target: number) {
     const id = caseId;
@@ -176,7 +174,7 @@ export function chainOracle(opts: {
         "opened the case",
       );
 
-      // Read the id out of the event rather than guessing it from nextCaseId — another
+      // Read the id out of the event rather than guessing it from nextCaseId, another
       // player could have opened a case between our read and our write.
       for (const log of receipt.logs) {
         try {
@@ -230,7 +228,7 @@ export function chainOracle(opts: {
       }
       if (!answerHandle) throw new Error("no answer handle in the receipt");
 
-      // Private decrypt — the handle was granted to this wallet and nobody else.
+      // Private decrypt, the handle was granted to this wallet and nobody else.
       onPhase?.("reading");
       const zap = await getZap();
       const [result] = await withPatience(() =>
@@ -263,7 +261,7 @@ export function chainOracle(opts: {
         }
       }
 
-      // Public reveal — no wallet signature, and one round-trip for the whole board rather
+      // Public reveal, no wallet signature, and one round-trip for the whole board rather
       // than 2N sequential ones.
       onPhase?.("revealing");
       const zap = await getZap();

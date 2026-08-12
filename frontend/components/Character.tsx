@@ -5,7 +5,7 @@ import { useEffect, useRef, useState } from "react";
 /**
  * Retro cartoon characters, drawn as parameterised SVG.
  *
- * Style target is 1960s limited animation — UPA / early Hanna-Barbera: bold flat fills,
+ * Style target is 1960s limited animation. UPA / early Hanna-Barbera: bold flat fills,
  * one heavy warm-black outline, no gradients, exaggerated silhouettes that stay readable
  * at 48px. Everything is drawn rather than loaded, so there are no image assets to license
  * and a suspect can change expression per frame without a spritesheet.
@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 export type Expression =
   | "neutral"
   | "talking"
-  | "shifty" // eyes slide away — the tell
+  | "shifty" // eyes slide away, the tell
   | "nervous" // sweat, raised brows
   | "smug"
   | "shocked"
@@ -44,7 +44,7 @@ export interface CharacterSpec {
   suit: string;
   shirt: string;
   tie: string;
-  /** Slight head tilt, in degrees — stops a lineup looking like clones. */
+  /** Slight head tilt, in degrees, stops a lineup looking like clones. */
   tilt: number;
 }
 
@@ -240,7 +240,7 @@ function AccessoryPart({ style, suit }: { style: Accessory; suit: string }) {
 /**
  * The standing figure, from the collar down.
  *
- * This owns the *entire* body — shoulders, torso, shirt, tie, arms, legs. The
+ * This owns the *entire* body, shoulders, torso, shirt, tie, arms, legs. The
  * head-and-shoulders drawing has its own collar for the portrait crop, and rendering both
  * produced a cape over a second torso with two ties and hands floating at chest height. In
  * full-body mode that collar is skipped and everything below the neck comes from here, so
@@ -249,7 +249,7 @@ function AccessoryPart({ style, suit }: { style: Accessory; suit: string }) {
  * Proportions are deliberately cartoon: the head is about a quarter of total height, which
  * is wrong anatomically and right for 1960s limited animation.
  *
- * Posture carries as much as the face at full height — a nervous suspect draws his arms in,
+ * Posture carries as much as the face at full height, a nervous suspect draws his arms in,
  * a smug one plants his feet.
  */
 function Body({ spec, expression }: { spec: CharacterSpec; expression: Expression }) {
@@ -283,7 +283,7 @@ function Body({ spec, expression }: { spec: CharacterSpec; expression: Expressio
       <path d="M44 92 L50 126 L56 92 L56 152 L44 152 Z" fill={spec.shirt} stroke={INK} strokeWidth="2.2" />
       <path d="M50 100 L54.5 114 L50 148 L45.5 114 Z" fill={spec.tie} stroke={INK} strokeWidth="2" />
 
-      {/* the jacket is TWO lapel panels meeting at the button, not one slab — a single
+      {/* the jacket is TWO lapel panels meeting at the button, not one slab, a single
           closed shape buried the shirt and tie entirely */}
       <path
         d="M27 106 Q28 98 35 95 Q42 92 45 94 L50 124 L50 176 L33 176 Z"
@@ -312,7 +312,7 @@ function Body({ spec, expression }: { spec: CharacterSpec; expression: Expressio
 export function Character({
   spec,
   expression = "neutral",
-  /** Dim and desaturate — used for suspects the notebook has ruled out. */
+  /** Dim and desaturate, used for suspects the notebook has ruled out. */
   cleared = false,
   /** Draw the whole figure, standing, for the room scene. */
   fullBody = false,
@@ -328,7 +328,7 @@ export function Character({
   const [talkFrame, setTalkFrame] = useState(0);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Idle blinking. Irregular on purpose — a metronome blink reads as a machine.
+  // Idle blinking. Irregular on purpose, a metronome blink reads as a machine.
   useEffect(() => {
     if (cleared) return;
     let alive = true;
@@ -390,7 +390,7 @@ export function Character({
           </>
         )}
 
-        {/* neck — drawn after the body so the jaw sits in front of the collar */}
+        {/* neck, drawn after the body so the jaw sits in front of the collar */}
         <path d="M42 82 L42 99 Q50 104 58 99 L58 82 Z" fill={spec.skin} stroke={INK} strokeWidth="2.5" />
 
         {/* ears */}
@@ -446,7 +446,7 @@ export function Character({
         <FacialHairPart style={spec.facialHair} color={spec.hairColor} />
         <AccessoryPart style={spec.accessory} suit={spec.suit} />
 
-        {/* sweat — the classic cartoon tell, and it only ever appears when it means something */}
+        {/* sweat, the classic cartoon tell, and it only ever appears when it means something */}
         {(expression === "nervous" || expression === "caught") && (
           <g className="sweat">
             <path d="M76 40 q4 6 0 9 q-4 -3 0 -9 Z" fill="#8fd0e8" stroke={INK} strokeWidth="1.6" />

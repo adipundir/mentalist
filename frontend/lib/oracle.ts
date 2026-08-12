@@ -3,7 +3,7 @@
  *
  * One implementation: `chainOracle` in `lib/chain-oracle.ts`, which sends each move to
  * `Mentalist.sol` on Base and reads the answer back through Inco's attested decryption
- * (Loop B — the answer is granted to the detective and never publicly revealed).
+ * (Loop B, the answer is granted to the detective and never publicly revealed).
  *
  * The interface stays separate from that implementation so the scene never has to know how
  * a question is answered. There is deliberately no local fallback: a simulated case would
@@ -47,12 +47,9 @@ export interface Oracle {
 // An earlier draft of this file guessed the decrypt at 420 ms p50 / 1.6 s p95. That was
 // wrong by roughly 5×, and the animation budget was built on it.
 //
-// The demo deliberately does NOT reproduce those numbers. Making a practice file take
-// eleven seconds per question would lose a judge before the mechanic ever lands, and the
-// demo is honestly labelled as a browser-dealt practice file rather than a simulation of
-// chain timing. What the two modes *do* share is the choreography: named phases, a floored
-// beat, and a drone that resolves on the answer — so the on-chain wait reads as
-// deliberation at 11 s exactly as it does at 1 s.
+// The interrogation choreography is built around the real number rather than against it:
+// named phases, a floored beat, and a drone that resolves on the answer, so eleven seconds
+// of waiting on the covalidator reads as deliberation instead of as lag.
 
 /** What a move actually costs on-chain, measured warm. Kept so the numbers aren't folklore. */
 export const MEASURED_CHAIN_LATENCY = {
@@ -66,7 +63,7 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /**
  * Floor a beat so it never flashes. Sub-150ms state changes read as a bug; the same
  * verdict staged over a beat reads as adjudicated. Sometimes the fast path should be
- * slower — rhythm beats raw speed for perceived quality.
+ * slower, rhythm beats raw speed for perceived quality.
  */
 export async function atLeast<T>(p: Promise<T>, ms: number): Promise<T> {
   const [value] = await Promise.all([p, wait(ms)]);

@@ -11,7 +11,7 @@ import { MentalistHarness } from "./MentalistHarness.sol";
  * @dev These tests exist to answer the question the whole design lives or dies on:
  *      *is the encrypted lie actually lying, and is the game actually solvable?*
  *
- *      IncoTest mocks the entire Inco stack in-process — no Docker, no covalidator — so
+ *      IncoTest mocks the entire Inco stack in-process, no Docker, no covalidator, so
  *      this is the fast loop. `get(handle)` is the mock's plaintext oracle; production
  *      code can never do this, which is exactly the point.
  */
@@ -26,7 +26,7 @@ contract MentalistTest is IncoTest {
         game = new MentalistHarness();
         vm.deal(detective, 100 ether);
         vm.deal(stranger, 10 ether);
-        // Inco fees are drawn from the *contract's* balance, not msg.value — msg.value
+        // Inco fees are drawn from the *contract's* balance, not msg.value, msg.value
         // only tops it up. Pre-funding here is the sponsored-fee model the deployed game
         // uses, so players never think about Inco fees at all.
         vm.deal(address(game), 100 ether);
@@ -167,7 +167,7 @@ contract MentalistTest is IncoTest {
         (uint8 killer, ) = _layout(id, n);
 
         for (uint8 w = 0; w < n; w++) {
-            // "Are YOU the killer?" — a yes is only producible by an innocent who lies.
+            // "Are YOU the killer?", a yes is only producible by an innocent who lies.
             if (_ask(id, w, uint16(1) << w)) {
                 assertTrue(w != killer, "the Tyger never confesses");
             }
@@ -177,8 +177,8 @@ contract MentalistTest is IncoTest {
     // ── solvability: the load-bearing design claim ─────────────
 
     /// @notice The load-bearing balance claim: 6 Focus is *always enough* to solve a
-    ///         9-suspect case with correct play — control question (2) plus at most four
-    ///         binary splits (4) — and most layouts resolve in fewer, leaving a surplus.
+    ///         9-suspect case with correct play, control question (2) plus at most four
+    ///         binary splits (4): and most layouts resolve in fewer, leaving a surplus.
     ///         That surplus is not slack; it is what converts to Megapot tickets, so the
     ///         reward for playing well is denominated in lottery entries.
     ///
@@ -192,7 +192,7 @@ contract MentalistTest is IncoTest {
             uint256 id = _open(n, 3, 6, 0);
             (uint8 killer, ) = _layout(id, n);
 
-            // 1. Control question — costs 2, tells us whether to invert this witness.
+            // 1. Control question, costs 2, tells us whether to invert this witness.
             bool witnessIsHonest = _ask(id, 0, _full(n));
 
             // 2. Binary splits until one suspect remains. A *known liar* is as good as an
@@ -286,7 +286,7 @@ contract MentalistTest is IncoTest {
         this.attestOrRevert(stranger, answer);
     }
 
-    /// @notice Mid-case, the layout is decryptable by *nobody* — not the player, not the
+    /// @notice Mid-case, the layout is decryptable by *nobody*, not the player, not the
     ///         contract's deployer. Only `accuse` opens it.
     function test_LayoutIsDecryptableByNobodyUntilAccusation() public {
         uint256 id = _open(9, 3, 6, 0);
@@ -302,7 +302,7 @@ contract MentalistTest is IncoTest {
         game.accuse(id, 0);
         processAllOperations();
 
-        this.attestOrRevert(detective, seat0); // now public — the case is over
+        this.attestOrRevert(detective, seat0); // now public, the case is over
     }
 
     function test_OnlyTheDetectiveCanPlay() public {
@@ -379,7 +379,7 @@ contract MentalistTest is IncoTest {
     }
 
     /// @notice The handle-match check is what stops a player settling on a conveniently
-    ///         true bit. The signature below is perfectly valid — it is just for the
+    ///         true bit. The signature below is perfectly valid, it is just for the
     ///         *wrong handle*.
     function test_SettlementRejectsAValidAttestationForTheWrongHandle() public {
         uint8 n = 9;
@@ -483,7 +483,7 @@ contract MentalistTest is IncoTest {
         game.openCase{ value: 0 }(9, 3, 6, 0);
     }
 
-    /// @notice Interrogation charges no Inco fee — none of getEbool/or/xor/allow do — so
+    /// @notice Interrogation charges no Inco fee, none of getEbool/or/xor/allow do, so
     ///         the moment-to-moment loop is an ordinary cheap Base transaction.
     function test_InterrogationIsFeeFree() public {
         uint256 id = _open(9, 3, 6, 0);

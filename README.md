@@ -1,6 +1,6 @@
 # MENTALIST
 
-**Nine suspects. One of them is the Tyger. Some of them lie — and the Tyger always does.**
+**Nine suspects. One of them is the Tyger. Some of them lie, and the Tyger always does.**
 
 A confidential deduction game built on [Inco Lightning](https://docs.inco.org) and
 [Megapot](https://docs.megapot.io) for the Inco × Megapot Summer Game Jam, 2026.
@@ -18,12 +18,11 @@ You interrogate witnesses with yes/no questions about who's in the room. The ans
 back is the truth about a secret you're hunting, **corrupted by a second secret you also
 can't see**. The chain sees *what you asked*. Only you see *what you were told*.
 
-That is not privacy for its own sake — it is the entire strategic surface. Reveal the
+That is not privacy for its own sake, it is the entire strategic surface. Reveal the
 honesty bit and there is no game left.
 
 **Why no other approach does this.** Existing confidential games hide a *value*: a card, a
-board, a role, a bid. This hides a **transformation**. Commit-reveal cannot emulate it —
-proving the answer was computed honestly would mean opening the honesty bit, which is
+board, a role, a bid. This hides a **transformation**. Commit-reveal cannot emulate it, proving the answer was computed honestly would mean opening the honesty bit, which is
 precisely the information the game is about. A trusted server could do it, but then the
 server *is* the game.
 
@@ -34,23 +33,22 @@ server *is* the game.
 `BEGIN` → boot → **THE LIST**, a seven-chapter campaign following the real Red John arc,
 with the lineup shrinking the way the suspect list does: 2,164 → 408 → 30 → **7** → 6 → 5 → 1.
 
-Before chapter one you choose how the campaign runs. **Both modes are the main loop** — the
+Before chapter one you choose how the campaign runs. **Both modes are the main loop**: the
 rules, the dealer and the scene are identical, and only the oracle differs:
 
 | | |
 |---|---|
-| **Play it for real** — Base Sepolia | Each chapter opens a real case. Red John is placed inside Inco's enclave, every answer is decrypted for you *and nobody else*, the contract settles the verdict against a covalidator attestation, and surplus Focus buys real Megapot tickets. ≈10s a question. |
-| **Play it now** — offline | The identical game dealt in your browser. Instant, no wallet, nothing on chain and no tickets. |
+| **Play it for real**: Base Sepolia | Each chapter opens a real case. Red John is placed inside Inco's enclave, every answer is decrypted for you *and nobody else*, the contract settles the verdict against a covalidator attestation, and surplus Focus buys real Megapot tickets. ≈10s a question. |
+| **Play it now**: offline | The identical game dealt in your browser. Instant, no wallet, nothing on chain and no tickets. |
 
-That split exists because of a measured number, not a guess — see
+That split exists because of a measured number, not a guess, see
 [measured latency](#measured-on-chain-latency). A campaign that demanded a funded wallet
 would be unplayable for anyone who just wants to see it; a campaign that quietly ran offline
 while the "real" game hid on another route would not put the integration in the main loop.
 
 The no-wallet demo is not a mock-up. It runs the same rules, the same dealer distribution
 and the same `answer = truth XOR liar[witness]` computation as the contract, so the
-deduction you learn there transfers exactly. It is deliberately *faster* than the chain —
-see [measured latency](#measured-on-chain-latency) — because an eleven-second wait per
+deduction you learn there transfers exactly. It is deliberately *faster* than the chain, see [measured latency](#measured-on-chain-latency): because an eleven-second wait per
 question would lose a first-time player before the mechanic ever lands.
 
 ---
@@ -59,15 +57,15 @@ question would lose a first-time player before the mechanic ever lands.
 
 You have **Focus**. Every question spends some. There are three worth knowing:
 
-**The control question** — ask about *everyone*, costs 2.
+**The control question**: ask about *everyone*, costs 2.
 The Tyger is always somewhere in the full lineup, so the answer is *purely* whether this
-witness lies. A perfect, 100%-reliable honesty test — and literally the interrogator's
+witness lies. A perfect, 100%-reliable honesty test, and literally the interrogator's
 trick it's named after: ask a question you already know the answer to.
 
-**The split** — mark about half the board, costs 1.
+**The split**: mark about half the board, costs 1.
 Worth a full bit of information, but only once you know whether to believe the witness.
 
-**The self-incrimination** — "are *you* the Tyger?", costs 1.
+**The self-incrimination**: "are *you* the Tyger?", costs 1.
 
 | Witness is… | truth | lies | answer |
 |---|---|---|---|
@@ -75,10 +73,10 @@ Worth a full bit of information, but only once you know whether to believe the w
 | innocent + liar | false | yes | **YES** |
 | the Tyger | true | yes (always) | **NO** |
 
-A **yes is proof of an innocent liar** — it exposes them and clears them at once.
+A **yes is proof of an innocent liar**: it exposes them and clears them at once.
 
 **The elegant part:** once a control question proves a witness lies, they become a *perfect
-oracle* — just read them backwards. A control question is never wasted. The real decision is
+oracle*, just read them backwards. A control question is never wasted. The real decision is
 whether you can afford 2 Focus to be certain, or gamble 1 that you're already right.
 
 ---
@@ -87,12 +85,12 @@ whether you can afford 2 Focus to be certain, or gamble 1 that you're already ri
 
 ```
 contracts/
-  contracts/Mentalist.sol      the game — encrypted deal, the xor lie, attested settlement
-  contracts/CaseRewards.sol    Megapot layer — surplus Focus buys real lottery tickets
+  contracts/Mentalist.sol      the game, encrypted deal, the xor lie, attested settlement
+  contracts/CaseRewards.sol    Megapot layer, surplus Focus buys real lottery tickets
   test-forge/                  25 Foundry tests, no Docker required
 frontend/
   lib/case.ts                  domain model, shared by both play modes
-  lib/solver.ts                the Notebook — enumerates every layout still consistent
+  lib/solver.ts                the Notebook, enumerates every layout still consistent
   lib/oracle.ts                the seam: localOracle (demo) and the Oracle interface
   lib/chain-oracle.ts          the same interface, backed by Base + Inco
   components/CaseBoard.tsx     the board
@@ -111,7 +109,7 @@ lookalike, and it means the game is playable by a judge with ninety seconds and 
 
 ```bash
 pnpm install          # see the note below if this fails
-pnpm dev              # http://localhost:3000 — the demo needs nothing else
+pnpm dev              # http://localhost:3000, the demo needs nothing else
 ```
 
 > **`pnpm install` and SSH.** The Inco scaffold pins three git dependencies. If you don't
@@ -162,7 +160,7 @@ case #2 opened in 2618ms  (fee 140625000000 wei, gas 1314742)
 control question: witness 0 -> NO   -> witness 0 is A LIAR (read them inverted)
 binary splits:    9 -> 4 -> 2 -> 1
 seat 1  THE TYGER  lied
-CASE CLOSED — the deduction was correct.
+CASE CLOSED, the deduction was correct.
   PASS  exactly one Tyger
   PASS  the Tyger lies
   PASS  liar count is LIARS or LIARS+1
@@ -213,13 +211,13 @@ Measured with `pnpm --filter contracts play:onchain` and `measure-latency.ts`, w
 
 The decrypt dominates and is irreducible from the client side, so the game is built around
 it rather than pretending otherwise: the question is staged as a sequence of beats that name
-the real stage the wait is in ("they're choosing their words — the enclave is deciding"), the
+the real stage the wait is in ("they're choosing their words, the enclave is deciding"), the
 suspect performs through it, and a drone beats a minor second until the answer resolves it to
 unison. Ten seconds of a suspect refusing to answer is the tensest thing in an interrogation.
 Ten seconds of a progress bar is a bug report.
 
 The decrypt dominates by a wide margin, and an earlier draft of the frontend had guessed it
-at ~1.6 s — wrong by roughly 5×, with the animation budget built on top of that guess. The
+at ~1.6 s, wrong by roughly 5×, with the animation budget built on top of that guess. The
 demo deliberately runs faster than the chain and says so; what carries between the two modes
 is the deduction and the choreography, not the wall clock.
 
@@ -231,14 +229,14 @@ Two races only a live run surfaces, both now handled:
   committed. The oracle now waits for the case to read back as open.
 - **"acl disallowed" is not terminal.** For a second or two after `interrogate` lands, the
   covalidator can see the answer handle before it has indexed the `e.allow` that came with
-  it — `inco.isAllowed(handle, detective)` returns `true` on-chain while the enclave still
+  it, `inco.isAllowed(handle, detective)` returns `true` on-chain while the enclave still
   refuses. The SDK treats `PermissionDenied` as fatal, so an outer retry wraps it.
 
 ## Two bugs the tests caught
 
 **The design doc was wrong about the Focus economy.** It claimed the standard line costs
 *exactly* 6 Focus. Playing the strategy to completion across twelve fresh deals showed the
-worst case is 6 and the typical case is 5. Corrected — and the surplus turned out to be the
+worst case is 6 and the typical case is 5. Corrected, and the surplus turned out to be the
 better design, because it's what converts to Megapot tickets.
 
 **Streaks were unenforceable.** Settlement is player-initiated, so a detective who accused
@@ -260,12 +258,12 @@ repository history and description").
 as incremental commits in this repository's history.
 
 What is *not* ours, and is used as a building block under §4.1 ("You may use open-source
-libraries, frameworks, public SDKs, and third-party APIs — including Inco and Megapot
+libraries, frameworks, public SDKs, and third-party APIs, including Inco and Megapot
 tooling"):
 
 | | |
 |---|---|
-| Project skeleton | `create-inco-app` (Inco's official scaffold) — Hardhat + Next.js + RainbowKit wiring. Its two example contracts (`ConfidentialERC20`, `ConfidentialLottery`) were **deleted**; see commit `0ce43c5`. |
+| Project skeleton | `create-inco-app` (Inco's official scaffold): Hardhat + Next.js + RainbowKit wiring. Its two example contracts (`ConfidentialERC20`, `ConfidentialLottery`) were **deleted**; see commit `0ce43c5`. |
 | Confidential compute | `@inco/lightning` and `@inco/lightning-js` v1.0.0 |
 | Lottery protocol | Megapot's deployed `Jackpot` and `JackpotRandomTicketBuyer` contracts on Base |
 | Everything else | Next.js, React, wagmi, viem, Tailwind, framer-motion, Foundry, OpenZeppelin |
@@ -274,14 +272,14 @@ The very first commit (`0d502db`) is the untouched scaffold, so the diff from th
 to `HEAD` is exactly the work done during the jam.
 
 **No art or audio assets are used at all.** Suspect portraits are drawn as inline SVG from a
-seeded PRNG, and every sound is synthesised at runtime with the Web Audio API — so there is
+seeded PRNG, and every sound is synthesised at runtime with the Web Audio API, so there is
 nothing in this repository whose licensing needs checking.
 
 ---
 
 ## Honest framing
 
-Inco is **TEE-based confidential compute — not FHE, and not zk.** "Secret" means the value
+Inco is **TEE-based confidential compute, not FHE, and not zk.** "Secret" means the value
 is decrypted inside an Intel TDX enclave. "Provably fair" means a covalidator attestation,
 not a zero-knowledge proof.
 
@@ -290,7 +288,7 @@ the Tyger is, because placement happens inside the enclave and no plaintext ever
 chain. But it rests on a hardware trust assumption, and that is worth saying plainly rather
 than overselling.
 
-The antagonist is **the Tyger**, from Blake's 1794 poem — public domain. The game's
+The antagonist is **the Tyger**, from Blake's 1794 poem, public domain. The game's
 inspiration is CBS-owned, so every suspect here is generated and no character names are
 borrowed. *"What immortal hand or eye / Could frame thy fearful symmetry?"* turns out to
 describe matching a hidden profile rather well.

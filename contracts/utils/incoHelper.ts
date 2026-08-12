@@ -14,11 +14,11 @@ export async function getConfig() {
   console.log(`Initializing Inco config for chain: ${chainId}`);
 
   if (chainId === 31337) {
-    // Local Anvil node — `mainnet` pepper (executor 0x4b9911… = the canonical Lib.sol),
+    // Local Anvil node, `mainnet` pepper (executor 0x4b9911… = the canonical Lib.sol),
     // matching the local-node-*-mainnet docker images.
     zap = await Lightning.localNode('mainnet');
   } else if (chainId === 84532) {
-    // Base Sepolia — v1 network factory (no pepper/chainId needed).
+    // Base Sepolia, v1 network factory (no pepper/chainId needed).
     // Pass our own RPC URL when configured; otherwise the SDK falls back to viem's public endpoint.
     const rpcUrl = process.env.BASE_SEPOLIA_RPC_URL;
     zap = await Lightning.baseSepoliaTestnet(
@@ -56,7 +56,7 @@ export async function encryptValue({
 
 // Re-encrypt and decrypt a handle for a specific wallet.
 // The covalidator processes operations asynchronously, so a freshly-produced handle may not be
-// ready the instant we read it — especially on Base Sepolia where processing is slower and under
+// ready the instant we read it, especially on Base Sepolia where processing is slower and under
 // shared load. The SDK's built-in backoff retries the transient "ciphertext not processed yet"
 // error until the handle is ready (~2.5 min max).
 export async function decryptValue({

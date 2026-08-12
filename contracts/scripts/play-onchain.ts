@@ -4,7 +4,7 @@
  * Opens a real case, asks the control question, reads the answer back through Inco's
  * attested decryption, plays binary splits to a single suspect, accuses, and verifies the
  * revealed board. If this passes, the whole confidential loop works against a live
- * covalidator — not a mock.
+ * covalidator, not a mock.
  *
  *   pnpm --filter contracts play:onchain
  */
@@ -72,7 +72,7 @@ const N = 9, LIARS = 3, FOCUS = 6;
 /**
  * The SDK's own backoff retries "ciphertext not found", but treats PermissionDenied
  * ("acl disallowed") as terminal. Right after `interrogate` lands, the covalidator can
- * briefly see the handle before it has indexed the `allow` that came with it — the grant
+ * briefly see the handle before it has indexed the `allow` that came with it, the grant
  * is on-chain (isAllowed returns true) but the enclave hasn't caught up. That is a
  * read-your-own-write race, not a real authorisation failure, so it needs an outer retry.
  */
@@ -205,7 +205,7 @@ async function main() {
   const settleReceipt = await send("settle", [caseId, attestation, signatures]);
   console.log(`  settled (gas ${settleReceipt.gasUsed})`);
 
-  // Same propagation wait as after openCase — otherwise this asserts against stale state.
+  // Same propagation wait as after openCase, otherwise this asserts against stale state.
   let caseAfter: any;
   for (let i = 0; i < 30; i++) {
     caseAfter = await publicClient.readContract({ address: GAME, abi: ABI, functionName: "getCase", args: [caseId] });
@@ -216,7 +216,7 @@ async function main() {
   console.log(`  case status ${caseAfter.status} (3 = Closed), solved=${caseAfter.solved}, streak=${streak}, focus left ${caseAfter.focusLeft}`);
 
   const ok = killer === seat;
-  console.log(`\n${ok ? "CASE CLOSED — the deduction was correct." : "MISS — named " + (seat + 1) + ", it was " + (killer + 1)}`);
+  console.log(`\n${ok ? "CASE CLOSED, the deduction was correct." : "MISS, named " + (seat + 1) + ", it was " + (killer + 1)}`);
 
   // Invariants the whole design rests on.
   const guiltCount = guilt.filter(Boolean).length;

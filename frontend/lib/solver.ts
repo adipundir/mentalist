@@ -6,7 +6,7 @@
  * on *which question to ask next*, never on bookkeeping they could do with a pen. Obra Dinn
  * keeps your book for you and is a better game for it.
  *
- * It is also strictly honest — it derives only from information the player legitimately
+ * It is also strictly honest, it derives only from information the player legitimately
  * holds (the case parameters, which are stated up front, and their own answers). It never
  * reads hidden state.
  *
@@ -31,7 +31,7 @@ export interface Deductions {
   killerOdds: number[];
   /** seat → 'liar' | 'honest' | 'unknown', proven across every surviving world. */
   honesty: ("liar" | "honest" | "unknown")[];
-  /** True when the testimony admits no layout at all — only reachable if a witness was turned. */
+  /** True when the testimony admits no layout at all, only reachable if a witness was turned. */
   contradiction: boolean;
 }
 
@@ -60,7 +60,7 @@ export function enumerateWorlds(suspects: number, liars: number): World[] {
   return worlds;
 }
 
-/** answer = (killer ∈ mask) XOR liar[witness] — the contract's `e.xor`, in the clear. */
+/** answer = (killer ∈ mask) XOR liar[witness], the contract's `e.xor`, in the clear. */
 export function predictAnswer(world: World, witness: number, mask: number): boolean {
   const truth = inMask(mask, world.killer);
   const lies = ((world.liarMask >> witness) & 1) === 1;
@@ -74,7 +74,7 @@ export function deduce(
   /**
    * Seats whose honesty flipped mid-case. Testimony given *before* a witness was turned
    * still constrains their pre-flip state, so a turned witness's constraints are dropped
-   * rather than inverted — we cannot know which side of the flip a given answer sits on
+   * rather than inverted, we cannot know which side of the flip a given answer sits on
    * without tracking order, so we take the sound-but-weaker route.
    */
   turned: number[] = [],
@@ -115,7 +115,7 @@ export function deduce(
 }
 
 /**
- * How much a question is worth right now, in bits, against the current world set — the
+ * How much a question is worth right now, in bits, against the current world set, the
  * expected reduction in entropy over *who Red John is*.
  *
  * This is what the hint system spends: it lets the UI show a player why a control question

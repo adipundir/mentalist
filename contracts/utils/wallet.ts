@@ -1,4 +1,4 @@
-import { createWalletClient, createPublicClient, http , type Address} from "viem";
+import { createWalletClient, createPublicClient, http, type Address} from "viem";
 import { privateKeyToAccount, mnemonicToAccount, generatePrivateKey } from "viem/accounts";
 import { baseSepolia, anvil } from "viem/chains";
 import * as dotenv from "dotenv";
@@ -6,7 +6,7 @@ import { HexString } from "@inco/lightning-js";
 
 dotenv.config();
 
-// Well-known default anvil private key and mnemonic (account #0) — safe for local dev only
+// Well-known default anvil private key and mnemonic (account #0): safe for local dev only
 const DEFAULT_ANVIL_PRIVATE_KEY = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
 const DEFAULT_ANVIL_MNEMONIC = "test test test test test test test test test test test junk";
 
@@ -59,7 +59,7 @@ export const wallet = createWalletClient({
 // Named wallets.
 // For local Anvil we derive from a mnemonic (deterministic addresses are convenient when
 // re-running tests against a persistent local node). For testnet we generate FRESH random
-// private keys each test run — the well-known anvil mnemonic addresses are MEV-drained on
+// private keys each test run, the well-known anvil mnemonic addresses are MEV-drained on
 // public testnets within seconds, so any shared/deterministic seed is unusable there.
 function createNamedWallet(path: string) {
   const account = USE_ANVIL

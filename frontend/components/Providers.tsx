@@ -12,7 +12,7 @@ const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 
 /**
  * WalletConnect adds mobile/QR wallets but needs a project id. Without one we fall back to
- * injected connectors, which is enough to play — so a missing id degrades the wallet list
+ * injected connectors, which is enough to play, so a missing id degrades the wallet list
  * rather than breaking the page.
  */
 const config = projectId
@@ -30,8 +30,8 @@ const config = projectId
 
 /**
  * RainbowKit ships a light-on-white button that reads as a different product bolted onto
- * the case file. Its theme is overridden to the game's palette — charcoal, bone, one blood
- * red — so the wallet modal belongs to the same world as everything around it.
+ * the case file. Its theme is overridden to the game's palette, charcoal, bone, one blood
+ * red, so the wallet modal belongs to the same world as everything around it.
  */
 const noir = darkTheme({
   accentColor: "#c1272d",

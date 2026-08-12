@@ -3,7 +3,7 @@
  *
  * All three marks are the official assets: Inco's own wordmark keeps its blue, Base ships a
  * white lockup in its brand kit, and Megapot's is near-black for light backgrounds so it
- * uses a bone variant — glyphs recoloured only, luminance mask untouched, which is the
+ * uses a bone variant, glyphs recoloured only, luminance mask untouched, which is the
  * standard monochrome treatment on a dark ground.
  */
 const MARKS = [
@@ -32,7 +32,7 @@ export function PoweredBy({
       }
     >
       <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-        <span className="font-mono text-[9px] tracking-file text-bone-dim/45">POWERED BY</span>
+        <span className="font-mono text-[9px] tracking-file text-bone-dim/75">POWERED BY</span>
         {MARKS.map((m) => (
           <a
             key={m.alt}

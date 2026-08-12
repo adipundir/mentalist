@@ -3,14 +3,14 @@
 /**
  * The narrator.
  *
- * Uses the browser's built-in Web Speech API — no API key, no model download, no network
- * call, and it works offline. For a game whose story cards are short noir paragraphs, a
+ * Uses the browser's built-in Web Speech API, no API key, no model download, no network
+ * call, and it needs no network round-trip. For a game whose story cards are short noir paragraphs, a
  * voice that is *present* matters more than one that is flawless, and shipping zero bytes
  * to get it is the right trade for a jam build.
  *
- * (The upgrade path, if we ever want it, is a real neural TTS in WASM — Piper or Kokoro via
+ * (The upgrade path, if we ever want it, is a real neural TTS in WASM, Piper or Kokoro via
  * transformers.js. Better voice, but a 20–60MB first load, which would undo the "playable
- * in ninety seconds with no wallet" property the demo is built around.)
+ * to first case" property the game is built around.)
  *
  * Two browser facts this has to work around:
  *   1. `getVoices()` is empty until the async `voiceschanged` event fires.
@@ -33,7 +33,7 @@ export interface NarratorOptions {
  * for a neural voice first and only fall back to the classic ones.
  */
 const PREFERRED = [
-  // macOS neural — genuinely good, and free on any recent Mac.
+  // macOS neural, genuinely good, and free on any recent Mac.
   "Daniel (Premium)",
   "Daniel (Enhanced)",
   "Oliver (Premium)",
@@ -49,7 +49,7 @@ const PREFERRED = [
   // Chrome's bundled voices.
   "Google UK English Male",
   "Google US English",
-  // Legacy fallbacks — serviceable, not great.
+  // Legacy fallbacks, serviceable, not great.
   "Daniel",
   "Alex",
 ];
@@ -70,7 +70,7 @@ export function narratorAvailable(): boolean {
   return synth() !== null;
 }
 
-/** Resolve once the voice list is populated — it is empty on first paint in Chrome. */
+/** Resolve once the voice list is populated, it is empty on first paint in Chrome. */
 export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   const s = synth();
   if (!s) return Promise.resolve([]);
@@ -96,7 +96,7 @@ export async function pickVoice(): Promise<SpeechSynthesisVoice | null> {
     if (hit) return (cached = hit);
   }
 
-  // Nothing from the list — take any English neural voice before any English legacy one.
+  // Nothing from the list, take any English neural voice before any English legacy one.
   const english = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
   const neural = english.find((v) =>
     NEURAL_HINTS.some((h) => v.name.toLowerCase().includes(h)),
@@ -148,12 +148,12 @@ export async function narrate(text: string, opts: NarratorOptions = {}): Promise
 
   // Speak sentence by sentence rather than as one block.
   //
-  // A single long utterance comes out metronomic — the engine holds one pitch and pace for
+  // A single long utterance comes out metronomic, the engine holds one pitch and pace for
   // the whole paragraph. Chunking lets each sentence start fresh, adds a real breath
   // between them, and lets us vary pitch and rate a hair per sentence, which is most of
   // the difference between "reading" and "reciting".
   const sentences = text
-    .split(/(?<=[.!?—])\s+/)
+    .split(/(?<=[.!?, ])\s+/)
     .map((x) => x.trim())
     .filter(Boolean);
 
@@ -215,7 +215,7 @@ function speakOne(text: string, opts: NarratorOptions): Promise<void> {
 function stripForSpeech(text: string): string {
   return text
     .replace(/[“”"']/g, "")
-    .replace(/—/g, ", ")
+    .replace(/, /g, ", ")
     .replace(/\.\.\./g, ",")
     .replace(/(\d+)\/(\d+)/g, "$1 of $2")
     .replace(/\s+/g, " ")

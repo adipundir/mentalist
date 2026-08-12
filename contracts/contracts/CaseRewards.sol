@@ -38,7 +38,7 @@ interface IJackpot {
 }
 
 /**
- * @title  CaseRewards — solve the case, earn the long shot
+ * @title  CaseRewards: solve the case, earn the long shot
  *
  * @notice The Megapot half of MENTALIST, and the reason the Focus economy has teeth.
  *
@@ -50,7 +50,7 @@ interface IJackpot {
  *         Three properties make this a core-loop integration rather than a link-out:
  *
  *         1. **The game funds the tickets.** Megapot's gifting flow lets a payer buy for
- *            an arbitrary recipient — "tickets are never free, you fund every gift". This
+ *            an arbitrary recipient, "tickets are never free, you fund every gift". This
  *            contract is the payer and the player is the recipient, so a player who has
  *            never held USDC still walks away holding a genuine lottery ticket NFT.
  *
@@ -60,8 +60,7 @@ interface IJackpot {
  *            inside the Jackpot and are swept back into this treasury, which is what funds
  *            the next round of rewards. The loop closes.
  *
- *         3. **The reward is earned, not granted.** Ticket count is a function of skill —
- *            surplus Focus plus a streak bonus — not of spend.
+ *         3. **The reward is earned, not granted.** Ticket count is a function of skill, *            surplus Focus plus a streak bonus, not of spend.
  *
  * @dev    Deliberately decoupled from `Mentalist`: the game contract knows nothing about
  *         lotteries and stays independently deployable on its own for the Inco track.
@@ -75,7 +74,7 @@ contract CaseRewards is Ownable, ReentrancyGuard {
     uint256 public constant MAX_TICKETS_PER_CASE = 10;
 
     /// @dev Referral splits are 1e18-scaled and must sum to exactly 1e18. The `Bps` in the
-    ///      parameter name is a misnomer in Megapot's own ABI — basis points would be 10_000
+    ///      parameter name is a misnomer in Megapot's own ABI, basis points would be 10_000
     ///      and the call would silently mis-split. This is the single easiest thing to get
     ///      wrong in a Megapot integration.
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
@@ -91,7 +90,7 @@ contract CaseRewards is Ownable, ReentrancyGuard {
     IJackpot public immutable jackpot;
     IERC20 public immutable usdc;
 
-    /// @dev Extra tickets granted at streak milestones — the reason a wrong accusation hurts.
+    /// @dev Extra tickets granted at streak milestones, the reason a wrong accusation hurts.
     uint256 public streakBonusEvery = 3;
     uint256 public streakBonusTickets = 1;
 
@@ -150,7 +149,7 @@ contract CaseRewards is Ownable, ReentrancyGuard {
         uint256 count = c.focusLeft;
 
         // A streak milestone pays a bonus, so a wrong accusation costs more than the case
-        // it lost — it resets the multiplier on every case after it.
+        // it lost, it resets the multiplier on every case after it.
         uint32 streak = game.streak(c.detective);
         if (streakBonusEvery != 0 && streak != 0 && streak % streakBonusEvery == 0) {
             count += streakBonusTickets;
@@ -179,7 +178,7 @@ contract CaseRewards is Ownable, ReentrancyGuard {
         uint256 available = usdc.balanceOf(address(this));
         if (available < cost) revert TreasuryEmpty(cost, available);
 
-        // The buyer pulls USDC from us, so it — not the Jackpot — is the approval target.
+        // The buyer pulls USDC from us, so it, not the Jackpot, is the approval target.
         usdc.forceApprove(address(ticketBuyer), cost);
 
         address[] memory referrers = new address[](1);
@@ -197,7 +196,7 @@ contract CaseRewards is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────── treasury
 
     /// @notice Sweep accrued Megapot referral fees back into the reward treasury.
-    /// @dev Permissionless on purpose — anyone may refill the pot that pays other players,
+    /// @dev Permissionless on purpose, anyone may refill the pot that pays other players,
     ///      and the funds land here regardless of who pays the gas.
     function sweepReferralFees() external {
         uint256 before = usdc.balanceOf(address(this));

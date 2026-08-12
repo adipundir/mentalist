@@ -1,8 +1,8 @@
 /**
  * Suspects: who is in the lineup, and what they look like.
  *
- * A case is either **canonical** — the real names from the Red John arc, hand-designed so
- * each is recognisable at a glance — or **generated**, for the practice files, dealt
+ * A case is either **canonical**: the real names from the Red John arc, hand-designed so
+ * each is recognisable at a glance, or **generated**, for the practice files, dealt
  * deterministically from a seed so a shared case looks identical to everyone who opens it.
  */
 
@@ -19,7 +19,7 @@ export interface Suspect {
   seat: number;
   name: string;
   role: string;
-  /** Case-file line — what the dossier says about them. */
+  /** Case-file line, what the dossier says about them. */
   dossier: string;
   /** The physical detail a mentalist would notice. */
   tell: string;
@@ -44,7 +44,7 @@ const NOSES: NoseStyle[] = ["button", "hook", "broad", "pointed", "bulb"];
 const BEARDS: FacialHair[] = ["none", "none", "mustache", "mustache", "stubble", "goatee", "fullbeard"];
 const EXTRAS: Accessory[] = ["none", "none", "none", "none", "none", "glasses", "bowtie", "pipe", "badge", "hat"];
 
-/** mulberry32 — same seed, same lineup, every time. */
+/** mulberry32, same seed, same lineup, every time. */
 function rng(seed: number) {
   let s = seed >>> 0;
   return () => {

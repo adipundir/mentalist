@@ -2,7 +2,7 @@
 @config "../tailwind.config.ts";
 
 /*
- * MENTALIST — dossiers and redaction bars.
+ * MENTALIST, dossiers and redaction bars.
  *
  * One accent colour, used fewer than six times per screen. The moment red lands on more
  * than a handful of elements the noir collapses into "dark mode with red buttons";
@@ -16,10 +16,10 @@
     --ink-2: 26 27 31; /* raised card */
     --ink-3: 34 35 40; /* hairlines */
     --bone: 216 210 196; /* aged paper text */
-    --bone-dim: 150 144 132;
+    --bone-dim: 176 169 155;
     --blood: 158 32 32; /* the accent, at rest */
     --blood-hot: 232 62 58; /* live / hover / anything that means something */
-    --brass: 176 141 87;
+    --brass: 198 162 104;
     --phosphor: 126 214 160; /* the one terminal panel */
 
     --background: var(--ink);
@@ -52,7 +52,7 @@
 /*
  * Grain. Static, never animated.
  *
- * Lucas Pope's finding on Obra Dinn was that the dither had to be *stable* — it reads as an
+ * Lucas Pope's finding on Obra Dinn was that the dither had to be *stable*, it reads as an
  * applied surface texture rather than crawling television static, and a per-frame noise
  * layer measurably hurts text legibility. One fixed data URI, fixed to the viewport.
  */
@@ -81,7 +81,7 @@
   );
 }
 
-/* Aged paper for dossier cards — a warm wash plus a fibre speckle. */
+/* Aged paper for dossier cards, a warm wash plus a fibre speckle. */
 .paper {
   background-color: rgb(var(--ink-2));
   background-image:
@@ -111,7 +111,7 @@
   );
 }
 
-/* The single CRT panel. Scoped, never full-screen — full-page scanlines read as generic
+/* The single CRT panel. Scoped, never full-screen, full-page scanlines read as generic
    cyberpunk and hurt legibility; one green terminal set into a 1947 board reads as two
    eras in deliberate tension. */
 .crt {
@@ -204,7 +204,7 @@
 }
 
 /* Dossier entry. `both` fill so the card is never left mid-animation, and the reduced-motion
-   block below turns it off entirely — with no animation the element simply renders at its
+   block below turns it off entirely, with no animation the element simply renders at its
    natural, visible state. */
 @keyframes deal-in {
   from { opacity: 0; transform: translateY(14px); }
@@ -215,7 +215,7 @@
   animation: deal-in 320ms ease-out both;
 }
 
-/* The waiting beat — a slow breath, not a spinner. */
+/* The waiting beat, a slow breath, not a spinner. */
 @keyframes breathe {
   0%, 100% { opacity: 0.35; }
   50% { opacity: 0.9; }
@@ -250,7 +250,7 @@
   }
 }
 
-/* Dust drifting through the lamp beam. Slow and barely there — if you can *see* it moving
+/* Dust drifting through the lamp beam. Slow and barely there, if you can *see* it moving
    it reads as snow, not air. */
 @keyframes mote-drift {
   0%   { transform: translate(0, 0); opacity: 0; }

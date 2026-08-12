@@ -1,6 +1,6 @@
 # Inco Lite - Hardhat Template
 
-This template provides a **Hardhat setup** for developing, testing, and deploying **confidential smart contracts** on the Inco network — encryption, reencryption, decryption, and ciphertext formation.
+This template provides a **Hardhat setup** for developing, testing, and deploying **confidential smart contracts** on the Inco network, encryption, reencryption, decryption, and ciphertext formation.
 
 ## Prerequisites
 
@@ -21,7 +21,7 @@ cp .env.sample .env
 `.env` ships with the well-known Anvil key (`PRIVATE_KEY_ANVIL`) for local use. Before deploying to a live network, fill in `PRIVATE_KEY_BASE_SEPOLIA` / `BASE_SEPOLIA_RPC_URL` (and `PRIVATE_KEY_BASE` / `BASE_RPC_URL` for mainnet). Each network in `hardhat.config.ts` reads its own key:
 
 ```plaintext
-# Local Anvil (well-known default key — safe for local dev only!)
+# Local Anvil (well-known default key, safe for local dev only!)
 PRIVATE_KEY_ANVIL=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80
 
 # Base Sepolia (testnet)

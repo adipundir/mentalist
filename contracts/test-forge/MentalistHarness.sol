@@ -5,7 +5,7 @@ import { e, ebool, euint256 } from "@inco/lightning/src/Lib.sol";
 import { Mentalist } from "../contracts/Mentalist.sol";
 
 /**
- * @title  MentalistHarness — test-only dealer
+ * @title  MentalistHarness: test-only dealer
  *
  * @notice Identical to `Mentalist` in every rule; it only swaps *how the case is dealt*.
  *
@@ -14,12 +14,12 @@ import { Mentalist } from "../contracts/Mentalist.sol";
  *         `newEList` + `shuffle` dealer cannot execute under `forge test`. This harness
  *         deals an equivalent layout using only mock-supported primitives:
  *
- *           - the Tyger is a single hidden index — `e.randBounded(n)` then `e.eq` per seat,
+ *           - the Tyger is a single hidden index, `e.randBounded(n)` then `e.eq` per seat,
  *             which is exactly uniform and is the idiomatic primitive for "which one of N".
  *           - Honesty is an independent draw per seat, then welded to guilt with `e.or`
  *             exactly as production does.
  *
- *         The one property this dealer does NOT reproduce is *exactly K liars* — here the
+ *         The one property this dealer does NOT reproduce is *exactly K liars*, here the
  *         count is binomial. Tests therefore assert the game's rules (the encrypted lie,
  *         the Focus economy, access control, the turncoat, settlement) rather than the
  *         liar count, and the exact-K guarantee is asserted in the Hardhat integration
