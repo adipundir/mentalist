@@ -6,39 +6,30 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { CHAPTERS, FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
-import { localOracle } from "@/lib/oracle";
 import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
 import { MENTALIST_ADDRESS, addressUrl, txUrl } from "@/lib/contracts";
 import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
 import { Finale } from "@/components/Finale";
-import { ModePicker, type PlayMode } from "@/components/ModePicker";
+import { Gate } from "@/components/Gate";
 import { Settlement } from "@/components/Settlement";
 
-type Stage = "mode" | "opening" | "playing" | "closing" | "finale";
+type Stage = "gate" | "opening" | "playing" | "closing" | "finale";
 
 /**
- * THE LIST — the campaign, and the game's main loop.
+ * THE RED JOHN CASES — the game.
  *
- * Seven chapters following the real arc, the lineup shrinking the way the suspect list
- * does. Playable two ways, chosen up front:
+ * Seven cases following the real arc, the lineup shrinking the way the suspect list does.
  *
- *   - **On-chain.** Every chapter opens a real case on Base Sepolia; Red John is placed
- *     inside Inco's enclave, every answer is decrypted for this player alone, the verdict
- *     is settled by the contract against a covalidator attestation, and surplus Focus buys
- *     real Megapot tickets. About 10s a question, and the game is built to make that a
- *     dramatic beat rather than a stall.
- *   - **Practice.** The identical rules dealt locally, instant, no wallet.
- *
- * Both are first-class. That matters: the jam requires the integration to sit in the main
- * user loop, and a campaign that quietly ran offline while the "real" game hid on another
- * route would not qualify — but a campaign that *demanded* a funded wallet would be
- * unplayable for anyone who just wants to see it.
+ * Every case runs on Base Sepolia: Red John is placed inside Inco's enclave, each answer is
+ * decrypted for this player alone, the verdict is settled by the contract against a
+ * covalidator attestation, and unspent questions buy real Megapot tickets. About ten
+ * seconds a question, which the scene is built to spend as a dramatic beat rather than a
+ * stall.
  */
 function StoryInner() {
-  const [mode, setMode] = useState<PlayMode | null>(null);
   const [index, setIndex] = useState(0);
-  const [stage, setStage] = useState<Stage>("mode");
+  const [stage, setStage] = useState<Stage>("gate");
   const [solved, setSolved] = useState(false);
   const [focusLeft, setFocusLeft] = useState(0);
   const [attempt, setAttempt] = useState(0);
@@ -54,24 +45,20 @@ function StoryInner() {
 
   const chapter = CHAPTERS[index];
   const suspects = useMemo(() => lineup(chapter.roster), [chapter]);
-  const culpritSeat = chapter.roster.indexOf(chapter.culprit);
 
-  // The oracle is the only thing that differs between the two modes. Everything above it —
-  // the rules, the scene, the story — is identical, which is what makes practice an honest
-  // representation of the real game rather than a different game wearing its clothes.
+  // Every case is dealt and answered on-chain. There is no local fallback: a simulation of
+  // the game would be a different game, and the whole point is that the secret is somewhere
+  // neither the player nor the page can reach.
   const oracle = useMemo(() => {
-    if (mode === "chain" && publicClient && walletClient && address) {
-      return chainOracle({
-        publicClient,
-        walletClient,
-        account: address,
-        onTx: (hash, label) => setTxs((t) => [{ hash, label }, ...t].slice(0, 6)),
-      });
-    }
-    return localOracle(culpritSeat);
-  }, [mode, publicClient, walletClient, address, culpritSeat, index, attempt]);
+    if (!publicClient || !walletClient || !address) return null;
+    return chainOracle({
+      publicClient,
+      walletClient,
+      account: address,
+      onTx: (hash, label) => setTxs((t) => [{ hash, label }, ...t].slice(0, 6)),
+    });
+  }, [publicClient, walletClient, address, index, attempt]);
 
-  const onChain = mode === "chain";
   const isLast = index === CHAPTERS.length - 1;
 
   function finishChapter(didSolve: boolean, left: number) {
@@ -118,21 +105,15 @@ function StoryInner() {
           ))}
         </ol>
 
-        {mode && (
-          <span
-            className={[
-              "ml-auto border px-2 py-0.5 font-mono text-[9px] tracking-file",
-              onChain ? "border-blood-hot text-blood-hot" : "border-ink-3 text-bone-dim",
-            ].join(" ")}
-          >
-            {onChain ? "ON-CHAIN · BASE SEPOLIA" : "PRACTICE · OFFLINE"}
-          </span>
-        )}
+        <span className="ml-auto border border-blood-hot px-2 py-0.5 font-mono text-[9px] tracking-file text-blood-hot">
+          BASE SEPOLIA
+        </span>
       </div>
 
       <div className="px-2 pb-8 pt-3 sm:px-4">
+        {oracle && (
         <Scene
-          key={`${mode}-${index}-${attempt}`}
+          key={`${index}-${attempt}`}
           config={chapter}
           oracle={oracle}
           suspects={suspects}
@@ -144,8 +125,7 @@ function StoryInner() {
             line: chapter.nudge.line,
           }}
           chainStatus={
-            onChain ? (
-              <div className="crt max-w-[280px] border border-ink-3 p-2 font-mono text-[9px] leading-relaxed tracking-file">
+            <div className="crt max-w-[280px] border border-ink-3 p-2 font-mono text-[9px] leading-relaxed tracking-file">
                 <p>
                   ENCRYPTED ON BASE ·{" "}
                   <a href={addressUrl(MENTALIST_ADDRESS)} target="_blank" rel="noreferrer" className="underline">
@@ -166,15 +146,15 @@ function StoryInner() {
                     ))}
                   </ul>
                 )}
-              </div>
-            ) : null
+            </div>
           }
           onResolved={finishChapter}
         />
+        )}
       </div>
 
       <AnimatePresence>
-        {stage === "mode" && <ModePicker onPick={(m) => { setMode(m); setStage("opening"); }} />}
+        {stage === "gate" && <Gate onReady={() => setStage("opening")} />}
 
         {stage === "opening" && (
           <StoryCard
@@ -196,12 +176,8 @@ function StoryInner() {
             onContinue={advance}
             continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CASE") : "TRY AGAIN"}
             extra={
-              onChain ? (
-                <Settlement
-                  oracle={oracle as ChainOracle}
-                  solved={solved}
-                  focusLeft={focusLeft}
-                />
+              oracle ? (
+                <Settlement oracle={oracle} solved={solved} focusLeft={focusLeft} />
               ) : null
             }
           />

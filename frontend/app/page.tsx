@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { BootScreen } from "@/components/BootScreen";
 import * as sfx from "@/lib/sound";
+import { PoweredBy } from "@/components/PoweredBy";
 
 /**
  * The title card.
@@ -104,19 +105,25 @@ export default function Home() {
         transition={{ delay: 1.3 }}
         className="mt-8 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 font-mono text-[10px] tracking-file text-bone-dim"
       >
-        <Link href="/case/demo" className="hover:text-bone">SINGLE CASE</Link>
-        <Link href="/case/play" className="hover:text-bone">PLAY ON-CHAIN ↗</Link>
         <Link href="/about" className="hover:text-bone">HOW IT WORKS</Link>
+        <a
+          href="https://github.com/adipundir/mentalist"
+          target="_blank"
+          rel="noreferrer"
+          className="hover:text-bone"
+        >
+          SOURCE ↗
+        </a>
       </motion.nav>
 
-      <motion.p
+      <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 1.8 }}
-        className="absolute bottom-8 left-1/2 -translate-x-1/2 whitespace-nowrap font-mono text-[9px] tracking-file text-bone-dim/40"
+        className="absolute inset-x-0 bottom-8 px-6"
       >
-        INCO LIGHTNING · MEGAPOT · BASE SEPOLIA
-      </motion.p>
+        <PoweredBy />
+      </motion.div>
 
       <AnimatePresence>
         {booting && <BootScreen onReady={() => router.push("/story")} />}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PoweredBy } from "@/components/PoweredBy";
 
 /**
  * The explanation, moved off the front door.
@@ -46,17 +47,16 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
       <p className="mt-2 font-body text-[16px] leading-relaxed text-bone-dim">
         Most confidential games hide a <em>value</em> — a card, a board, a role, a bid. This
         hides a <em>transformation</em>: your measurement of one secret is corrupted by a
-        second secret you also can&rsquo;t see. Nobody — not the other players, not an
-        observer, not the deployer — knows who Red John is until you name him.
+        second secret you also can&rsquo;t see. That is the whole game, and a transparent
+        chain cannot hold it.
       </p>
 
       <h2 className="mt-10 font-mono text-[10px] tracking-file text-bone-dim">HONESTLY</h2>
       <p className="mt-2 font-body text-[16px] leading-relaxed text-bone-dim">
         Inco is <span className="text-bone">TEE-based confidential compute — not FHE, not zk</span>.
-        &ldquo;Secret&rdquo; means the value is decrypted inside an Intel TDX enclave;
-        &ldquo;provably fair&rdquo; means a covalidator attestation, not a zero-knowledge proof.
-        The claim that the deployer cannot know the answer rests on that hardware assumption,
-        and we would rather say so than oversell it.
+        &ldquo;Secret&rdquo; means the value is decrypted inside an Intel TDX enclave, and
+        &ldquo;provably fair&rdquo; means a covalidator attestation rather than a
+        zero-knowledge proof. Worth stating plainly rather than overselling.
       </p>
 
       <h2 className="mt-10 font-mono text-[10px] tracking-file text-bone-dim">BUILT WITH</h2>
@@ -70,6 +70,8 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
         Made for the Inco × Megapot Summer Game Jam, 2026. Adapted from the Red John arc of
         The Mentalist.
       </p>
+
+      <PoweredBy className="mt-12 border-t border-ink-3 pt-8" />
 
       <div className="mt-8 flex flex-wrap gap-2">
         <Link
