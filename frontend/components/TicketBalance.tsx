@@ -68,7 +68,7 @@ export function TicketBalance() {
       target="_blank"
       rel="noreferrer"
       title="Megapot tickets won in these cases"
-      className={`flex items-center gap-1.5 border px-2.5 py-1.5 transition-colors ${
+      className={`flex h-10 items-center gap-2 border px-3 transition-colors ${
         tickets > 0
           ? "border-brass/40 bg-brass/10 hover:border-brass/70"
           : "border-ink-3 bg-ink hover:border-bone-dim/40"
