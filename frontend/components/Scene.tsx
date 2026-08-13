@@ -231,7 +231,6 @@ export function Scene({
             </h1>
           </div>
 
-          {closesAt !== undefined && <Countdown closesAt={closesAt} />}
 
           <div className="text-right">
             <p className="font-mono text-[10px] tracking-file text-bone-dim">SPOKEN TO</p>
@@ -241,6 +240,8 @@ export function Scene({
             </p>
           </div>
         </div>
+
+        {closesAt !== undefined && <Countdown closesAt={closesAt} />}
 
         {/* the team, leaning in */}
         {nudge && !g.over && !line && (
@@ -400,9 +401,9 @@ function Countdown({ closesAt }: { closesAt: number }) {
   const urgent = left < 5 * 60_000;
 
   return (
-    <div className="pointer-events-none text-center">
+    <div className="pointer-events-none absolute left-1/2 top-14 -translate-x-1/2 text-center sm:top-16">
       <p className="font-mono text-[10px] tracking-file text-bone-dim">
-        {left === 0 ? "CASE CLOSED" : "CLOSES IN"}
+        {left === 0 ? "CASE CLOSED" : "CASE CLOSES IN"}
       </p>
       <p
         className={`font-mono text-[30px] leading-none tabular-nums ${urgent ? "text-blood-hot" : "text-bone"}`}

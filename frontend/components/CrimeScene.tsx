@@ -236,15 +236,27 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
       />
       <Victim x={scene.bodyX} y={scene.bodyY} left={scene.left} />
 
-      {/* ── prints walking out ── */}
+      {/* ── prints walking out ──
+          A shoe, not a pill. The old pair of stacked ovals read as a red capsule lying on
+          the floor: no toe, no arch, no heel, and nothing to say which way it was going.
+          A sole narrows at the waist and the heel sits apart from it, which is most of what
+          makes a print legible at this size. Left and right alternate about the line of
+          travel and the whole foot points along it. */}
       {scene.prints.map((p, i) => (
         <g
           key={i}
-          transform={`translate(${p.x} ${p.y + p.side * 1.5}) rotate(${p.rot}) scale(${p.s})`}
+          transform={`translate(${p.x} ${p.y + p.side * 1.6}) rotate(${p.rot + p.side * 6}) scale(${p.s * 0.9})`}
           opacity={p.o}
         >
-          <ellipse cx="0" cy="0" rx="0.95" ry="1.9" fill={BLOOD_WET} />
-          <ellipse cx="0" cy="-2.4" rx="0.7" ry="0.8" fill={BLOOD_WET} />
+          <g transform={`scale(${p.side} 1)`}>
+            {/* sole: broad across the ball of the foot, pinched at the waist */}
+            <path
+              d="M-0.95 -2.9 C-1.35 -1.9 -1.25 -0.7 -0.75 0.05 C-0.35 0.65 0.35 0.65 0.7 0.05 C1.15 -0.7 1.2 -1.95 0.85 -2.9 C0.5 -3.75 -0.6 -3.8 -0.95 -2.9 Z"
+              fill={BLOOD_WET}
+            />
+            {/* heel, set back and slightly narrower */}
+            <ellipse cx="-0.05" cy="1.75" rx="0.72" ry="0.95" fill={BLOOD_WET} />
+          </g>
         </g>
       ))}
 
