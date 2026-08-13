@@ -207,9 +207,12 @@ export function Room({
           </svg>
         </div>
 
-        {/* ── the practical: one hanging lamp ── */}
-        <div className="pointer-events-none absolute left-1/2 top-0 -translate-x-1/2">
-          <div className="mx-auto h-[8%] w-[2px] bg-[#3a343f]" />
+        {/* ── the practical: one hanging lamp ──
+            Hung low enough to clear the heads-up display: the bulb was a blurred smear
+            tucked up behind the clock, so the one light source in the room was invisible
+            and the cone below it came from nowhere. */}
+        <div className="pointer-events-none absolute left-1/2 top-[7%] -translate-x-1/2">
+          <div className="mx-auto h-[9vh] w-[2px] bg-[#3a343f]" />
           <div
             className="mx-auto h-5 w-16"
             style={{
@@ -218,7 +221,41 @@ export function Room({
               border: "1px solid #554e5c",
             }}
           />
-          <div className="mx-auto -mt-1 h-2.5 w-7 rounded-full blur-[2px]" style={{ background: room.lamp }} />
+
+          {/* the bulb itself: glass, a filament, and the halo it throws on its own shade */}
+          <svg
+            className="mx-auto -mt-[3px] block h-9 w-9 overflow-visible"
+            viewBox="0 0 24 30"
+            aria-hidden
+          >
+            <defs>
+              <radialGradient id="bulbGlow">
+                <stop offset="0%" stopColor={room.lamp} stopOpacity="0.95" />
+                <stop offset="45%" stopColor={room.lamp} stopOpacity="0.28" />
+                <stop offset="100%" stopColor={room.lamp} stopOpacity="0" />
+              </radialGradient>
+            </defs>
+
+            <circle cx="12" cy="15" r="17" fill="url(#bulbGlow)" />
+            {/* brass cap and its threads */}
+            <rect x="9" y="2" width="6" height="4.4" rx="0.8" fill="#6b5a3e" />
+            <path d="M9 3.6h6M9 5h6" stroke="#4a3d29" strokeWidth="0.6" />
+            {/* glass: a pear, not a circle */}
+            <path
+              d="M12 6.4c-4 0-6.4 3.1-6.4 6.5 0 3.1 2.2 4.6 3 6.4h6.8c0.8-1.8 3-3.3 3-6.4 0-3.4-2.4-6.5-6.4-6.5Z"
+              fill={room.lamp}
+              fillOpacity="0.9"
+            />
+            {/* the filament, which is the thing that actually reads as "lit" */}
+            <path
+              d="M10 9.4v2.6l1 1.4-1 1.4 1 1.4M14 9.4v2.6l-1 1.4 1 1.4-1 1.4"
+              fill="none"
+              stroke="#fff4d0"
+              strokeWidth="0.7"
+              strokeLinecap="round"
+            />
+            <ellipse cx="9.4" cy="10.6" rx="1.5" ry="2.4" fill="#fffaf0" opacity="0.5" />
+          </svg>
         </div>
 
         {/* light cone */}
