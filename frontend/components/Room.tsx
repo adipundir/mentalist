@@ -102,12 +102,15 @@ export function Room({
   subjects,
   focused,
   onFocus,
+  onStepBack,
   variant = 0,
 }: {
   subjects: RoomSubject[];
   /** Seat the camera is pushed in on, or null for the wide shot. */
   focused: number | null;
   onFocus: (seat: number) => void;
+  /** Clicking the room rather than a person in it: stand back, look at all of them. */
+  onStepBack?: () => void;
   /** Which crime scene to lay out. One per case. */
   variant?: number;
 }) {
@@ -133,7 +136,12 @@ export function Room({
     : { x: "0%", y: "0%", scale: 1 };
 
   return (
-    <div className="relative h-full w-full overflow-hidden bg-[#0d0c0e]">
+    // The floor, the walls and the empty air are all one big "never mind": click anything
+    // that is not a person and the camera pulls back out to the wide shot.
+    <div
+      className="relative h-full w-full overflow-hidden bg-[#0d0c0e]"
+      onClick={onStepBack}
+    >
       <motion.div
         className="absolute inset-0"
         animate={camera}
@@ -296,7 +304,12 @@ export function Room({
             <motion.button
               key={s.suspect.seat}
               type="button"
-              onClick={() => onFocus(s.suspect.seat)}
+              // Stopped here, or the same click would walk up to him and immediately step
+              // back off him again on its way through the room behind.
+              onClick={(e) => {
+                e.stopPropagation();
+                onFocus(s.suspect.seat);
+              }}
               // A mouse click must not leave the figure focused. The ring below is meant for
               // keyboard users and `focus-visible` is supposed to keep it to them, but the
               // browser hands a clicked button focus anyway and draws a hard red box round the
@@ -387,16 +400,13 @@ export function Room({
               {/* status pips. Nothing here is a deduction: the room proves nothing until
                   the case closes, so it only reports what the player has done. */}
               <div className="pointer-events-none absolute -top-2 left-1/2 flex -translate-x-1/2 gap-1">
-                {s.named ? (
-                  <span className="border border-blood-hot bg-blood-hot/20 px-1 font-mono text-[7px] tracking-file text-blood-hot">
-                    YOUR MAN
+                {/* Only what the player has done, and only where it is not already said
+                    louder somewhere else. The accusation has its own copy in the stake
+                    panel, so a second label riding on his head was the same news twice. */}
+                {!s.named && s.heard && (
+                  <span className="border border-brass/70 bg-ink px-1 font-mono text-[7px] tracking-file text-brass">
+                    HEARD
                   </span>
-                ) : (
-                  s.heard && (
-                    <span className="border border-brass/70 bg-ink px-1 font-mono text-[7px] tracking-file text-brass">
-                      HEARD
-                    </span>
-                  )
                 )}
               </div>
             </motion.button>

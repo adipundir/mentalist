@@ -21,6 +21,8 @@
 export interface NarratorOptions {
   /** Speak as this seat: its own voice and manner. Omit for the narrator's own voice. */
   seat?: number;
+  /** Whether that seat should sound like a woman. Omitted means the mixed pool. */
+  feminine?: boolean;
   rate?: number;
   pitch?: number;
   volume?: number;
@@ -119,13 +121,64 @@ const NOVELTY = new Set([
 const QUALITY = ["premium", "enhanced", "natural", "neural", "siri", "online"];
 
 /**
+ * Which voices sound like women, and which sound like men.
+ *
+ * The API refuses to say. `SpeechSynthesisVoice` exposes a name, a language and a URI, and
+ * nothing about who it sounds like, so the only handle available is the given name the
+ * platform shipped it under. That is workable, because every platform names them after
+ * people: macOS has Samantha and Daniel, Chrome spells it out in the name, Windows has
+ * Zira and David.
+ *
+ * A voice missing from both lists stays unclassified and is usable by anybody, which is the
+ * right default: an unknown voice is a worse outcome than a wrong-sounding one only if we
+ * refuse to use it at all.
+ */
+const FEMININE = new Set([
+  // macOS / iOS
+  "samantha", "allison", "ava", "susan", "victoria", "karen", "moira", "tessa", "fiona",
+  "serena", "kate", "nicky", "zoe", "veena", "martha", "matilda", "isha", "noelle",
+  // Chrome
+  "female",
+  // Windows / Edge
+  "zira", "aria", "jenny", "michelle", "ana", "emma", "clara", "natasha", "sonia", "libby",
+  "hazel", "susan", "linda", "molly", "neerja", "yan", "amber", "ashley", "cora", "elizabeth",
+  "monica", "jane", "nancy", "sara", "denise", "eloise",
+]);
+
+const MASCULINE = new Set([
+  // macOS / iOS
+  "alex", "daniel", "tom", "oliver", "rishi", "aaron", "arthur", "gordon", "jamie", "nathan",
+  "lee", "xander", "carlos", "diego", "jorge", "juan", "thomas", "yuri", "felipe", "luca",
+  // Chrome
+  "male",
+  // Windows / Edge
+  "david", "mark", "guy", "christopher", "eric", "roger", "steffan", "ryan", "andrew",
+  "brian", "liam", "william", "prabhat", "george", "james", "connor", "duncan", "adam",
+  "alfie", "oliver", "thomas", "tony", "brandon", "jason", "jacob", "kai",
+]);
+
+/** Best guess at who a voice sounds like, from the only clue the platform gives: its name. */
+function voiceSounds(v: SpeechSynthesisVoice): "f" | "m" | null {
+  // "Microsoft Aria Online (Natural) - English (United States)" → aria, online, natural, …
+  const words = v.name.toLowerCase().split(/[^a-z]+/).filter(Boolean);
+  for (const w of words) {
+    if (FEMININE.has(w)) return "f";
+    if (MASCULINE.has(w)) return "m";
+  }
+  return null;
+}
+
+/**
  * A voice per suspect, drawn only from voices that can actually be understood.
  *
  * Prefers the platform's good voices and falls back to plain ones, but never to a novelty.
  * If a machine has only one usable voice, everybody shares it: one voice the player can hear
  * beats eight they cannot.
  */
-export async function voiceForSeat(seat: number): Promise<SpeechSynthesisVoice | null> {
+export async function voiceForSeat(
+  seat: number,
+  feminine?: boolean,
+): Promise<SpeechSynthesisVoice | null> {
   const voices = await loadVoices();
   const english = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
   const usable = (english.length ? english : voices).filter(
@@ -134,7 +187,25 @@ export async function voiceForSeat(seat: number): Promise<SpeechSynthesisVoice |
   if (!usable.length) return pickVoice();
 
   const good = usable.filter((v) => QUALITY.some((q) => v.name.toLowerCase().includes(q)));
-  const pool = good.length ? good : usable;
+  let pool = good.length ? good : usable;
+
+  // The right half of the room, where the platform lets us tell which half that is.
+  //
+  // Without this a man's account came out in whichever voice the alphabet handed his seat,
+  // and on a machine whose good voices are mostly women, most of the lineup answered in a
+  // woman's voice. Unclassified voices stay in the pool: they are usually fine, and a seat
+  // with no voice at all is worse than a seat with an ambiguous one. If the match empties
+  // the pool completely, the mixed pool is used rather than nothing.
+  if (feminine !== undefined) {
+    const want = feminine ? "f" : "m";
+    const fitted = pool.filter((v) => {
+      const sounds = voiceSounds(v);
+      return sounds === null || sounds === want;
+    });
+    // Prefer voices that positively match before ones that merely fail to contradict.
+    const exact = fitted.filter((v) => voiceSounds(v) === want);
+    pool = exact.length ? exact : fitted.length ? fitted : pool;
+  }
 
   // Sorted by name so the assignment survives a reload. Left to the browser's own ordering,
   // a suspect can come back sounding like somebody else.
@@ -259,7 +330,8 @@ function speakOne(text: string, opts: NarratorOptions): Promise<void> {
   if (!s) return Promise.resolve();
 
   return new Promise<void>((resolve) => {
-    const chooser = opts.seat === undefined ? pickVoice() : voiceForSeat(opts.seat);
+    const chooser =
+      opts.seat === undefined ? pickVoice() : voiceForSeat(opts.seat, opts.feminine);
     void chooser.then((voice) => {
       const u = new SpeechSynthesisUtterance(stripForSpeech(text));
       if (voice) u.voice = voice;

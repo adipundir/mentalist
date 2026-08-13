@@ -29,7 +29,28 @@ import * as sfx from "@/lib/sound";
  * business, and one of them is enjoying it and keeps catching himself. Nobody stands to
  * attention, because nobody stands to attention.
  */
-const IDLES: Idle[] = ["scratch", "scared", "glance", "giggle", "shift"];
+const IDLES: Idle[] = [
+  "scratch", "scared", "glance", "giggle", "shift", "pocket", "fold", "nod",
+];
+
+/**
+ * Who does what, in this room.
+ *
+ * There used to be five behaviours dealt straight round the lineup, so the sixth man copied
+ * the first: two figures with the same hand on the same side of the same head, which is the
+ * single loudest way to make drawn people look like one drawn person. There are eight now,
+ * more than fits in any room, and the deal is rotated by the case so the same man questioned
+ * in two different rooms is not standing the same way in both.
+ */
+function idlesFor(count: number, variant: number): Idle[] {
+  const offset = variant % IDLES.length;
+  // A stride coprime with the list length walks the whole thing without repeating, so the
+  // first `count` picks are distinct as long as the room is no bigger than the list.
+  return Array.from(
+    { length: count },
+    (_, i) => IDLES[(offset + i * 3) % IDLES.length]!,
+  );
+}
 
 export function Scene({
   suspects,
@@ -103,13 +124,15 @@ export function Scene({
     });
   }, [g.saying, suspects]);
 
+  // What they do while nobody is asking them anything. Fixed per seat rather than random,
+  // so a man who scratches his head keeps doing it and the room has faces you start to
+  // recognise, and distinct within the room so nobody reads as a copy of his neighbour.
+  const idles = useMemo(() => idlesFor(suspects.length, variant), [suspects.length, variant]);
+
   const subjects: RoomSubject[] = useMemo(
     () =>
       suspects.map((s, i) => {
-        // What they do while nobody is asking them anything. Fixed per seat rather than
-        // random, so a man who scratches his head keeps doing it and the room has faces you
-        // start to recognise. Spread across the lineup so no two neighbours match.
-        const idle: Idle = IDLES[i % IDLES.length]!;
+        const idle: Idle = idles[i]!;
 
         let expression: Expression = "neutral";
         if (g.saying?.seat === i) expression = "talking";
@@ -129,7 +152,7 @@ export function Scene({
           saying: g.saying?.seat === i ? g.saying.line : null,
         };
       }),
-    [suspects, g.saying, g.spoken, chosen],
+    [suspects, idles, g.saying, g.spoken, chosen],
   );
 
   // Hand the choice up so the wager can be placed on it. The money and the accusation are
@@ -154,8 +177,18 @@ export function Scene({
           // the wallet ever opened, so moving the pick then would only change what the screen
           // says, not what was bet. Hearing him out again stays free.
           onFocus={(seat) => {
-            g.interrogate(seat);
+            // The speaker's own voice, not the one the alphabet happened to hand his seat.
+            g.interrogate(seat, suspects[seat]?.character.feminine);
             if (g.allSpoken && !locked) setChosen(seat);
+          }}
+          // Clicking the room itself steps away from whoever you were standing over. Until
+          // now the only way out of a man's face was into another man's, which is not how
+          // walking away works. Held while a stake is in flight: the name in that
+          // transaction is already sealed and the screen should not pretend otherwise.
+          onStepBack={() => {
+            if (locked) return;
+            g.stepBack();
+            setChosen(null);
           }}
           variant={variant}
         />
@@ -213,7 +246,10 @@ export function Scene({
         style={{ background: "linear-gradient(transparent, rgb(8 7 9 / 0.88) 45%)" }}
       >
         {g.allSpoken && stakePanel ? (
-          <div className="py-1">{stakePanel}</div>
+          // No box round it. The gradient this bar already sits on is enough to hold the
+          // type, and a hard panel edge cuts the room in half right where the player is
+          // looking at it.
+          <div className="mx-auto max-w-[1100px] py-1">{stakePanel}</div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">
             <div className="min-w-0 flex-1 font-body text-[15px] leading-snug text-bone">

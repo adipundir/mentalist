@@ -3,7 +3,22 @@
 import { ReactNode } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { WagmiProvider, createConfig, http } from "wagmi";
-import { getDefaultConfig, RainbowKitProvider, darkTheme } from "@rainbow-me/rainbowkit";
+import {
+  connectorsForWallets,
+  getDefaultConfig,
+  getDefaultWallets,
+  RainbowKitProvider,
+  darkTheme,
+} from "@rainbow-me/rainbowkit";
+import {
+  braveWallet,
+  coinbaseWallet,
+  injectedWallet,
+  okxWallet,
+  phantomWallet,
+  rabbyWallet,
+  trustWallet,
+} from "@rainbow-me/rainbowkit/wallets";
 import { activeChain } from "@/lib/network";
 
 const queryClient = new QueryClient();
@@ -11,20 +26,45 @@ const queryClient = new QueryClient();
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 
 /**
- * WalletConnect adds mobile/QR wallets but needs a project id. Without one we fall back to
- * injected connectors, which is enough to play, so a missing id degrades the wallet list
- * rather than breaking the page.
+ * A named wallet list instead of whatever the page announces about itself.
+ *
+ * EIP-6963 discovery is deduplicated by uuid rather than by wallet id, and Phantom announces
+ * itself more than once with a fresh uuid each time. Two announcements become two connectors
+ * carrying the same `app.phantom` id, React sees two children under one key in the wallet
+ * modal, and warns. Naming the wallets ourselves gives exactly one entry per wallet, and
+ * `injectedWallet` at the end still catches whatever else the browser has installed.
  */
+const { wallets: popular } = getDefaultWallets();
+
+/** Everything that connects straight from the browser, with or without a project id. */
+const INSTALLED = {
+  groupName: "Installed",
+  wallets: [coinbaseWallet, phantomWallet, rabbyWallet, braveWallet, injectedWallet],
+};
+
+const wallets = [
+  ...popular,
+  { groupName: "More", wallets: [okxWallet, trustWallet, ...INSTALLED.wallets] },
+];
+
 const config = projectId
   ? getDefaultConfig({
       appName: "MENTALIST",
       projectId,
       chains: [activeChain],
+      wallets,
+      // Off, or the discovered duplicates come straight back in beside the named list.
+      multiInjectedProviderDiscovery: false,
       ssr: true,
     })
   : createConfig({
       chains: [activeChain],
       transports: { [activeChain.id]: http() },
+      // WalletConnect adds mobile and QR wallets but needs a project id, so without one the
+      // list is the browser's own wallets. Named rather than discovered for the same reason
+      // as above, and none of these needs a project id to connect.
+      connectors: connectorsForWallets([INSTALLED], { appName: "MENTALIST", projectId: "" }),
+      multiInjectedProviderDiscovery: false,
       ssr: true,
     });
 

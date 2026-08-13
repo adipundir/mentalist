@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { IntroVideo } from "@/components/IntroVideo";
 import { RedJohnMark } from "@/components/RedJohnMark";
-import { ColdOpen } from "@/components/ColdOpen";
 import * as sfx from "@/lib/sound";
 import { PoweredBy } from "@/components/PoweredBy";
 
@@ -130,7 +129,6 @@ export default function Home() {
         {booting && <IntroVideo onReady={() => router.push("/cases")} />}
       </AnimatePresence>
 
-      <ColdOpen />
     </main>
   );
 }

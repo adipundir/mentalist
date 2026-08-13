@@ -190,6 +190,18 @@ export const MENTALIST_ABI = [
     outputs: [{ name: "", type: "uint16" }],
   },
   {
+    // Carries the ticket ids a payout bought, which is the only per-player record of Megapot
+    // holdings anywhere: the jackpot contract has no balance view for a ticket holder.
+    type: "event",
+    name: "PaidOut",
+    inputs: [
+      { name: "caseId", type: "uint16", indexed: true },
+      { name: "player", type: "address", indexed: true },
+      { name: "share", type: "uint256", indexed: false },
+      { name: "ticketIds", type: "uint256[]", indexed: false },
+    ],
+  },
+  {
     type: "function",
     name: "refund",
     stateMutability: "nonpayable",

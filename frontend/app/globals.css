@@ -297,14 +297,44 @@
 }
 .arm-scratch { animation: armScratch 8s ease-in-out infinite; }
 
-/* Cannot keep still. A shiver, not a shake. */
+/* Cannot keep still, and cannot keep it up either.
+
+   This was a 0.42s shiver on infinite repeat, which is a man vibrating for the length of a
+   case: unreadable as fear, and exhausting to sit next to. Fear comes in waves. He holds
+   himself together, loses it for a second or two, gets a grip, loses it again. The bursts
+   live inside one long cycle so it stays pure CSS, and `--shiver-phase` offsets each figure
+   so a frightened room never shakes in unison. */
 @keyframes idleScared {
-  0%, 100% { transform: translateX(0) rotate(0deg); }
-  25% { transform: translateX(-0.7px) rotate(-0.35deg); }
-  50% { transform: translateX(0.6px) rotate(0.3deg); }
-  75% { transform: translateX(-0.5px) rotate(-0.25deg); }
+  0%, 13% { transform: translateX(0) rotate(0deg); }
+  13.6% { transform: translateX(-0.7px) rotate(-0.35deg); }
+  14.22% { transform: translateX(0.6px) rotate(0.3deg); }
+  14.84% { transform: translateX(-0.55px) rotate(-0.28deg); }
+  15.46% { transform: translateX(0.5px) rotate(0.25deg); }
+  16.08% { transform: translateX(-0.4px) rotate(-0.2deg); }
+  16.7% { transform: translateX(0.34px) rotate(0.17deg); }
+  17.32% { transform: translateX(-0.25px) rotate(-0.12deg); }
+  17.94% { transform: translateX(-0.7px) rotate(-0.35deg); }
+  18.56% { transform: translateX(0.6px) rotate(0.3deg); }
+  19.18% { transform: translateX(-0.55px) rotate(-0.28deg); }
+  19.8% { transform: translateX(0.5px) rotate(0.25deg); }
+  20.42% { transform: translateX(-0.4px) rotate(-0.2deg); }
+  21.6%, 57% { transform: translateX(0) rotate(0deg); }
+  57.6% { transform: translateX(-0.7px) rotate(-0.35deg); }
+  58.22% { transform: translateX(0.6px) rotate(0.3deg); }
+  58.84% { transform: translateX(-0.55px) rotate(-0.28deg); }
+  59.46% { transform: translateX(0.5px) rotate(0.25deg); }
+  60.08% { transform: translateX(-0.4px) rotate(-0.2deg); }
+  60.7% { transform: translateX(0.34px) rotate(0.17deg); }
+  61.32% { transform: translateX(-0.25px) rotate(-0.12deg); }
+  61.94% { transform: translateX(-0.7px) rotate(-0.35deg); }
+  62.56% { transform: translateX(0.6px) rotate(0.3deg); }
+  63.18% { transform: translateX(-0.55px) rotate(-0.28deg); }
+  64.1%, 100% { transform: translateX(0) rotate(0deg); }
 }
-.idle-scared { animation: idleScared 0.42s ease-in-out infinite; }
+.idle-scared {
+  animation: idleScared 15s linear infinite;
+  animation-delay: var(--shiver-phase, 0s);
+}
 
 /* Enjoying this far too much, and catching himself doing it. */
 @keyframes idleGiggle {
@@ -335,12 +365,31 @@
 }
 .idle-shift { animation: idleShift 7.5s ease-in-out infinite; }
 
+/* Hands in his pockets: the weight rolls, because there is nothing else to do with it. */
+@keyframes idleSway {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  50% { transform: translateX(-1.1px) rotate(-0.5deg); }
+}
+.idle-sway { animation: idleSway 9.5s ease-in-out infinite; }
+
+/* Agreeing with nobody in particular, twice, a long way apart. */
+@keyframes idleNod {
+  0%, 34%, 100% { transform: translateY(0) rotate(0deg); }
+  37% { transform: translateY(1.1px) rotate(0.5deg); }
+  40% { transform: translateY(0) rotate(0deg); }
+  43% { transform: translateY(0.9px) rotate(0.4deg); }
+  46% { transform: translateY(0) rotate(0deg); }
+}
+.idle-nod { animation: idleNod 12s ease-in-out infinite; }
+
 @media (prefers-reduced-motion: reduce) {
   .arm-scratch,
   .idle-scared,
   .idle-giggle,
   .idle-glance,
-  .idle-shift {
+  .idle-shift,
+  .idle-sway,
+  .idle-nod {
     animation: none;
   }
 }

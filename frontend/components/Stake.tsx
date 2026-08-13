@@ -212,10 +212,10 @@ export function Stake({
     <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
       <div className="text-center">
         <p className="font-mono text-[10px] tracking-file text-bone-dim">IN THE POT</p>
-        <p className="font-type text-[22px] leading-none text-brass">
+        <p className="mt-1.5 font-type text-[22px] leading-none text-brass">
           {pot === null ? "…" : `$${usdc(pot)}`}
         </p>
-        <p className="font-mono text-[9px] tracking-file text-bone-dim">
+        <p className="mt-1.5 font-mono text-[9px] tracking-file text-bone-dim">
           {entrants === null
             ? "READING THE CHAIN…"
             : `${entrants} ${entrants === 1 ? "PLAYER" : "PLAYERS"}`}

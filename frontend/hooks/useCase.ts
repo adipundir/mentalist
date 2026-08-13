@@ -3,7 +3,7 @@
 import { useCallback, useState, useRef } from "react";
 import type { Alibi } from "@/lib/casebook";
 import * as sfx from "@/lib/sound";
-import { narrate, toneForSeat, unlockNarrator } from "@/lib/narrator";
+import { narrate, stopNarration, toneForSeat, unlockNarrator } from "@/lib/narrator";
 
 /**
  * Working the room: who has spoken, and what they said.
@@ -30,7 +30,7 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
    * comparing two stories should not have to hold one of them in their head.
    */
   const interrogate = useCallback(
-    (seat: number) => {
+    (seat: number, feminine?: boolean) => {
       const line = alibis[seat]?.text;
       if (line === undefined) return;
 
@@ -51,12 +51,26 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
       // the utterance ends, so that is the moment to put the face back. The token guards
       // against a stale utterance landing after the player has moved on to somebody else.
       const token = ++speechToken.current;
-      void narrate(line, { ...toneForSeat(seat), seat }).then(() => {
+      void narrate(line, { ...toneForSeat(seat), seat, feminine }).then(() => {
         if (speechToken.current === token) setSaying(null);
       });
     },
     [alibis],
   );
+
+  /**
+   * Step away from whoever you were standing in front of.
+   *
+   * Walking up to a man was reversible only by walking up to a different one, which left
+   * the player no way to simply stop looking at someone. The token bump is what keeps the
+   * utterance already in flight from clearing state that belongs to a later action.
+   */
+  const stepBack = useCallback(() => {
+    speechToken.current++;
+    stopNarration();
+    setWitness(null);
+    setSaying(null);
+  }, []);
 
   return {
     n,
@@ -65,5 +79,6 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
     saying,
     allSpoken: spoken.length === n,
     interrogate,
+    stepBack,
   };
 }

@@ -32,7 +32,19 @@ export type Expression =
  * fidget: someone scratches his head at the whole business, someone cannot stop shaking,
  * and one of them keeps almost smiling and catching himself.
  */
-export type Idle = "still" | "scratch" | "scared" | "giggle" | "glance" | "shift";
+export type Idle =
+  | "still"
+  | "scratch"
+  | "scared"
+  | "giggle"
+  | "glance"
+  | "shift"
+  /** Hands in his pockets, weight rolling gently from one foot to the other. */
+  | "pocket"
+  /** Arms folded, waiting you out. */
+  | "fold"
+  /** Agreeing with nobody in particular, slowly. */
+  | "nod";
 
 export type FaceShape = "oval" | "square" | "round" | "long";
 export type HairStyle =
@@ -56,6 +68,15 @@ export interface CharacterSpec {
   tie: string;
   /** Slight head tilt, in degrees, stops a lineup looking like clones. */
   tilt: number;
+  /**
+   * Whether this person reads as a woman.
+   *
+   * Here for the narrator rather than the drawing: the speech engine has no idea who it is
+   * reading for, and a lineup where half the men answer in a woman's voice is a lineup
+   * nobody believes. Optional, and absent means "not specified", which the voice picker
+   * treats as the larger, mixed pool rather than as a man.
+   */
+  feminine?: boolean;
 }
 
 const INK = "#1c1613";
@@ -409,6 +430,55 @@ function ScratchArm({ spec }: { spec: CharacterSpec }) {
   );
 }
 
+/**
+ * Hands in his pockets.
+ *
+ * Same trick as the scratch: a stroked path with a real elbow, because rotating the rigid
+ * hanging arm can only ever swing it, and a man with his hands in his pockets is bent at
+ * the elbow with his forearms angled in. No hand circles, because the hands are the one
+ * part of this pose you are not supposed to see.
+ */
+function PocketArms({ spec }: { spec: CharacterSpec }) {
+  const arm = (d: string) => (
+    <>
+      <path d={d} fill="none" stroke={INK} strokeWidth="15" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={spec.suit} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  );
+  return (
+    <g>
+      {arm("M31 97 L16 127 L34 151")}
+      {arm("M69 97 L84 127 L66 151")}
+    </g>
+  );
+}
+
+/**
+ * Arms folded, which is the whole personality of some people in a police lineup.
+ *
+ * His left goes over his right, the way most people fold, and the hands land tucked under
+ * the opposite arm rather than out in the open, so the pose reads closed rather than as two
+ * limbs that happen to overlap.
+ */
+function FoldedArms({ spec }: { spec: CharacterSpec }) {
+  const arm = (d: string) => (
+    <>
+      <path d={d} fill="none" stroke={INK} strokeWidth="15" strokeLinecap="round" strokeLinejoin="round" />
+      <path d={d} fill="none" stroke={spec.suit} strokeWidth="11" strokeLinecap="round" strokeLinejoin="round" />
+    </>
+  );
+  return (
+    <g>
+      {/* his right, screen left, underneath */}
+      {arm("M31 99 L26 122 L60 131")}
+      <circle cx="62" cy="131" r="6" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+      {/* his left, screen right, over the top */}
+      {arm("M69 99 L74 118 L40 126")}
+      <circle cx="38" cy="126" r="6" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+    </g>
+  );
+}
+
 function Arms({
   spec,
   armIn,
@@ -418,6 +488,10 @@ function Arms({
   armIn: number;
   idle?: Idle;
 }) {
+  // Nothing behind the jacket for these two: their arms come round the front of it, and
+  // drawing them back here buried the fold entirely inside the torso.
+  if (idle === "pocket" || idle === "fold") return null;
+
   return (
     <g strokeLinejoin="round" strokeLinecap="round">
       {/* his right, screen left. Only drawn back here when it is hanging at his side: a
@@ -513,9 +587,20 @@ export function Character({
                 ? "idle-shift"
                 : idle === "glance"
                   ? "idle-glance"
-                  : undefined
+                  : idle === "pocket"
+                    ? "idle-sway"
+                    : idle === "nod" || idle === "fold"
+                      ? "idle-nod"
+                      : undefined
         }
-        style={{ transformOrigin: "50px 240px" }}
+        // A negative delay starts the cycle already part-way through, so two frightened men
+        // standing next to each other lose their nerve at different moments. Derived from
+        // the figure's own tilt, which is fixed per suspect, so his rhythm is his own and
+        // survives a re-render.
+        style={{
+          transformOrigin: "50px 240px",
+          ["--shiver-phase" as string]: `${-((Math.abs(spec.tilt) * 4.7) % 15).toFixed(2)}s`,
+        }}
       >
         {fullBody ? (
           <Body spec={spec} expression={expression} idle={idle} />
@@ -595,6 +680,8 @@ export function Character({
         {/* The hand he is scratching with passes in front of his own head, so it is the
             last thing drawn. Anywhere earlier and the pose is correct but invisible. */}
         {fullBody && idle === "scratch" && <ScratchArm spec={spec} />}
+        {fullBody && idle === "pocket" && <PocketArms spec={spec} />}
+        {fullBody && idle === "fold" && <FoldedArms spec={spec} />}
 
         {/* sweat, the classic cartoon tell, and it only ever appears when it means something */}
         {(expression === "nervous" || expression === "caught") && (

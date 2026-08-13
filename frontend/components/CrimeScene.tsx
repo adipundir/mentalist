@@ -216,19 +216,21 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
       preserveAspectRatio="xMidYMid slice"
       aria-hidden
     >
-      {/* ── his signature, on the back wall above the body ── */}
-      <g
-        transform={`translate(${scene.markX} 27) scale(0.95)`}
-        opacity={0.5}
-        style={{ filter: "blur(0.12px)" }}
-      >
-        <circle cx="0" cy="0" r="7.2" fill="none" stroke={BLOOD_DRY} strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M-3.4 -2.6 l0 0" stroke={BLOOD_DRY} strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M3.4 -2.6 l0 0" stroke={BLOOD_DRY} strokeWidth="2.6" strokeLinecap="round" />
-        <path d="M-4 2.2 Q0 6.4 4 2.2" fill="none" stroke={BLOOD_DRY} strokeWidth="1.5" strokeLinecap="round" />
-        {/* the drip, because it was painted with fingers and it ran */}
-        <path d="M5.6 4.2 q0.5 3.4 -0.2 6.2" stroke={BLOOD_DRY} strokeWidth="0.7" fill="none" opacity="0.75" />
-      </g>
+      {/* ── his signature, on the back wall above the body ──
+          The same photograph the title, the cold open and the unmasking use. Every room in
+          the game is supposed to have been signed by one hand, and four hand-drawn versions
+          of a face is four hands. Held back off the wall by opacity and a hair of blur: it
+          is paint that dried days ago under a bad light, not a decal. */}
+      <image
+        href="/brand/redjohn.png"
+        x={scene.markX - 8.5}
+        y={17.5}
+        width="17"
+        height="24.3"
+        opacity={0.42}
+        preserveAspectRatio="xMidYMid meet"
+        style={{ filter: "blur(0.12px) saturate(0.75) brightness(0.85)" }}
+      />
 
       {/* ── spatter ── */}
       {scene.spatter.map((sp, i) => (

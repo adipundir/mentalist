@@ -24,6 +24,13 @@ import { PoweredBy } from "@/components/PoweredBy";
  * look different from one nobody has touched, because it is.
  */
 
+/** The three edges the key art dissolves through, composited down to their intersection. */
+const JANE_MASK = [
+  "linear-gradient(to left, #000 42%, transparent 96%)",
+  "linear-gradient(to bottom, #000 72%, transparent 100%)",
+  "linear-gradient(to top, #000 94%, transparent 100%)",
+].join(", ");
+
 interface Row {
   pot: bigint;
   entrants: number;
@@ -98,13 +105,14 @@ export default function Board() {
   return (
     <main className="relative min-h-screen overflow-hidden px-5 pb-32 pt-6 sm:px-8">
       {/* The face of the show.
-          Key art running off the right edge of the frame and dissolving into the page, the
-          way a series presents itself on a streaming front page: cropped by the edge rather
-          than sitting in a box, lit from the side it faces, and graded down until it is
-          scenery for the type instead of competition for it. Held back on small screens,
-          where there is no room to be anything but in the way. */}
+          Key art standing on the bottom edge of the window and running off the right of it,
+          the way a series presents itself on a streaming front page: cropped by the frame
+          rather than sitting in a box, lit from the side it faces, graded down until it is
+          scenery for the type instead of competition for it. Fixed, not absolute — it is the
+          backdrop the board scrolls over, and a backdrop that slides away is just a picture.
+          Held back on small screens, where there is no room to be anything but in the way. */}
       <div
-        className="pointer-events-none absolute right-0 top-0 z-0 hidden h-[400px] w-[min(54vw,620px)] select-none md:block lg:h-[470px]"
+        className="pointer-events-none fixed right-0 top-0 z-0 hidden h-dvh w-[min(62vw,820px)] select-none overflow-hidden md:block"
         aria-hidden
       >
         {/* the light he is standing in */}
@@ -112,7 +120,7 @@ export default function Board() {
           className="absolute inset-0"
           style={{
             background:
-              "radial-gradient(56% 60% at 74% 36%, rgb(var(--blood) / 0.18) 0%, transparent 72%)",
+              "radial-gradient(52% 46% at 72% 30%, rgb(var(--blood) / 0.2) 0%, transparent 72%)",
           }}
         />
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -120,18 +128,16 @@ export default function Board() {
           src="/brand/jane.png"
           alt=""
           draggable={false}
-          className="absolute bottom-0 right-0 h-full w-auto max-w-none object-contain"
+          className="absolute right-0 top-0 h-full w-auto max-w-none object-contain object-top"
           style={{
-            // Two fades at once — off the left into the text, off the bottom into the
-            // board — so no straight cut ever shows. `intersect` is what keeps them from
-            // cancelling each other out into a fully opaque rectangle.
-            maskImage:
-              "linear-gradient(to left, #000 44%, transparent 95%), linear-gradient(to bottom, #000 60%, transparent 98%)",
-            WebkitMaskImage:
-              "linear-gradient(to left, #000 44%, transparent 95%), linear-gradient(to bottom, #000 60%, transparent 98%)",
+            // Three fades at once — off the left into the text, off the bottom into the
+            // board, and a touch off the top so his hair does not butt against the window
+            // edge. `intersect` is what stops them cancelling out into an opaque rectangle.
+            maskImage: JANE_MASK,
+            WebkitMaskImage: JANE_MASK,
             maskComposite: "intersect",
             WebkitMaskComposite: "source-in",
-            filter: "grayscale(0.4) contrast(1.06) brightness(0.82) sepia(0.14)",
+            filter: "grayscale(0.4) contrast(1.06) brightness(0.8) sepia(0.14)",
           }}
         />
       </div>
@@ -200,7 +206,9 @@ export default function Board() {
         })}
       </ol>
 
-      <PoweredBy fixed />
+      {/* At the foot of the board rather than pinned to the viewport: it is a credit,
+          not a HUD, and it was covering the cases it is meant to be underneath. */}
+      <PoweredBy className="relative z-10 mx-auto mt-16 w-full max-w-[1100px]" />
     </main>
   );
 }

@@ -41,7 +41,7 @@ export function PoweredBy({
       }
     >
       <div className="pointer-events-auto flex flex-wrap items-center justify-center gap-x-6 gap-y-3">
-        <span className="font-mono text-[9px] tracking-file text-bone-dim/75">POWERED BY</span>
+        <span className="flex h-5 items-center font-mono text-[9px] tracking-file text-bone-dim/75">POWERED BY</span>
         {MARKS.map((m) => (
           <a
             key={m.alt}
@@ -49,12 +49,12 @@ export function PoweredBy({
             target="_blank"
             rel="noreferrer"
             aria-label={m.alt}
-            className="flex items-center gap-1.5 opacity-60 transition-opacity hover:opacity-100"
+            className="flex h-5 items-center gap-1.5 opacity-60 transition-opacity hover:opacity-100"
           >
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={m.src} alt={m.alt} className={`${m.h} w-auto`} />
+            <img src={m.src} alt={m.alt} className={`${m.h} w-auto shrink-0 self-center`} />
             {"word" in m && (
-              <span className="font-type text-[15px] leading-none tracking-wide text-bone">
+              <span className="font-type text-[15px] leading-none tracking-wide text-bone self-center">
                 {m.word}
               </span>
             )}
