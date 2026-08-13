@@ -6,7 +6,7 @@
  * themselves. Every case therefore has to be opened here, by the same key that deployed the
  * contract, or the board is seven permanently closed rows.
  *
- * The answers are read straight out of `frontend/lib/mentalist.ts` rather than copied into a
+ * The answers are read straight out of `frontend/lib/casebook.ts` rather than copied into a
  * table here. They are the same seven rows of data and a second copy of them is a second
  * thing to get wrong: a drifted answer would settle the market on the wrong man, silently,
  * because nothing on chain can be compared against the alibis afterwards.
@@ -33,7 +33,7 @@ import { handleTypes } from "@inco/lightning-js";
 import * as dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { MENTALIST } from "../../frontend/lib/mentalist";
+import { CASEBOOK } from "../../frontend/lib/casebook";
 
 dotenv.config();
 
@@ -54,7 +54,7 @@ function artifact(name: string): { abi: Abi; bytecode: Hex } {
 
 /** Red John's seat: the one account in the room that cannot be true. */
 function answerOf(index: number): number {
-  const seat = MENTALIST[index]!.alibis.findIndex((a) => a.impossible);
+  const seat = CASEBOOK[index]!.alibis.findIndex((a) => a.impossible);
   if (seat < 0) throw new Error(`case ${index} has no impossible alibi`);
   return seat;
 }
@@ -67,7 +67,7 @@ async function main() {
   // Fail before spending gas rather than four cases in. Each room's alibi list has to match
   // the suspect count the contract is told, or a case is opened over a room that is not the
   // one the frontend paints.
-  for (const [i, c] of MENTALIST.entries()) {
+  for (const [i, c] of CASEBOOK.entries()) {
     if (c.alibis.length !== c.suspects || c.roster.length !== c.suspects) {
       throw new Error(`case ${i} (${c.title}) does not agree with itself on how many people are in the room`);
     }
@@ -93,7 +93,7 @@ async function main() {
 
   const zap = await Lightning.baseSepoliaTestnet();
 
-  for (const [i, c] of MENTALIST.entries()) {
+  for (const [i, c] of CASEBOOK.entries()) {
     // The ciphertext is bound to this account and this contract, and `openCase` ingests it
     // with `newEuint256(msg.sender)`, so the key that encrypts has to be the key that sends,
     // and it has to be the owner.
