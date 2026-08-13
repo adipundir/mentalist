@@ -33,6 +33,12 @@ interface IJackpotRandomTicketBuyer {
 }
 
 interface IJackpot {
+    /** Five unique normals in [1, ballMax] and one bonusball in [1, bonusballMax]. */
+    struct Ticket {
+        uint8[] normals;
+        uint8 bonusball;
+    }
+
     function ticketPrice() external view returns (uint256);
 
     function currentDrawingId() external view returns (uint256);
@@ -42,4 +48,27 @@ interface IJackpot {
     function referralFees(address referrer) external view returns (uint256);
 
     function claimReferralFees() external;
+}
+
+/**
+ * Megapot's bulk route. `createBatchOrder` registers an order and Megapot's own keeper mints
+ * it out across later transactions, so the cost of ordering does not scale with the count:
+ * twenty-five tickets ordered for 277k gas, against 1.3M to mint a single one immediately.
+ * That is the whole reason it exists, and the only way a winner converts a large share.
+ *
+ * One live order per recipient, so `hasActiveBatchOrder` has to be checked before creating.
+ */
+interface IBatchPurchaseFacilitator {
+    function createBatchOrder(
+        address recipient,
+        uint64 dynamicTicketCount,
+        IJackpot.Ticket[] calldata userStaticTickets,
+        address[] calldata referrers,
+        uint256[] calldata referralSplit,
+        bytes32 source
+    ) external;
+
+    function hasActiveBatchOrder(address recipient) external view returns (bool);
+
+    function minimumTicketCount() external view returns (uint256);
 }

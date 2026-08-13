@@ -8,7 +8,7 @@ import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { ReentrancyGuard } from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import { IJackpot, IJackpotRandomTicketBuyer } from "./Megapot.sol";
+import { IBatchPurchaseFacilitator, IJackpot, IJackpotRandomTicketBuyer } from "./Megapot.sol";
 
 /**
  * @title  Mentalist: a prediction market on a name nobody can read
@@ -90,6 +90,12 @@ contract Mentalist is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────── state
 
     IJackpotRandomTicketBuyer public immutable ticketBuyer;
+
+    /// @dev Megapot's bulk route, set by the owner because it is not derivable from the buyer
+    ///      and is not published in the mainnet address table. Zero disables it and every
+    ///      payout falls back to the immediate purchase below, so a wrong or missing address
+    ///      costs tickets per call and never a winner's money.
+    IBatchPurchaseFacilitator public batchFacilitator;
     IJackpot public immutable jackpot;
     IERC20 public immutable usdc;
 
@@ -111,6 +117,15 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
     /// @dev Everything owed to open cases. The owner can never withdraw it.
     uint256 public reserved;
+
+    /// @dev What a winner has left to spend on tickets, once they have asked to be paid in
+    ///      them. A Megapot ticket costs about a megagas to mint and the public RPCs refuse a
+    ///      transaction past roughly 16.7M, so a share worth hundreds of tickets can never be
+    ///      converted in one call however it is written. Rather than clamp the winner to
+    ///      whatever fits and hand back the rest as cash, the remainder is held here and they
+    ///      come back for more. It stays inside `reserved` the whole time, so it is still
+    ///      their money and the owner can never reach it.
+    mapping(uint16 => mapping(address => uint256)) public ticketCredit;
 
     /// @dev The address the keeper files verdicts from. It is a courier and not an authority:
     ///      `resolveFor` verifies a covalidator signature over a handle this contract stored,
@@ -143,18 +158,18 @@ contract Mentalist is Ownable, ReentrancyGuard {
     ///      ceiling below is a bound on gas, not a promise about what a share converts to:
     ///      whatever it refuses leaves as USDC down the remainder path in `payout`.
     ///
-    ///      Five, and the figure comes off the chain rather than out of the air. A single
-    ///      quick-pick costs 1,305,946 gas here, measured by buying one: the buyer draws five
-    ///      unique normals and a bonusball per ticket, and that work does not get cheaper in
-    ///      bulk. The public RPCs refuse any transaction over roughly 16.7M, so ten tickets
-    ///      cannot fit and twenty was never close. Five lands near 6.5M and leaves the rest
-    ///      of the budget for the transfer and the bookkeeping around it.
+    ///      Ten a call, which is Megapot's own per-transaction limit on every immediate
+    ///      purchase route. The figure comes off the chain: a quick-pick costs 1,305,946 gas
+    ///      here, measured, so ten lands near 13M and the public RPCs refuse anything past
+    ///      roughly 16.7M.
     ///
-    ///      This bounds the *form*, never the amount. Whatever the ceiling refuses leaves as
-    ///      USDC on the same path, and the ticket bonus is computed on the whole share, so a
-    ///      winner who takes tickets is still paid the full five percent extra.
-    uint256 public constant TICKETS_PER_BATCH = 5;
-    uint256 public constant MAX_BATCHES = 1;
+    ///      Ten a call is not ten in total. What the call cannot take is kept as
+    ///      `ticketCredit` and the winner comes back for the next ten, as often as they like,
+    ///      until the whole share has been converted. `BatchPurchaseFacilitator` is the
+    ///      protocol's own answer to the same problem and would do it in one order, but it is
+    ///      not deployed on Base Sepolia: the published table is mainnet only and the mainnet
+    ///      address holds an unrelated contract here.
+    uint256 public constant TICKETS_PER_BATCH = 10;
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
     bytes32 public constant SOURCE = bytes32("mentalist");
 
@@ -181,6 +196,9 @@ contract Mentalist is Ownable, ReentrancyGuard {
     event Resolved(uint16 indexed caseId, address indexed player, bool won);
     event Settled(uint16 indexed caseId, uint128 pot, uint128 winningStake, uint32 winners);
     event RakeTaken(uint16 indexed caseId, uint256 amount);
+    event TicketsBought(uint16 indexed caseId, address indexed player, uint256[] ticketIds, uint256 creditLeft);
+    event BatchOrdered(uint16 indexed caseId, address indexed player, uint256 tickets, uint256 creditLeft);
+    event CreditTaken(uint16 indexed caseId, address indexed player, uint256 amount);
     event ResolverSet(address indexed resolver);
     event PaidOut(uint16 indexed caseId, address indexed player, uint256 share, uint256[] ticketIds);
     event Refunded(uint16 indexed caseId, address indexed player, uint256 amount);
@@ -207,6 +225,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
     error NotResolver();
     error CaseHasMoneyIn();
     error LengthMismatch();
+    error NoCredit();
 
     constructor(IJackpotRandomTicketBuyer _ticketBuyer, address _owner) Ownable(_owner) {
         ticketBuyer = _ticketBuyer;
@@ -539,12 +558,11 @@ contract Mentalist is Ownable, ReentrancyGuard {
      * @dev Tickets rather than cash on purpose: reading a room correctly buys real lottery
      *      entries, and the stakes of everyone who read it wrong are what buy them.
      *
-     *      Up to `TICKETS_PER_BATCH * MAX_BATCHES` of them, and then no more, because each
-     *      batch is a separate call into Megapot. Everything the ceiling and the ticket price
-     *      between them leave over goes back as USDC rather than being kept. At the price Base
-     *      Sepolia quotes that remainder is most of a real winner's share, not the sub-ticket
-     *      change the ceiling was written for, so nothing that talks to a player may call it
-     *      dust.
+     *      `TICKETS_PER_BATCH` of them here, and the rest whenever they ask: what this call
+     *      cannot convert is kept as `ticketCredit` and `buyMoreTickets` spends the next ten,
+     *      as often as they like, until the whole share has become entries. A winner is no
+     *      longer capped at what one transaction's gas can hold, and `takeCredit` turns any
+     *      remainder back into USDC if they would rather stop.
      *
      *      Note for callers: the live buyer costs roughly a million gas a ticket, so a payout
      *      at the ceiling is around ninety million. That is well inside a Base block and well
@@ -586,51 +604,135 @@ contract Mentalist is Ownable, ReentrancyGuard {
         // reserving only what they put in would lock their winnings in here forever.
         reserved -= share;
         uint256 budget = share + bonus;
-
-        // Tickets are the preferred form of the payout, not a condition of it. If Megapot is
-        // shut (a drawing window, an LP lock, a permanent stop) or quoting a zero price, the
-        // share still leaves, as USDC, down the same remainder path below. Reverting here
-        // instead would strand the whole share: `refund` is closed to a case that had a
-        // winner and `withdrawSurplus` cannot reach reserved money.
-        uint256 count;
-        uint256 cost;
-        uint256 price = jackpot.ticketPrice();
-        if (wantTickets && price != 0 && jackpot.allowTicketPurchases()) {
-            count = budget / price;
-            if (count > TICKETS_PER_BATCH * MAX_BATCHES) count = TICKETS_PER_BATCH * MAX_BATCHES;
-            cost = price * count;
-        }
-
-        if (cost != 0) {
-            usdc.forceApprove(address(ticketBuyer), cost);
-            address[] memory referrers = new address[](1);
-            uint256[] memory split = new uint256[](1);
-            referrers[0] = address(this);
-            split[0] = FULL_REFERRAL_SPLIT;
-
-            ticketIds = new uint256[](count);
-            uint256 filled;
-            while (filled < count) {
-                uint256 batch = count - filled;
-                if (batch > TICKETS_PER_BATCH) batch = TICKETS_PER_BATCH;
-                uint256[] memory got = ticketBuyer.buyTickets(batch, msg.sender, referrers, split, SOURCE);
-                for (uint256 i; i < got.length; ++i) ticketIds[filled + i] = got[i];
-                filled += batch;
-            }
-            usdc.forceApprove(address(ticketBuyer), 0);
-        } else {
-            ticketIds = new uint256[](0);
-        }
-
-        // Whatever the tickets could not absorb leaves as cash, which on the USDC branch is
-        // the entire share. The bonus is only ever spent on tickets: it is not a cash prize,
-        // so a share that converted to nothing hands back the share and not a penny more.
-        uint256 paid = cost != 0 ? budget : share;
-        uint256 dust = paid - cost;
-        if (dust != 0) usdc.safeTransfer(msg.sender, dust);
-
-        emit PaidOut(caseId, msg.sender, paid, ticketIds);
+        return _buyAndBank(caseId, budget, wantTickets);
     }
+
+    /**
+     * @notice Convert the next ten tickets' worth of what you are owed.
+     *
+     * @dev The reason a winner has to come back at all is gas: a ticket costs about a megagas
+     *      to mint and no transaction gets past roughly 16.7M, so a share worth a hundred
+     *      tickets cannot become a hundred tickets in one call however it is written. Rather
+     *      than clamp them to whatever fits and push the rest back as cash, the remainder
+     *      stays theirs and this spends it, ten at a time, for as long as it lasts.
+     */
+    function buyMoreTickets(uint16 caseId) external nonReentrant returns (uint256[] memory) {
+        if (ticketCredit[caseId][msg.sender] == 0) revert NoCredit();
+        return _spendCredit(caseId);
+    }
+
+    /**
+     * @notice Take whatever is left of your ticket money as USDC instead.
+     *
+     * @dev The escape hatch, and the reason holding a remainder is safe: Megapot can be shut,
+     *      the price can move, a winner can simply change their mind, and none of that may
+     *      leave their money sitting in here. It is inside `reserved` until it is taken, so
+     *      `withdrawSurplus` can never reach it either.
+     */
+    function takeCredit(uint16 caseId) external nonReentrant {
+        uint256 amount = ticketCredit[caseId][msg.sender];
+        if (amount == 0) revert NoCredit();
+        ticketCredit[caseId][msg.sender] = 0;
+        reserved -= amount;
+        usdc.safeTransfer(msg.sender, amount);
+        emit CreditTaken(caseId, msg.sender, amount);
+    }
+
+    /// @dev The first conversion, straight off a payout.
+    function _buyAndBank(
+        uint16 caseId,
+        uint256 budget,
+        bool wantTickets
+    ) internal returns (uint256[] memory ids) {
+        if (!wantTickets) {
+            usdc.safeTransfer(msg.sender, budget);
+            emit PaidOut(caseId, msg.sender, budget, new uint256[](0));
+            return new uint256[](0);
+        }
+        // Banked first, spent second, so both paths run the same code and there is exactly
+        // one place that knows how to turn credit into tickets.
+        ticketCredit[caseId][msg.sender] = budget;
+        reserved += budget;
+        ids = _spendCredit(caseId);
+
+        // Anything that cannot become a ticket goes home as cash in this same transaction.
+        // Holding it back would strand a winner's money behind a second call for no gain, and
+        // it covers the case where Megapot is shut outright: the share still leaves, in full,
+        // exactly as it did before any of this existed.
+        uint256 left = ticketCredit[caseId][msg.sender];
+        if (left != 0) {
+            uint256 price = jackpot.ticketPrice();
+            if (price == 0 || left < price || !jackpot.allowTicketPurchases()) {
+                ticketCredit[caseId][msg.sender] = 0;
+                reserved -= left;
+                usdc.safeTransfer(msg.sender, left);
+            }
+        }
+
+        emit PaidOut(caseId, msg.sender, budget, ids);
+    }
+
+    /// @dev Spends up to `TICKETS_PER_BATCH` of a player's credit on real Megapot entries.
+    function _spendCredit(uint16 caseId) internal returns (uint256[] memory ticketIds) {
+        uint256 credit = ticketCredit[caseId][msg.sender];
+        uint256 price = jackpot.ticketPrice();
+
+        uint256 count;
+        if (price != 0 && jackpot.allowTicketPurchases()) {
+            count = credit / price;
+        }
+        if (count == 0) return new uint256[](0);
+
+        address[] memory referrers = new address[](1);
+        uint256[] memory split = new uint256[](1);
+        referrers[0] = address(this);
+        split[0] = FULL_REFERRAL_SPLIT;
+
+        // The bulk route first, because it is the only one that scales. Minting a ticket costs
+        // about a megagas and no transaction survives past roughly 16.7M, so an immediate
+        // purchase can never carry more than ten however it is written. Ordering does not work
+        // that way: twenty-five tickets cost 277k gas to register and Megapot's keeper mints
+        // them out afterwards. A share worth two hundred entries becomes two hundred entries.
+        //
+        // Skipped when the facilitator is unset, when the order would fall under its minimum,
+        // or when this player already has one in flight, since it keys orders by recipient.
+        if (address(batchFacilitator) != address(0) && count > TICKETS_PER_BATCH) {
+            uint256 minimum = batchFacilitator.minimumTicketCount();
+            if (count >= minimum && !batchFacilitator.hasActiveBatchOrder(msg.sender)) {
+                uint256 bulkCost = price * count;
+                ticketCredit[caseId][msg.sender] = credit - bulkCost;
+                reserved -= bulkCost;
+
+                usdc.forceApprove(address(batchFacilitator), bulkCost);
+                batchFacilitator.createBatchOrder(
+                    msg.sender,
+                    uint64(count),
+                    new IJackpot.Ticket[](0),
+                    referrers,
+                    split,
+                    SOURCE
+                );
+                usdc.forceApprove(address(batchFacilitator), 0);
+
+                // The keeper mints these later, so there are no ids to hand back yet. The
+                // count is what the event carries and what a client counts.
+                emit BatchOrdered(caseId, msg.sender, count, ticketCredit[caseId][msg.sender]);
+                return new uint256[](0);
+            }
+        }
+
+        if (count > TICKETS_PER_BATCH) count = TICKETS_PER_BATCH;
+        uint256 cost = price * count;
+        ticketCredit[caseId][msg.sender] = credit - cost;
+        reserved -= cost;
+
+        usdc.forceApprove(address(ticketBuyer), cost);
+        ticketIds = ticketBuyer.buyTickets(count, msg.sender, referrers, split, SOURCE);
+        usdc.forceApprove(address(ticketBuyer), 0);
+
+        emit TicketsBought(caseId, msg.sender, ticketIds, ticketCredit[caseId][msg.sender]);
+    }
+
 
     /**
      * @notice If nobody named him, everyone gets their stake back.
@@ -712,6 +814,11 @@ contract Mentalist is Ownable, ReentrancyGuard {
     ///         file a whole room and nobody has to come back to collect a win they already had.
     /// @dev Losing this key loses nothing: it cannot forge a verdict, and every player can
     ///      still `unseal` and `resolve` for themselves. Set it to zero to turn the keeper off.
+    /// @notice Point at Megapot's batch facilitator, or at zero to stop using it.
+    function setBatchFacilitator(address to) external onlyOwner {
+        batchFacilitator = IBatchPurchaseFacilitator(to);
+    }
+
     function setResolver(address to) external onlyOwner {
         resolver = to;
         emit ResolverSet(to);

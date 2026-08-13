@@ -25,10 +25,10 @@ import { activeChain, NETWORK } from "@/lib/network";
  * The block the live contract was deployed in. Log scans start here: `fromBlock: 0` asks for
  * a forty-five-million block range, which most public RPCs refuse outright.
  */
-export const DEPLOY_BLOCK = 45482713n;
+export const DEPLOY_BLOCK = 45483605n;
 
 export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ||
-  "0x7e77a3bcbdde6e39f2311ad1d779983d605746f8") as `0x${string}`;
+  "0xc499a06023c81917dcf6188928c34a1e8b54ab7e") as `0x${string}`;
 
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
 export const EXPLORER = activeChain.blockExplorers!.default.url;

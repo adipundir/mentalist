@@ -963,8 +963,8 @@ contract CasebookTest is IncoTest {
 
         vm.prank(jane);
         uint256[] memory ids = book.payout(CASE_ID, true);
-        assertEq(ids.length, 5, "five tickets in one call, which is the clamp");
-        assertEq(megapot.ticketsOf(jane), 5);
+        assertEq(ids.length, 10, "ten tickets in one call, which is the per-call clamp");
+        assertEq(megapot.ticketsOf(jane), 10);
         for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole in the middle of the batch");
     }
 
@@ -989,15 +989,28 @@ contract CasebookTest is IncoTest {
         vm.prank(jane);
         uint256[] memory ids = book.payout(CASE_ID, true);
 
-        uint256 ceiling = book.TICKETS_PER_BATCH() * book.MAX_BATCHES();
-        assertEq(ceiling, 5, "the ceiling this test exists to reach");
-        assertEq(ids.length, ceiling, "clamped at five in a single batch");
+        uint256 ceiling = book.TICKETS_PER_BATCH();
+        assertEq(ceiling, 10, "the per-call ceiling this test exists to reach");
+        assertEq(ids.length, ceiling, "clamped at ten in a single call");
         assertEq(megapot.ticketsOf(jane), ceiling, "and Megapot issued every one of them to her");
         for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole across either call");
 
-        assertEq(usdc.balanceOf(jane) - before, 4_950_000, "what the ceiling refused came back as cash");
-        assertEq(usdc.balanceOf(address(megapot)), 50_000, "and only the five tickets were paid for");
-        assertEq(book.reserved(), 0, "nothing of hers is still filed here");
+        assertEq(usdc.balanceOf(jane) - before, 0, "the remainder is not pushed back as cash");
+        assertEq(
+            book.ticketCredit(CASE_ID, jane),
+            4_900_000,
+            "it stays hers to spend on the next ten, and the ten after that"
+        );
+        assertEq(usdc.balanceOf(address(megapot)), 100_000, "and only the ten tickets were paid for");
+        assertEq(
+            book.reserved(),
+            4_900_000,
+            "her ticket credit is still owed to her, so it is still counted as owed"
+        );
+
+        vm.prank(jane);
+        book.takeCredit(CASE_ID);
+        assertEq(book.reserved(), 0, "and taking it is what closes the books");
         assertEq(usdc.balanceOf(address(book)), 0, "with nothing stranded");
     }
 
