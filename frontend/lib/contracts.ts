@@ -21,6 +21,12 @@ import { activeChain, NETWORK } from "@/lib/network";
  * silently empty address and a site where no case could be opened. The env var still wins if
  * it is set, which is what a local fork or a redeploy needs.
  */
+/**
+ * The block the live contract was deployed in. Log scans start here: `fromBlock: 0` asks for
+ * a forty-five-million block range, which most public RPCs refuse outright.
+ */
+export const DEPLOY_BLOCK = 45482713n;
+
 export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ||
   "0x7e77a3bcbdde6e39f2311ad1d779983d605746f8") as `0x${string}`;
 

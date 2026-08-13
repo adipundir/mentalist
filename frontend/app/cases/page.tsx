@@ -12,6 +12,7 @@ import { usdc } from "@/lib/market";
 import { SEASON_START, countdown, nextRelease, schedule } from "@/lib/schedule";
 import { Character } from "@/components/Character";
 import { PoweredBy } from "@/components/PoweredBy";
+import { TicketBalance } from "@/components/TicketBalance";
 
 /**
  * THE BOARD.
@@ -149,6 +150,7 @@ export default function Board() {
         <span className="text-bone-dim">/</span>
         <span className="font-mono text-[10px] tracking-file text-blood-hot">THE RED JOHN CASES</span>
         <div className="ml-auto flex items-center gap-3">
+          <TicketBalance />
           <ConnectButton showBalance={false} chainStatus="icon" />
         </div>
       </header>

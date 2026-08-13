@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { createPublicClient, createWalletClient, fallback, http, parseAbiItem } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
+import { DEPLOY_BLOCK, MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { activeChain } from "@/lib/network";
 import { attestVerdict } from "@/lib/inco";
 import { CASEBOOK } from "@/lib/casebook";
@@ -26,14 +26,6 @@ import { CASEBOOK } from "@/lib/casebook";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
-/**
- * The block this contract was deployed in. `fromBlock: 0` asks for a forty-five-million block
- * range, which publicnode refuses outright (`exceed maximum block range: 50000`) and
- * sepolia.base.org caps at 10,000. Only one provider in the fallback list served it, so the
- * keeper was one rate limit away from never settling anything. There are no logs before the
- * contract existed, so this loses nothing and every provider serves it.
- */
-const DEPLOY_BLOCK = 45482713n;
 
 const STAKED = parseAbiItem(
   "event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot)",
