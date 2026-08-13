@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { BootScreen } from "@/components/BootScreen";
+import { ColdOpen } from "@/components/ColdOpen";
 import * as sfx from "@/lib/sound";
 import { PoweredBy } from "@/components/PoweredBy";
 
@@ -161,6 +162,7 @@ export default function Home() {
 
       <AnimatePresence>
         {booting && <BootScreen onReady={() => router.push("/cases")} />}
+      <ColdOpen />
       </AnimatePresence>
     </main>
   );
