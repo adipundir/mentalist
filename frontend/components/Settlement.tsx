@@ -139,6 +139,21 @@ export function Settlement({
     return () => clearInterval(id);
   }, [refresh]);
 
+  // Nudge the keeper when somebody opens a case that has closed and not been filed. The
+  // schedule that normally does this runs on GitHub, which is late under load, and a player
+  // sitting on a finished case is the moment being late actually shows. It asks at most once
+  // a minute per browser, and the endpoint is idempotent, so a crowd all asking at once
+  // costs one round of work rather than one each.
+  useEffect(() => {
+    if (!row || row.settled || row.resolved) return;
+    if (Date.now() < row.closesAt) return;
+    const last = Number(sessionStorage.getItem("keeper-nudge") ?? 0);
+    if (Date.now() - last < 60_000) return;
+    sessionStorage.setItem("keeper-nudge", String(Date.now()));
+    // Nothing here waits on the answer: the poll above picks the result up either way.
+    void fetch("/api/keeper").catch(() => {});
+  }, [row]);
+
   /** One transaction per action, and each one waits for its receipt before the UI moves. */
   const send = useCallback(
     async (kind: Exclude<Busy, null>, label: string, run: () => Promise<`0x${string}`>) => {

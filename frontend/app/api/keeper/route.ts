@@ -36,14 +36,33 @@ function keeperAccount() {
   return privateKeyToAccount((key.startsWith("0x") ? key : `0x${key}`) as `0x${string}`);
 }
 
+/**
+ * The last time an unauthenticated caller was allowed to start a run.
+ *
+ * The site nudges this endpoint when a player is sitting on a case that has closed, which is
+ * the moment a late schedule actually shows, so the browser cannot be made to carry a secret
+ * and the door has to be open. It cannot be made to lie, but it can be made to spend the
+ * keeper's gas: a caller who hammers it during a filing window makes it send `unsealFor`
+ * again and again for players the covalidator is not yet signing for. A cooldown is the whole
+ * defence needed. It is per instance rather than shared, which only means a burst across
+ * several cold starts gets through, and that costs one extra round of work, not a drain.
+ */
+let lastOpenRun = 0;
+const OPEN_COOLDOWN_MS = 60_000;
+
 export async function GET(request: Request) {
-  // Vercel signs its own cron calls. Anything else needs the secret, because while this
-  // endpoint cannot be made to lie, it can be made to spend the keeper's gas.
   const secret = process.env.KEEPER_SECRET;
   const auth = request.headers.get("authorization");
-  const fromVercelCron = request.headers.get("x-vercel-cron") !== null;
-  if (!fromVercelCron && secret && auth !== `Bearer ${secret}`) {
-    return NextResponse.json({ error: "not authorised" }, { status: 401 });
+  // Vercel signs its own cron calls, and the GitHub schedule carries the secret. Both skip
+  // the cooldown; a browser does not.
+  const trusted =
+    request.headers.get("x-vercel-cron") !== null || (!!secret && auth === `Bearer ${secret}`);
+  if (!trusted) {
+    const now = Date.now();
+    if (now - lastOpenRun < OPEN_COOLDOWN_MS) {
+      return NextResponse.json({ ok: true, skipped: "asked too recently" });
+    }
+    lastOpenRun = now;
   }
 
   const account = keeperAccount();
