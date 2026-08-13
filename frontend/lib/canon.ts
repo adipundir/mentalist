@@ -98,7 +98,7 @@ export const CAST: Record<string, CanonPerson> = {
       facialHair: "none", accessory: "glasses", suit: "#8a6a44", shirt: "#c9a83f", tie: "#6b5327", tilt: 3 },
   ),
 
-  // Chapter 1–3 outsiders, from Jane's original notebook page.
+  // Chapter 1 to 3 outsiders, from Jane's original notebook page.
   mashburn: P("mashburn", "Walter Mashburn", "Industrialist",
     "Self-made, bored, and rich enough to be interesting. Collects cars, art and risk.",
     "Enjoys being suspected. Answers the question you didn't ask.",
