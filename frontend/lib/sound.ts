@@ -343,10 +343,29 @@ export function stabAccuse() {
 }
 
 /** Correct, a minor resolution. This is not a happy game. */
+/**
+ * Winning, in two flavours, alternating so a player who takes several cases in a row does not
+ * hear the same four notes each time.
+ *
+ * Both are built here out of oscillators. Nothing sampled, nothing borrowed: this ships in a
+ * public deployment and everything in it has to be ours to ship.
+ */
+let winTurn = 0;
+
 export function stingSolved() {
+  const ac = audio();
+  if (!ac) return;
+  if (winTurn++ % 2 === 0) stingSolvedRise();
+  else stingSolvedGasp();
+}
+
+/** A minor chord that arrives, opens up, and rings out. The straight one. */
+function stingSolvedRise() {
   brass([110, 130.8, 164.8], { peak: 0.19, decay: 1.5, sweepFrom: 2800, sweepTo: 320 });
   const ac = audio();
   if (!ac) return;
+  // The octave lands a beat late, on top, which is what makes it feel like a result rather
+  // than a chord.
   setTimeout(() => {
     const o = ac.createOscillator();
     o.type = "sine";
@@ -357,6 +376,64 @@ export function stingSolved() {
     o.start();
     o.stop(ac.currentTime + 1.6);
   }, 240);
+}
+
+/**
+ * The surprised one: a fast swoop up into a bright held note, the shape of somebody catching
+ * their breath. Same job as the meme sounds, done with oscillators.
+ */
+function stingSolvedGasp() {
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+
+  // The intake. A quarter second bending up nearly an octave.
+  const swoop = ac.createOscillator();
+  swoop.type = "triangle";
+  swoop.frequency.setValueAtTime(196, t0);
+  swoop.frequency.exponentialRampToValueAtTime(392, t0 + 0.26);
+  const sg = ac.createGain();
+  sg.gain.setValueAtTime(0.0001, t0);
+  sg.gain.exponentialRampToValueAtTime(0.13, t0 + 0.12);
+  sg.gain.setTargetAtTime(0.0001, t0 + 0.24, 0.1);
+  swoop.connect(sg);
+  toBus(sg, 0.7);
+  swoop.start(t0);
+  swoop.stop(t0 + 0.9);
+
+  // Then the held note it lands on, with a slow vibrato so it sounds sung rather than beeped.
+  const held = ac.createOscillator();
+  held.type = "sine";
+  held.frequency.setValueAtTime(392, t0 + 0.22);
+  const vib = ac.createOscillator();
+  vib.frequency.value = 5.2;
+  const vibDepth = ac.createGain();
+  vibDepth.gain.value = 4.5;
+  vib.connect(vibDepth).connect(held.frequency);
+
+  const hg = ac.createGain();
+  hg.gain.setValueAtTime(0.0001, t0 + 0.2);
+  hg.gain.exponentialRampToValueAtTime(0.15, t0 + 0.34);
+  hg.gain.setTargetAtTime(0.0001, t0 + 0.75, 0.42);
+  held.connect(hg);
+  toBus(hg, 1);
+  vib.start(t0 + 0.2);
+  held.start(t0 + 0.2);
+  held.stop(t0 + 2.4);
+  vib.stop(t0 + 2.4);
+
+  // A fifth underneath so the landing has a floor under it.
+  const low = ac.createOscillator();
+  low.type = "triangle";
+  low.frequency.value = 130.8;
+  const lg = ac.createGain();
+  lg.gain.setValueAtTime(0.0001, t0 + 0.22);
+  lg.gain.exponentialRampToValueAtTime(0.09, t0 + 0.4);
+  lg.gain.setTargetAtTime(0.0001, t0 + 0.8, 0.5);
+  low.connect(lg);
+  toBus(lg, 0.9);
+  low.start(t0 + 0.22);
+  low.stop(t0 + 2.4);
 }
 
 /** Wrong, a falling minor second, the sound of the door closing behind him. */
