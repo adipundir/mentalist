@@ -1,426 +1,270 @@
 # MENTALIST
 
-**Seven rooms. Everyone in them knows who did it. Not all of them will tell you.**
+**Seven rooms. A body in each one. Everybody gives an account of themselves, and exactly one of those accounts cannot be true.**
 
-**Play it: https://red-john-cases.vercel.app**
+Live: **https://red-john-cases.vercel.app**
+Source: **https://github.com/adipundir/mentalist**
 
-A confidential deduction game on Base Sepolia, adapted from the Red John arc of *The
-Mentalist*, wrapped in a pari-mutuel prediction market. Built on
-[Inco Lightning](https://docs.inco.org) and [Megapot](https://docs.megapot.io) for the
-Inco × Megapot Summer Game Jam, 2026.
+A confidential prediction market on Base Sepolia, built for the Inco x Megapot Summer Game Jam 2026, adapted from the Red John arc of *The Mentalist*.
 
-You stake USDC on a room full of suspects, work out which of them did it before your clock
-runs out, and if you are right you take a share of everything the people who were wrong put
-in, paid as real Megapot lottery tickets.
+You walk into a room, listen to everyone in it, work out which one is describing something that could not have happened, and stake USDC on that person. Everyone who names the right person splits the whole pot in proportion to what they staked, paid out as real Megapot lottery tickets bought with the money of everyone who was wrong.
 
 ---
 
-## The one line this game exists for
+## The game
 
-```solidity
-ebool truth  = e.or(...);              // is the killer inside the set he speaks about?
-ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's hidden honesty
-```
+Seven hand-written cases. Each case is a room containing a body and a number of people. Every case is a different room, and the rooms are different sizes: the smallest holds three people, the largest eight.
 
-What you are told is the truth about a secret you are hunting, corrupted by a second secret
-you also cannot see. The chain sees who spoke and who he spoke about. Only you see what he
-said.
-
-That is not privacy for its own sake, it is the entire strategic surface. Reveal the honesty
-bit and there is no game left.
-
-**Why no other approach does this.** Existing confidential games hide a *value*: a card, a
-board, a role, a bid. This hides a **transformation**. Commit-reveal cannot emulate it,
-because proving the answer was computed honestly would mean opening the honesty bit, which is
-precisely the information the game is about. A trusted server could do it, but then the
-server *is* the game.
-
----
-
-## How a case is played
-
-1. **Open the case.** Approve your stake, open your own case on `Mentalist`, hand the case id
-   to the market. Three transactions, and then a 20-minute clock.
-2. **Walk up to a man.** You click one suspect. That is the entire input.
-3. **He says one thing.** Every suspect has exactly one statement in him, and it is always
-   about the same fixed set of other suspects, decided before the case was dealt. The enclave
-   computes whether the killer is inside that set, then XORs the result with that speaker's
-   hidden honesty bit. **The words are scripted. The direction is not.** If he lies, the
-   sentence comes out inverted, and nothing about the delivery tells you which happened.
-4. **Everyone speaks once**, in whatever order you like.
-5. **Name him.** The board is revealed, the contract rules on whether you were right.
-
-There is no Focus budget to spend, no question builder, no control question, no turncoat. The
-only decision that matters is the last one, and everything before it is reading a room.
-
-> The contract still takes a question budget and a turncoat parameter, because it is a more
-> general machine than the game currently asks it to be. Every round is configured with one
-> question per suspect and the turncoat switched off, so neither appears in play.
-
-### Who each man speaks about is searched, not authored
-
-The claim masks in `frontend/lib/story.ts` were not written by taste. For each case, the
-assignment chosen is the one that leaves the fewest suspects standing once every man has
-spoken.
-
-It does not always leave one. Depending on how the case was dealt you can be left with two
-men who fit everything you were told, and on the larger boards sometimes three. That residual
-ambiguity is deliberate and it is the reason a stake means anything: some rooms hand you an
-answer, and some hand you a decision.
-
-### The lineup
-
-| Case | Title | Suspects | Lying |
+| Case | Title | Room | People |
 |---|---|---|---|
-| I | Cinnabar Sunday | 4 | 1 |
-| II | The Vermilion Hour | 6 | 2 |
-| III | Oxblood Handshake | 8 | 3 |
-| IV | Seven Shades of Crimson | 7 | 3 |
-| V | Carmine on Her Cheek | 6 | 4 |
-| VI | Claret and Brimstone | 5 | 4 |
-| VII | Sanguine | 3 | 2 |
+| I | Cinnabar Sunday | a shuttered Sunday parlour | 4 |
+| II | The Vermilion Hour | a shuttered safe house | 6 |
+| III | Oxblood Handshake | a half dead mall food court | 8 |
+| IV | Seven Shades of Crimson | a shuttered hotel lounge | 7 |
+| V | Carmine on Her Cheek | a dance hall's dirt cellar | 6 |
+| VI | Claret and Brimstone | the parlour where it happened | 5 |
+| VII | Sanguine | a chapel beside the graves | 3 |
 
-The liar count is the *base* count. The killer is welded onto it with one encrypted OR
-(`liar[i] = e.or(liar[i], guilt[i])`), so the realised number of liars is that figure or one
-more, and you never learn which. That denies you an exact parity check on the liar
-population, which would otherwise be worth a free deduction.
+Red John is the killer in every case. He always leaves the same mark, a smiling face drawn in the victim's blood.
 
-One case lands per day from the season epoch, and each stays playable until its round closes
-on chain, so a player who arrives late can still work the earlier rooms.
+Each person in the room gives exactly one spoken alibi. Exactly one of those alibis is logically **impossible**, and that person is Red John. Not suspicious, not shifty, not evasive: impossible. From Chapter VII, in the vestry of a chapel:
+
+> I shut myself in the vestry when the rain started and I bolted the door behind me. Nobody else in there the whole hour, just me and that little board they keep by the stove, and I got beaten before the candle was half down, which tells you exactly what kind of night I was having.
+
+Chess takes two. There was nobody on the other side of the board.
+
+The other six cases run on the same principle with different shapes: asleep for a whole hour and also certain nobody came up the stairs, bolted alone behind a door and also standing over the body outside it, standing third in a queue with nobody else in the building, three miles on foot in four minutes, upstairs with the trapdoor shut and also watching what happened at the bottom of the steps, a phone call made on a line that has been dead since Tuesday.
+
+The loop is:
+
+1. Click a person. They talk. This is free: no transaction, no signature, nothing on chain.
+2. Hear out as many of them as you want, in any order.
+3. Work out which account cannot be true.
+4. Stake USDC on that person.
+
+---
+
+## Where Inco is load bearing
+
+Inco is **TEE-based confidential compute** running on Intel TDX. It is **not FHE** and it is **not zero knowledge**. "Secret" here means the value is decrypted and operated on inside an enclave. "Provably fair" here means a covalidator attestation, not a zk proof. That is a hardware trust assumption and it is worth stating plainly rather than dressing up.
+
+**The alibis are public.** Every word every person says is in `frontend/lib/casebook.ts`, in the repository, where anyone can read them. That is deliberate: they are content, and content belongs in the repo.
+
+**What is secret is which person gives the impossible alibi.** That is the answer, and it is the only thing worth hiding.
+
+The design in `contracts/contracts/Casebook.sol`:
+
+- The case author encrypts Red John's person id on their own machine and hands the contract a ciphertext. `openCase` ingests it straight into an `euint256` and calls `e.allowThis`. The person id is never in the repository, never in calldata, never in a log, and not readable afterwards by the account that put it there.
+- A player calls `stake` with their USDC amount and their own encrypted person id.
+- The contract compares the two inside the enclave with `e.eq(named, _answer[caseId])`, gets an `ebool`, and grants it to that player alone with `e.allow(right, msg.sender)`. The handle is stored in `verdictHandle` so the contract knows exactly which ciphertext that player must later open.
+- After the case closes, the player files a `DecryptionAttestation` over their own verdict bit. `resolve` checks the handle matches the one it stored, then verifies the covalidator signatures through `inco.incoVerifier().isValidDecryptionAttestation`. The contract rules on who won, not the client.
+
+So the answer is never public, and neither is anybody's bet. A spectator watching the chain sees stakes arriving and cannot tell who anyone backed, which means they cannot watch the informed money and copy it.
+
+**Why not commit-reveal.** Two reasons, both fatal. The operator would have to hold the answer until settlement, which means they could change it. And a hash commitment over a person id drawn from a range of 3 to 8 is brute forced instantly. The answer has to be *usable* while still secret, because the contract has to compare against it. That is what a TEE gives and a hash does not.
 
 ---
 
 ## The market
 
-`contracts/contracts/CaseMarket.sol`. One round per case, each with its own pot.
+Pari-mutuel, one pot per case.
 
-- **Stake USDC to enter**, between 0.10 and 5.00. **One entry per wallet per case.** You get
-  one read of each room.
-- **A 20-minute play window** starts when your stake lands. Name him inside it and you are a
-  winner. Miss, or run out of clock, and your stake stays in the pot.
-- **Winners split the whole pot**, pro rata to stake: `pot * yourStake / totalWinningStake`.
-  Conviction pays twice, once for being right and once for how much you were willing to put
-  behind it.
-- **Payout is in real Megapot tickets**, bought for the winner's wallet with the losers'
-  stakes and gifted straight to them, batched in tens because Megapot's quick-pick buyer
-  rejects counts outside 1 to 10. Anything left under the price of a whole ticket is returned
-  as USDC rather than kept by the house.
-- **If nobody solves a case**, everyone who entered gets their stake back. A pot with no
-  winners has nobody to divide it among.
+- Stake between 0.10 and 5.00 USDC, one entry per wallet per case.
+- Winners split the **whole** pot in proportion to stake: `pot * yourStake / totalWinningStake`. Being right pays once for being right and once for how much you were willing to put behind it.
+- Payout is in real **Megapot tickets**, bought for the winner's wallet with the losers' stakes. Batched in tens because Megapot's quick-pick buyer rejects counts outside 1 to 10. Whatever is left under the price of a whole ticket goes back to the player as USDC rather than being kept by the house.
+- If nobody names him, everyone who entered gets their stake back. A pot with no winners has nobody to divide it among.
 
-It is pari-mutuel rather than fixed odds for a reason: fixed odds need a bookmaker with a
-balance sheet, and any multiplier this contract set would be a number someone invented. A
-pool sets its own price and can never be insolvent, because it only ever pays out what it
-already holds.
+Pari-mutuel rather than fixed odds because fixed odds need a bookmaker with a balance sheet, and any multiplier this contract set would be a number somebody invented. A pool sets its own price and can never be insolvent: it only ever pays out what it already holds.
 
-### The market never touches an encrypted handle
+Two Megapot facts that cost time to establish, both confirmed against the chain by RPC rather than read off a docs page:
 
-The order of operations is the point, and it is why staking is three transactions instead of
-one. **The player opens their own case on `Mentalist`**, so every answer is granted to them
-with `e.allow` and to nobody else, the market included. Only then is the case id handed to
-`enter`, which verifies that the case is theirs, untouched (`questionsAsked == 0`), and
-matches the lineup this round calls for. Without that check a player could walk in with a
-four-man case and take the pot off people who played the eight-man one.
+- The live protocol is **V2** (`Jackpot` plus `JackpotRandomTicketBuyer`). The V1 `BaseJackpot` / `purchaseTickets` API that fills every search result is archived and incompatible.
+- `_referralSplitBps` is **1e18-scaled** despite the name, and must sum to exactly `1e18`. Passing basis points silently mis-splits the fee. `FULL_REFERRAL_SPLIT` is `1e18` with a comment saying why.
 
-Settlement runs the same way round. `recordResult` reads `solved` off the game contract, and
-`solved` only becomes true after `Mentalist.settle` has verified a covalidator attestation
-over the accused seat's encrypted guilt bit, with a handle-match check. **The pool settles
-against Inco's attested verdict**, not against anything the player or the browser asserts. A
-market that settled on a number the client reported would just be a scoreboard.
+Nothing else about Megapot is hardcoded: the jackpot address and the ticket token are read off the buyer contract at construction, and the ticket price is read live on every payout.
 
 ---
 
-## What this does not do
+## Status
 
-**It does not guarantee a single answer.** The claim search minimises how many suspects
-survive the testimony, not the worst case. Cases with small lineups usually collapse to one
-man; the middle chapters frequently leave two, and the eight-man and seven-man boards can
-leave three. When that happens you are betting, not solving, and the pari-mutuel split is
-built for exactly that.
+Honest accounting, because it matters.
 
-**It is testnet only.** Base Sepolia, testnet USDC, and Megapot's testnet jackpot. The stakes
-are real transactions with no real money behind them. There is no mainnet deployment.
+### On chain on Base Sepolia
 
-**The seven cases are a fixed run, not generated content.** The rosters, the scripts, the
-crime scenes and the claim masks are seven hand-built rooms released one a day. What is dealt
-fresh inside each one is the layout: who is guilty and who lies, placed by the enclave every
-time a case is opened. When the seventh case closes, the season is over.
+| | |
+|---|---|
+| `Mentalist` | [`0xc93769517ff196330dfd9a6bf997adec0e322cf2`](https://sepolia.basescan.org/address/0xc93769517ff196330dfd9a6bf997adec0e322cf2) |
+| `CaseMarket` | [`0xbcf4b0ca661ecf415e382355cc05a5ec8ce8f653`](https://sepolia.basescan.org/address/0xbcf4b0ca661ecf415e382355cc05a5ec8ce8f653) |
+| Megapot `Jackpot` | [`0x465dA3c859f193A3807386387bEE941B2A4c3279`](https://sepolia.basescan.org/address/0x465dA3c859f193A3807386387bEE941B2A4c3279) |
+| Megapot `JackpotRandomTicketBuyer` | [`0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746`](https://sepolia.basescan.org/address/0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746) |
+| USDC | [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e) |
 
----
+Those first two are the addresses in `frontend/.env.local`, in `frontend/.env.example`, and in the JavaScript the live site actually ships. The Megapot and USDC addresses are the ones in `frontend/lib/contracts.ts` and `contracts/scripts/deploy-market.ts`.
 
-## Playing it
+### The deployed pair is an earlier design
 
-You need two things in a Base Sepolia wallet:
+`Mentalist.sol` and `CaseMarket.sol` are what the frontend points at, and they implement an earlier version of the idea: the enclave dealt a **different culprit to each player**. That is a good puzzle and a poor market. A shared pot only means something if everyone is betting on the same question, and if we are all solving different problems then the pot is a pile of unrelated bets and "the odds" mean nothing.
 
-- **Testnet USDC** for the stake, from [faucet.circle.com](https://faucet.circle.com)
-  (`0x036CbD53842c5426634e7929541eC2318f3dCF7e`).
-- **A little test ETH** for gas and for the Inco list fee that opening a case charges. The
-  fee is quoted by `quoteOpenFee` and is a fraction of a cent.
+### The deployed `Mentalist` is older than `Mentalist.sol`
 
-Everything else in the game is fee-free: `interrogate` runs `getEbool`, `e.or`, `e.xor` and
-`e.allow`, none of which charge an Inco fee, so the moment-to-moment loop is an ordinary
-cheap Base transaction.
+Checked with `eth_getCode` and `eth_call` against Base Sepolia rather than assumed. The build at `0xc937...` still carries `interrogate(uint256,uint8,uint16)` and a plaintext `accuse(uint256,uint8)`. It has no `beginHearing`, no `statementOf`, no `quoteNameFee`, and no ciphertext form of `accuse`. `CaseMarket`'s deployed bytecode, by contrast, matches its source function for function.
 
----
+That gap has a consequence, so it goes here rather than in a footnote: `frontend/lib/chain-oracle.ts` opens the room by calling `beginHearing`, and on the deployed game that call has nothing to hit. Its accusation path already probes `quoteNameFee` and falls back to a plaintext seat when the game is too old for the encrypted one, but the hearing step has no such fallback. Redeploying `Mentalist` is the same blocked step as everything else below: the deployer wallet is out of gas.
 
-## What's here
+### Casebook.sol is the corrected design and is not deployed
 
-```
-contracts/
-  contracts/Mentalist.sol      the game: encrypted deal, the xor lie, attested settlement
-  contracts/CaseMarket.sol     the pari-mutuel pool, and the Megapot payout
-  contracts/CaseRewards.sol    the Megapot interfaces (IJackpot, IJackpotRandomTicketBuyer)
-                               plus the standalone per-case ticket path the market supersedes
-  test-forge/                  52 Foundry tests, no Docker required
-  scripts/deploy-market.ts     deploys both contracts and opens all seven rounds
-  scripts/play-onchain.ts      a full case against the live covalidator, not a mock
-frontend/
-  lib/story.ts                 the seven cases: rosters, claim masks, prose
-  lib/canon.ts                 the cast, drawn to the character system
-  lib/script.ts                what a suspect says, and why the words are not the answer
-  lib/chain-oracle.ts          Base + Inco: both reveal loops, and the races they hit
-  lib/solver.ts                the Notebook, enumerates every layout still consistent
-  lib/schedule.ts              one case a day, derived from a fixed epoch
-  components/Scene.tsx         the room, which is the whole interface
-  components/Stake.tsx         approve, open your own case, hand it to the market
-  components/Settlement.tsx    file the verdict, record it, collect in tickets
-DESIGN.md                      why the game is shaped this way
-```
+`contracts/contracts/Casebook.sol` is the contract described in the Inco section above: one authored answer per case, encrypted once, everyone betting on the same name. It is **written but not deployed and not tested**. There is no test file for it and no deploy script for it, and the string `Casebook` does not appear anywhere in `contracts/scripts`, `contracts/test-forge` or `contracts/ignition`. The reason is mundane: the deployer wallet ran out of gas. Nothing in this section should be read as live.
 
-### Which Inco loop, where
+The frontend is likewise still pointed at the deployed pair. `frontend/lib/contracts.ts` reads `NEXT_PUBLIC_MENTALIST_ADDRESS` and `NEXT_PUBLIC_MARKET_ADDRESS` and knows nothing about a `Casebook` address yet.
 
-Both reveal models are used, each where it belongs.
+### Encrypted accusations: written and tested, not deployed
 
-- **Loop B, private decrypt, for testimony.** `interrogate` grants the answer to the
-  detective with `e.allow`, and the client reads it with `attestedDecrypt`. Nobody else can
-  read it, not even by watching the chain.
-- **Loop A, public reveal, plus Model A settlement, for the verdict.** `accuse` calls
-  `e.reveal` over the whole board, so the post-mortem paints with no signature at all, and
-  `settle` hands the covalidator's attestation back to the contract with a handle-match
-  check. The signature alone would only prove the enclave decrypted *some* handle; without
-  the match a player could settle on a different, conveniently true bit.
-
-### Art and audio
-
-No art or audio assets. Every character is drawn as inline SVG from a spec, every sound is
-synthesised at runtime with the Web Audio API, the narrator is the browser's own speech
-synthesis, and the room is a generated crime scene laid out from the case index, so Chapter I
-and Chapter VI are recognisably different rooms without seven sets of coordinates to
-maintain. The only image files in the repository are the Inco, Megapot and Base brand marks
-in `frontend/public/brand`.
+The seat a player names is encrypted client side and ingested with `newEuint256`, so the accusation never appears in calldata, in a log, or on any explorer. This is written in `Mentalist.sol` and covered by the test suite. It is not part of what is currently deployed, and that is a checked fact rather than a hedge: the deployed bytecode has no `accuse(uint256,bytes)` in it.
 
 ---
 
-## Running it
+## What this does not do yet
+
+- **`Casebook.sol` has never run.** Not on a testnet, not against a local covalidator, not under `forge test`. It compiles and it is reviewed, and that is all that can be claimed for it.
+- **The live site cannot currently see a case through.** You can open one, and then the frontend asks the deployed game to open the room with a function that build does not have. Until `Mentalist` is redeployed, the URL above is a room you can walk into and not much else.
+- **The live site is the earlier design regardless.** Even once it is redeployed and playable, what is at that URL is the per-player-culprit version, not the shared-answer market. That waits on `Casebook`.
+- **Testnet only.** Base Sepolia, testnet USDC, Megapot's testnet jackpot. Real transactions, no real money. There is no mainnet deployment and no plan stated here for one.
+- **The seven cases are fixed content, not generated.** Once you have solved a case you know its answer permanently, so each room is single-use per person. There is no procedural case generator.
+- **No audit.** These are jam contracts. `Casebook.sol` in particular has had no adversarial review beyond the author's.
+- **The security claim rests on hardware.** If the TDX enclave or the covalidator set is compromised, the answer is readable. That is the honest boundary of what Inco provides.
+- **Encrypted accusations and the `Casebook` design have not been exercised together.** They are two pieces of unshipped work, not one tested system.
+
+---
+
+## Tests
+
+48 Foundry tests pass: 16 in `contracts/test-forge/Mentalist.t.sol`, 32 in `contracts/test-forge/CaseMarket.t.sol`. They cover the two contracts as they stand in this repository, which for `CaseMarket` is also what is deployed and for `Mentalist` is not. `Casebook.sol` has no suite.
 
 ```bash
-pnpm install          # see the note below if this fails
-pnpm dev              # http://localhost:3000
+cd contracts
+forge test
 ```
 
-> **`pnpm install` and SSH.** The Inco scaffold pins three git dependencies. If you don't
-> have GitHub SSH keys configured, pnpm fails with `Host key verification failed`. Either
-> use the HTTPS rewrite for one invocation:
->
-> ```bash
-> GIT_CONFIG_COUNT=2 \
->   GIT_CONFIG_KEY_0='url.https://github.com/.insteadOf' GIT_CONFIG_VALUE_0='ssh://git@github.com/' \
->   GIT_CONFIG_KEY_1='url.https://github.com/.insteadOf' GIT_CONFIG_VALUE_1='git@github.com:' \
->   pnpm install
-> ```
->
-> ...or set that rewrite globally. The `package.json` overrides already use `git+https://`
-> URLs; this covers transitive specs that don't.
+The ones worth naming:
 
-`frontend/.env.local` needs the deployed addresses. There is no offline mode: without them
-the room paints but cannot be played, because a simulated case would be a different game.
+| Test | What it pins down |
+|---|---|
+| `test_ExactlyOneManIsLying` | exactly one person in the room gives a false account |
+| `test_TheRoomIsUnreadableUntilYouOpenIt` | the answer cannot be read until its own player opens the room |
+| `test_EveryManGetsHisOwnAccountAndOnlyTheLiarGetsTheTell` | no two people give the same account |
+| `test_CannotRerollIntoAnEasierDeal` | a player cannot open cases until one is convenient and bet on that |
+| `test_CannotRecordAfterTheRoundHasSealed` | results cannot join `winningStake` after the round seals and dilute shares already computed |
+| `test_ReservedDrainsToZeroOnceWinnersArePaid` | payouts account exactly, with nothing stranded in the contract |
+| `test_SubTicketRemainderGoesBackToThePlayer` | rounding dust returns to the winner rather than to the house |
+| `test_OwnerCannotWithdrawAnotherRoundsStakes` | `withdrawSurplus` can only ever move referral fees and dust |
+
+Two notes on the harness, since they bound what the suite proves.
+
+The dealer used to build an encrypted list and shuffle it, and Inco's in-process Foundry mock (v1.0.0) does not implement the elist operations that needs, so the suite ran against a substitute dealer and the real one was only ever exercised on a live network. It no longer does. `_deal` now places the impossible account with one `e.randBounded` draw and a row of comparisons, all of which the mock supports, so these tests run the production dealing code exactly as written. `_deal` is still `virtual` and nothing overrides it.
+
+The other note is what makes any of it assertable: the mock hands the test a plaintext oracle. `get(handle)` reads a ciphertext in the clear, with `getBoolValue` and `getUint256Value` as typed wrappers over the same store, and `getDecryptionAttestation(requester, HandleWithProof)` mints an attestation on demand. Production code can do none of that, which is exactly the point, and it is why a green suite is evidence about the rules of the game rather than about the confidentiality claim.
+
+---
+
+## Running it locally
+
+```bash
+pnpm install
+pnpm dev            # http://localhost:3000
+```
+
+If `pnpm install` fails with `Host key verification failed`, that is the three git dependencies in the root `package.json` overrides (`forge-std`, `ds-test`, `@safe-global/safe-smart-account`) resolving over SSH. Rewrite them for one invocation:
+
+```bash
+GIT_CONFIG_COUNT=2 \
+  GIT_CONFIG_KEY_0='url.https://github.com/.insteadOf' GIT_CONFIG_VALUE_0='ssh://git@github.com/' \
+  GIT_CONFIG_KEY_1='url.https://github.com/.insteadOf' GIT_CONFIG_VALUE_1='git@github.com:' \
+  pnpm install
+```
+
+Copy `frontend/.env.example` to `frontend/.env.local`. The addresses in it are the Base Sepolia deployment:
 
 ```
 NEXT_PUBLIC_MENTALIST_ADDRESS=0xc93769517ff196330dfd9a6bf997adec0e322cf2
 NEXT_PUBLIC_MARKET_ADDRESS=0xbcf4b0ca661ecf415e382355cc05a5ec8ce8f653
 NEXT_PUBLIC_NETWORK=testnet
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=       # optional, enables mobile wallets
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=      # optional, adds mobile wallets
 ```
 
-### Contracts
+There is no offline mode. Without addresses the room paints but cannot be played, because a simulated case would be a different game. With those addresses it paints and still cannot be played to the end, for the reason in the status section above.
+
+To play you need two things in a Base Sepolia wallet: testnet USDC from [faucet.circle.com](https://faucet.circle.com), and a little test ETH for gas and for the Inco fee charged when a ciphertext is ingested. Listening to people costs nothing.
+
+---
+
+## Deploying
 
 ```bash
 cd contracts
-forge test                              # 52 Foundry tests, in-process Inco mock, no Docker
+cp .env.sample .env          # set PRIVATE_KEY_BASE_SEPOLIA and BASE_SEPOLIA_RPC_URL
 pnpm compile
-pnpm deploy:market                      # both contracts, then opens all seven rounds
-pnpm play:onchain                       # a real case against the live covalidator
+pnpm deploy:market           # deploys Mentalist + CaseMarket, opens all seven rounds
 ```
 
-`deploy:market` is deliberately one script for both contracts: the market checks that the
-case you hand it matches the lineup its round calls for, so the specs it is configured with
-and the rosters the frontend opens cases with have to be the same seven rows of data.
+`deploy:market` is one script for both contracts on purpose: the market checks that the case handed to it matches the lineup its round calls for, so the specs it is configured with and the rosters the frontend opens cases with have to be the same seven rows of data. The round table in `contracts/scripts/deploy-market.ts` mirrors `frontend/lib/casebook.ts`.
 
-`play:onchain` opens a real case, asks a question, reads the answer back through
-`attestedDecrypt`, narrows to a single suspect, accuses, settles, and asserts the invariants
-the design rests on. If it passes, the whole confidential loop works against a live
-covalidator rather than a mock.
+Then put the two printed addresses into `frontend/.env.local`.
 
----
+Other scripts against the live chain:
 
-## Live on Base Sepolia
-
-| | |
-|---|---|
-| `Mentalist` | [`0xc93769517ff196330dfd9a6bf997adec0e322cf2`](https://sepolia.basescan.org/address/0xCF72B6D36619861521BF1b04f3A64e3647aE9356) |
-| `CaseMarket` | [`0xbcf4b0ca661ecf415e382355cc05a5ec8ce8f653`](https://sepolia.basescan.org/address/0x8b1508f518e4a04961c5f57ad6734304574f05f7) |
-| Megapot `Jackpot` | [`0x465dA3c859f193A3807386387bEE941B2A4c3279`](https://sepolia.basescan.org/address/0x465dA3c859f193A3807386387bEE941B2A4c3279) |
-| Megapot `JackpotRandomTicketBuyer` | [`0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746`](https://sepolia.basescan.org/address/0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746) |
-| USDC | [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e) |
-
-Two Megapot facts worth stating, both confirmed against the chain by RPC rather than read off
-a docs page. The live protocol is **V2** (`Jackpot` + `JackpotRandomTicketBuyer`); the V1
-`BaseJackpot` / `purchaseTickets` API that fills search results is archived and incompatible.
-And `_referralSplitBps` is **1e18-scaled** despite the name, and must sum to exactly `1e18`;
-passing basis points silently mis-splits the fee. `CaseMarket.FULL_REFERRAL_SPLIT` is `1e18`
-with a comment saying so. Nothing else is hardcoded that shouldn't be: the market reads the
-jackpot and the ticket token off the buyer contract at construction, and the ticket price
-live on every claim.
-
----
-
-## Proved on chain, with money
-
-`contracts/scripts/prove-market.ts` runs the entire loop against the live contracts and a
-live covalidator: it stakes real USDC, opens a case, hears every suspect's statement through
-attested decryption, solves it from the statements alone with no privileged reads, names a
-man, files the attestation, and records the result against the pot.
-
-```
-resuming case #3 (already staked 1 USDC)
-pot is 1 USDC across 1 entrant(s)
-contract ruled: CORRECT
-recorded: won=true  share=1 USDC
-round: pot 1, winning stake 1, 1 entrants, 1 winners
-
-PASS  market took the stake
-PASS  entry is bound to the case that was dealt
-PASS  the contract's ruling and the market agree
-PASS  a solved case has a share, a missed one does not
-PASS  deduction narrowed the room
+```bash
+pnpm play:onchain    # a full case against the live covalidator, not a mock
+pnpm prove:market    # stake, play, settle, and assert the market invariants end to end
 ```
 
-An earlier run of the same script on case II drew two surviving candidates, named the wrong
-one, and correctly took nothing. That is the game working, not failing.
-
-> The script reads every value until two consecutive reads agree. Base Sepolia's public
-> endpoints are load balanced, and a read issued straight after a receipt can land on a node
-> that has not seen the block. An earlier version reported a solved case as a miss for
-> exactly that reason, which is a lie about the chain rather than a finding about the
-> contract.
-
-## Testing notes
-
-`forge test` runs 52 Foundry tests: 23 on the game, 26 on the market.
-
-The game suite asserts that `answer` is exactly `truth XOR honesty` for every witness and
-every subset, that there is exactly one killer and he always lies, that testimony is
-decryptable by the detective and by nobody else, that the layout is decryptable by nobody at
-all until an accusation, that settlement rejects a validly signed attestation for the wrong
-handle, and that abandoning a case resolves it as a loss.
-
-The market suite asserts one entry per wallet, that a case belonging to someone else or
-already in progress or with the wrong lineup is refused, that solving after the deadline
-loses, that the pot splits pro rata to stake, that a claim buys real tickets and batches them
-correctly, that the sub-ticket remainder goes back to the player, that nobody solving means
-everybody is refunded, that `reserved` drains to zero once winners are paid, and that the
-owner cannot withdraw another round's stakes. It runs against a mock jackpot that mirrors the
-real buyer's constraints; the live path is exercised on Base Sepolia.
-
-Two things worth flagging honestly:
-
-**elist operations are not implemented in Inco's in-process Foundry mock** (v1.0.0), so a
-contract that shuffles cannot execute under `forge test` at all. `_deal` is therefore
-`virtual`, and `MentalistHarness` substitutes a `randBounded`-based dealer that exercises
-every other rule. The one property the harness does not reproduce is *exactly K liars*, since
-its honesty draw is binomial rather than a shuffle of a fixed multiset. The real dealer needs
-the Docker covalidator or a testnet deploy.
-
-**The documented Foundry cheatcode names have drifted.** `getBoolValue` / `getUint256Value`
-do not exist in 1.0.0; the real surface is `get(handle)` and
-`getDecryptionAttestation(requester, HandleWithProof)`.
+`Casebook.sol` has no deploy script yet. Adding one, funding the deployer, redeploying `Mentalist` so the frontend's hearing call resolves, and repointing the frontend is the remaining work.
 
 ---
 
-## Measured on-chain latency
+## Repository layout
 
-From real playthroughs on Base Sepolia, measured with `pnpm --filter contracts play:onchain`
-and `scripts/measure-latency.ts`, warm SDK:
+```
+contracts/
+  contracts/Mentalist.sol        the game: encrypted deal, attested settlement,
+                                 encrypted accusations. Deployed, but from an older build
+  contracts/CaseMarket.sol       the deployed pari-mutuel pool and the Megapot payout
+  contracts/Casebook.sol         the corrected design: one encrypted answer per case,
+                                 encrypted bets, e.eq inside the enclave. NOT DEPLOYED
+  contracts/CaseRewards.sol      the Megapot interfaces (IJackpot, IJackpotRandomTicketBuyer)
+                                 that the other contracts import, plus CaseRewards itself,
+                                 the earlier Focus-for-tickets contract. NOT DEPLOYED
+  test-forge/Mentalist.t.sol     16 tests
+  test-forge/CaseMarket.t.sol    32 tests
+  scripts/deploy-market.ts       deploys the pair and opens all seven rounds
+  scripts/play-onchain.ts        a real case against a live covalidator
+  scripts/prove-market.ts        the full staking loop against the live contracts
+  scripts/measure-latency.ts     on-chain timings
+frontend/
+  lib/casebook.ts                the seven cases: rooms, rosters, every alibi, every tell
+  lib/canon.ts                   the cast, drawn to the character system
+  lib/contracts.ts               addresses and the ABI fragments actually used
+  lib/chain-oracle.ts            Base plus Inco: the reveal loops and the races they hit
+  lib/schedule.ts                one case a day from a fixed epoch
+  lib/market.ts                  stake bounds and the case window
+  lib/sound.ts                   the whole audio palette, synthesised at runtime
+  lib/narrator.ts                the browser's own speech synthesis
+  components/Scene.tsx           the case as it plays out, phase by phase
+  components/Room.tsx            the room itself, and everyone standing in it
+  components/Character.tsx       every person, as parameterised SVG
+  components/CrimeScene.tsx      the crime scene, generated per case
+  components/Stake.tsx           approve, open, hand it to the market
+  components/Settlement.tsx      file the verdict, record it, collect in tickets
+DESIGN.md                        why the game is shaped the way it is
+```
 
-| step | time |
-|---|---|
-| SDK cold init | ~1.7 s (pre-warmed during the boot screen) |
-| `openCase` | ~2.1 s |
-| `interrogate` (mining) | 1.6 to 2.4 s |
-| `attestedDecrypt` | 5.5 to 11.3 s, ~8 s typical, and it does *not* improve when warm |
-| a six-move case, end to end | ~103 s |
-
-The decrypt dominates by a wide margin and is irreducible from the client side, so the game
-is built around it rather than pretending otherwise. The wait is staged as named beats, the
-suspect performs through it, and a drone beats a minor second until the answer resolves it to
-unison. Ten seconds of a suspect refusing to answer is the tensest thing in an interrogation.
-Ten seconds of a progress bar is a bug report.
-
-An earlier draft of the frontend had guessed the decrypt at ~1.6 s, wrong by roughly 5x, with
-the animation budget built on top of that guess.
-
-Two races only a live run surfaces, both now handled in `lib/chain-oracle.ts`:
-
-- **Stale reads.** `sepolia.base.org` is load-balanced, so a confirmed receipt does not mean
-  the next `eth_call` reaches a node with that block. viem simulates before every write, so
-  the first `interrogate` could revert `WrongStatus()` against state that was already
-  committed. The oracle waits for the case to read back as open.
-- **"acl disallowed" is not terminal.** For a second or two after `interrogate` lands, the
-  covalidator can see the answer handle before it has indexed the `e.allow` that came with
-  it, so `inco.isAllowed(handle, detective)` returns `true` on-chain while the enclave still
-  refuses. The SDK treats `PermissionDenied` as fatal, so an outer retry wraps it. Without
-  that, the first question of every session fails.
-
----
-
-## Honest framing
-
-Inco is **TEE-based confidential compute, not FHE, and not zk.** "Secret" means the value is
-decrypted inside an Intel TDX enclave. "Provably fair" means a covalidator attestation, not a
-zero-knowledge proof.
-
-The claim this game makes is real and worth making: the deployer genuinely cannot know who
-the killer is, because placement happens inside the enclave and no plaintext ever touches the
-chain. But it rests on a hardware trust assumption, and that is worth saying plainly rather
-than overselling.
-
-The fiction is adapted from the Red John arc of *The Mentalist*, which is CBS-owned. No art,
-audio or text assets are taken from it: the cast is drawn from scratch as SVG and every line
-in the game is written for it. 1794 poem, which is public domain, and which is also the arc's own passcode.
+`frontend/lib/solver.ts`, `frontend/lib/oracle.ts`, `frontend/lib/suspects.ts` and `frontend/lib/script.ts` belong to the earlier design and are still in the tree because the deployed contracts still use it. `frontend/lib/story.ts` is not one of them: the chapters moved into `casebook.ts` and what is left in that file is the finale text, which `app/story/page.tsx` renders.
 
 ---
 
-## Pre-existing work disclosure
+## Built with
 
-Required by the jam's Terms & Conditions §4.2 ("You must disclose in writing any pre-existing,
-project-specific work included in your submission, along with details in your repository
-history and description").
+Next.js 16 (App Router), React 19, Tailwind 4, wagmi, viem, RainbowKit, Foundry, Hardhat, `@inco/lightning` and `@inco/lightning-js` v1.0.0, OpenZeppelin, Megapot's deployed V2 contracts.
 
-**There is no pre-existing project-specific work in this submission.** Everything in
-`contracts/contracts/`, `contracts/test-forge/`, `contracts/scripts/`, `frontend/lib/`,
-`frontend/hooks/`, `frontend/components/` and `frontend/app/` was written during the jam
-window and is visible as incremental commits in this repository's history.
+**No art or audio assets at all.** Every character is drawn as parameterised SVG, every sound is synthesised at runtime with the Web Audio API, the narrator is the browser's own speech synthesis, and every crime scene is generated from the case index. The image files in the repository are the Inco, Megapot, Base and USDC brand marks in `frontend/public/brand`, the site icon at `frontend/app/icon.svg`, and `next.svg` and `vercel.svg` left over from the Next.js scaffold.
 
-What is *not* ours, and is used as a building block under §4.1 ("You may use open-source
-libraries, frameworks, public SDKs, and third-party APIs, including Inco and Megapot
-tooling"):
-
-| | |
-|---|---|
-| Project skeleton | `create-inco-app` (Inco's official scaffold): Hardhat + Next.js + RainbowKit wiring. Its two example contracts (`ConfidentialERC20`, `ConfidentialLottery`) were **deleted**; see commit `0ce43c5`. |
-| Confidential compute | `@inco/lightning` and `@inco/lightning-js` v1.0.0 |
-| Lottery protocol | Megapot's deployed `Jackpot` and `JackpotRandomTicketBuyer` contracts |
-| Everything else | Next.js, React, wagmi, viem, Tailwind, framer-motion, Foundry, OpenZeppelin |
-
-The very first commit (`0d502db`) is the untouched scaffold, so the diff from that commit to
-`HEAD` is exactly the work done during the jam.
+The fiction is adapted from the Red John arc of *The Mentalist*, which is CBS-owned. No art, audio or text is taken from it: the cast is drawn from scratch and every line in the game is written for it.
