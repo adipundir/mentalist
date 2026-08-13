@@ -22,8 +22,8 @@ export default function Home() {
   // going instead of dropping to silence. On a first, cold visit the browser refuses and
   // this does nothing, which is the correct and unavoidable behaviour.
   useEffect(() => {
-    if (sfx.audioReady()) sfx.startRoomTone();
-    return () => sfx.stopRoomTone();
+    if (sfx.audioReady()) sfx.startTitleBed();
+    return () => sfx.stopTitleBed();
   }, []);
 
   return (
@@ -129,7 +129,8 @@ export default function Home() {
           // rather than letting the loading screen run in silence.
           sfx.thud();
           sfx.knock();
-          sfx.startRoomTone();
+          // The bed comes up the moment audio unlocks, and carries under the loading screen.
+          sfx.startTitleBed();
           setBooting(true);
         }}
         className="mt-9 cursor-pointer border-2 border-blood-hot bg-blood-hot/10 px-10 py-3 font-type text-[20px] tracking-wide text-blood-hot transition-colors hover:bg-blood-hot/25"

@@ -439,3 +439,80 @@ export function thud() {
   n.start();
   n.stop(ac.currentTime + 0.25);
 }
+
+/**
+ * The bed under the title screen.
+ *
+ * Not a track. A held minor chord, very low and very quiet, with the two upper voices
+ * detuned by a few cents so they beat slowly against each other and the pad never sits
+ * still. There is no melody and no rhythm on purpose: this is a room you are standing in
+ * before anything has happened, and anything with a pulse would start telling you how to
+ * feel about it.
+ *
+ * Browsers will not let this start on a cold visit, because an AudioContext is suspended
+ * until a real gesture. It comes up on the first click and on any later return to the
+ * title, which is the most that can honestly be done.
+ */
+let bed: { stop: () => void } | null = null;
+
+export function startTitleBed() {
+  const ac = audio();
+  if (!ac || bed) return;
+
+  const out = ac.createGain();
+  out.gain.setValueAtTime(0.0001, ac.currentTime);
+  out.gain.exponentialRampToValueAtTime(0.05, ac.currentTime + 4);
+
+  // A slow sweep across the top so the chord opens and closes rather than droning flat.
+  const lp = ac.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 420;
+  lp.Q.value = 0.6;
+
+  const sweep = ac.createOscillator();
+  sweep.frequency.value = 0.045; // one breath every twenty two seconds
+  const sweepDepth = ac.createGain();
+  sweepDepth.gain.value = 190;
+  sweep.connect(sweepDepth).connect(lp.frequency);
+  sweep.start();
+
+  // D minor, rooted low. The fifth is left out: a bare root, third and octave is emptier,
+  // and empty is the point.
+  const voices = [
+    { hz: 36.7, type: "sine" as const, gain: 0.55 },
+    { hz: 73.4, type: "triangle" as const, gain: 0.3, detune: -7 },
+    { hz: 87.3, type: "triangle" as const, gain: 0.22, detune: 6 },
+    { hz: 146.8, type: "sine" as const, gain: 0.12, detune: -4 },
+  ];
+
+  const oscs = voices.map((v) => {
+    const o = ac.createOscillator();
+    o.type = v.type;
+    o.frequency.value = v.hz;
+    if (v.detune) o.detune.value = v.detune;
+    const g = ac.createGain();
+    g.gain.value = v.gain;
+    o.connect(g).connect(lp);
+    o.start();
+    return o;
+  });
+
+  lp.connect(out);
+  toBus(out, 0.9); // a lot of room on it, so it reads as a space rather than a synth
+
+  bed = {
+    stop: () => {
+      if (!ctx) return;
+      out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.7);
+      setTimeout(() => {
+        oscs.forEach((o) => o.stop());
+        sweep.stop();
+      }, 2600);
+    },
+  };
+}
+
+export function stopTitleBed() {
+  bed?.stop();
+  bed = null;
+}

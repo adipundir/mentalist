@@ -61,6 +61,9 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
         await new Promise((r) => setTimeout(r, 170));
       }
       sfx.knock(0.7);
+      // Hand over to the room: two ambiences at once is mud.
+      sfx.stopTitleBed();
+      sfx.startRoomTone();
       // Hand off shortly after the knock; the first narrated line plays over the board.
       setTimeout(onReady, 650);
     })();
