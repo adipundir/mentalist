@@ -381,8 +381,8 @@ function HangingArm({ spec, armIn }: { spec: CharacterSpec; armIn: number }) {
       {/* The hand goes in first and the cuff is drawn over it. Drawn the other way round,
           its own outline runs straight across the end of the sleeve and the hand reads as a
           ball stuck onto the arm rather than as a hand coming out of it. */}
-      <circle cx="25" cy="164" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
-      <path d="M31 94 Q18 126 19 161 L31 162 Q31 126 38 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+      <circle cx="25" cy="163.5" r="6.4" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+      <path d="M31 94 Q18 126 19 158.5 L31 159.5 Q31 126 38 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
     </g>
   );
 }
@@ -502,8 +502,8 @@ function Arms({
       {idle !== "scratch" && <HangingArm spec={spec} armIn={armIn} />}
       {/* his left, screen right */}
       <g transform={`rotate(${-armIn} 69 99)`} style={{ transformOrigin: "69px 99px" }}>
-        <circle cx="75" cy="164" r="6.5" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
-        <path d="M69 94 Q82 126 81 161 L69 162 Q69 126 62 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <circle cx="75" cy="163.5" r="6.4" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
+        <path d="M69 94 Q82 126 81 158.5 L69 159.5 Q69 126 62 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
       </g>
     </g>
   );

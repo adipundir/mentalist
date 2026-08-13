@@ -241,14 +241,10 @@ export function Scene({
       </div>
 
       {/* ── one instruction, always telling you the next click ── */}
-      <div
-        className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-12 sm:px-7"
-        style={{ background: "linear-gradient(transparent, rgb(8 7 9 / 0.88) 45%)" }}
-      >
+      <div className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-12 sm:px-7">
         {g.allSpoken && stakePanel ? (
-          // No box round it. The gradient this bar already sits on is enough to hold the
-          // type, and a hard panel edge cuts the room in half right where the player is
-          // looking at it.
+          // Nothing behind it. No box, no wash: the room runs all the way to the bottom of
+          // the frame and the money sits on top of it.
           <div className="mx-auto max-w-[1100px] py-1">{stakePanel}</div>
         ) : (
           <div className="flex flex-wrap items-center gap-3">

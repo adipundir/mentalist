@@ -963,8 +963,8 @@ contract CasebookTest is IncoTest {
 
         vm.prank(jane);
         uint256[] memory ids = book.payout(CASE_ID, true);
-        assertEq(ids.length, 25, "twenty-five tickets across three calls");
-        assertEq(megapot.ticketsOf(jane), 25);
+        assertEq(ids.length, 20, "twenty tickets across two calls, which is the clamp");
+        assertEq(megapot.ticketsOf(jane), 20);
         for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole in the middle of the batch");
     }
 
@@ -972,8 +972,8 @@ contract CasebookTest is IncoTest {
     ///         case rather than an edge one, and this is the only test that reaches it.
     /// @dev The mock's default 1 USDC is a hundred times the live quote: `ticketPrice()` on
     ///      0x465dA3c859f193A3807386387bEE941B2A4c3279 returns 10_000, so a share of one whole
-    ///      USDC already buys the full hundred. Every other payout test sits far under the clamp
-    ///      and under three batches, which is a shape no mainnet payout will ever have. Here a
+    ///      USDC already buys the full twenty. Every other payout test sits far under the clamp
+    ///      and under two batches, which is a shape no mainnet payout will ever have. Here a
     ///      default-maximum stake would buy five hundred, gets a hundred, and the four USDC that
     ///      the ceiling refused come back as cash instead of being kept.
     function test_ClampAndFullBatchingAtTheLiveTicketPrice() public {
@@ -990,13 +990,13 @@ contract CasebookTest is IncoTest {
         uint256[] memory ids = book.payout(CASE_ID, true);
 
         uint256 ceiling = book.TICKETS_PER_BATCH() * book.MAX_BATCHES();
-        assertEq(ceiling, 100, "the ceiling this test exists to reach");
-        assertEq(ids.length, ceiling, "clamped at a hundred across ten full batches");
+        assertEq(ceiling, 20, "the ceiling this test exists to reach");
+        assertEq(ids.length, ceiling, "clamped at twenty across two full batches");
         assertEq(megapot.ticketsOf(jane), ceiling, "and Megapot issued every one of them to her");
-        for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole across ten calls");
+        for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole across either call");
 
-        assertEq(usdc.balanceOf(jane) - before, 4_000_000, "what the ceiling refused came back as cash");
-        assertEq(usdc.balanceOf(address(megapot)), 1_000_000, "and only the hundred tickets were paid for");
+        assertEq(usdc.balanceOf(jane) - before, 4_800_000, "what the ceiling refused came back as cash");
+        assertEq(usdc.balanceOf(address(megapot)), 200_000, "and only the twenty tickets were paid for");
         assertEq(book.reserved(), 0, "nothing of hers is still filed here");
         assertEq(usdc.balanceOf(address(book)), 0, "with nothing stranded");
     }

@@ -231,19 +231,19 @@ export function Stake({
 
       {!address ? (
         <>
-          <div className="max-w-[320px]">
-            <p className="font-body text-[13px] leading-snug text-bone">
-              You have heard them all and it has cost you nothing.{" "}
-              <span className="text-blood-hot">Connect a wallet only if you want to back
-              your read</span>{" "}
-              with money.
-            </p>
+          <p className="max-w-[420px] flex-1 font-body text-[13px] leading-snug text-bone">
+            You have heard them all and it has cost you nothing.{" "}
+            <span className="text-blood-hot">Connect a wallet only if you want to back your
+            read</span>{" "}
+            with money.
+          </p>
+          <div className="shrink-0">
+            <ConnectButton showBalance={false} chainStatus="icon" />
           </div>
-          <ConnectButton showBalance={false} chainStatus="icon" />
         </>
       ) : (
         <>
-          <div>
+          <div className="shrink-0">
             <p className="font-mono text-[10px] tracking-file text-bone-dim">
               YOUR STAKE{" "}
               {balance !== null && (
@@ -293,52 +293,54 @@ export function Stake({
             </div>
           </div>
 
-          <div className="max-w-[280px]">
-            <p className="font-body text-[13px] leading-snug text-bone">
-              {naming ? (
-                <>
-                  You are naming <span className="font-type text-bone">{naming}</span>, and
-                  nobody will see it but you.{" "}
-                  <span className="text-blood-hot">The more you put down, the bigger your
-                  share</span>{" "}
-                  of what the wrong answers leave behind.
-                </>
-              ) : (
-                <>
-                  <span className="text-blood-hot">Click the man whose story cannot be
-                  true</span>
-                  , then put your money on it.
-                </>
-              )}
-            </p>
-          </div>
+          {/* Same width and roughly the same length whichever state it is in, so naming
+              somebody does not re-wrap the row underneath it. */}
+          <p className="min-h-[36px] w-[300px] shrink-0 font-body text-[13px] leading-snug text-bone">
+            {naming ? (
+              <>
+                You are naming <span className="font-type">{naming}</span>. Nobody sees it but
+                you, and{" "}
+                <span className="text-blood-hot">the more you put down, the bigger your
+                share</span>.
+              </>
+            ) : (
+              <>
+                <span className="text-blood-hot">Click the man whose story cannot be
+                true</span>
+                , then put your money on it.
+              </>
+            )}
+          </p>
 
           <button
             type="button"
             onClick={place}
             disabled={busy || short || outOfRange || !naming || !open}
-            className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2.5 font-mono text-[11px] tracking-file text-blood-hot transition-colors hover:bg-blood-hot/25 disabled:cursor-not-allowed disabled:border-ink-3 disabled:bg-transparent disabled:text-bone-dim/60"
+            className="w-[210px] shrink-0 cursor-pointer border border-blood-hot bg-blood-hot/15 px-4 py-2.5 font-mono text-[11px] tracking-file text-blood-hot transition-colors hover:bg-blood-hot/25 disabled:cursor-not-allowed disabled:border-ink-3 disabled:bg-transparent disabled:text-bone-dim/60"
           >
+            {/* Every label short enough to sit inside one fixed-width button. The name is
+                already spelled out in the line to the left, and repeating it in here is what
+                used to push the button onto a row of its own. */}
             {step === "sealing"
-              ? "SEALING THE NAME…"
+              ? "SEALING…"
               : step === "approving"
                 ? "APPROVING…"
                 : step === "staking"
-                  ? "PLACING YOUR STAKE…"
+                  ? "PLACING…"
                   : // An unread case is not a closed one, and saying so would be inventing a
                     // fact about the contract. The button stays disabled either way, because
                     // `!null` is true: unknown fails closed.
                     open === null
                     ? "READING THE CHAIN…"
                     : !open
-                      ? "THIS CASE IS NOT TAKING MONEY"
+                      ? "NOT TAKING MONEY"
                       : !naming
                         ? "PICK YOUR MAN"
                         : outOfRange
-                          ? `BETWEEN $${usdc(MIN_STAKE)} AND $${usdc(MAX_STAKE)}`
+                          ? `$${usdc(MIN_STAKE)} TO $${usdc(MAX_STAKE)}`
                           : short
                             ? "NOT ENOUGH USDC"
-                            : `NAME ${naming.toUpperCase()}, $${usdc(amount)} ON IT`}
+                            : `PUT $${usdc(amount)} ON IT`}
           </button>
         </>
       )}

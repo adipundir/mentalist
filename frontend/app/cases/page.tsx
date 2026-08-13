@@ -304,7 +304,7 @@ function CaseCard({
         </div>
 
         <div className="text-right">
-          <p className="font-mono text-[9px] tracking-file text-bone-dim">IN THE POT</p>
+          <p className="mb-1.5 font-mono text-[9px] tracking-file text-bone-dim">IN THE POT</p>
           <p className="font-type text-[19px] leading-none text-brass">
             ${row ? usdc(row.pot) : "0.00"}
           </p>

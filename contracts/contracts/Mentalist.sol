@@ -140,11 +140,16 @@ contract Mentalist is Ownable, ReentrancyGuard {
     mapping(uint16 => uint128) public caseMaxStake;
 
     /// @dev Megapot's quick-pick buyer batches, so a large share takes several calls. The
-    ///      ceiling below is a bound on gas, not a promise about what a share converts to: at
-    ///      the price Base Sepolia quotes it is worth about a dollar of tickets, and the rest
-    ///      of the share leaves as USDC down the remainder path in `payout`.
+    ///      ceiling below is a bound on gas, not a promise about what a share converts to:
+    ///      whatever it refuses leaves as USDC down the remainder path in `payout`.
+    ///
+    ///      Twenty, measured rather than guessed. A quick-pick ticket costs about 410k gas on
+    ///      this chain, and the public RPCs refuse any single transaction over roughly 16.7M,
+    ///      so the old hundred-ticket ceiling was unreachable by a factor of five: a payout
+    ///      that tried for thirty-nine tickets burned 15.8M and died out of gas. Twenty lands
+    ///      near 8M, which leaves room for the settlement work around it.
     uint256 public constant TICKETS_PER_BATCH = 10;
-    uint256 public constant MAX_BATCHES = 10;
+    uint256 public constant MAX_BATCHES = 2;
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
     bytes32 public constant SOURCE = bytes32("mentalist");
 

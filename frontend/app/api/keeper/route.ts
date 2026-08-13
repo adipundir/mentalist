@@ -33,7 +33,7 @@ export const maxDuration = 60;
  * keeper was one rate limit away from never settling anything. There are no logs before the
  * contract existed, so this loses nothing and every provider serves it.
  */
-const DEPLOY_BLOCK = 45479277n;
+const DEPLOY_BLOCK = 45482159n;
 
 const STAKED = parseAbiItem(
   "event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot)",
@@ -224,11 +224,11 @@ export async function GET(request: Request) {
         });
         await publicClient.waitForTransactionReceipt({ hash });
         step.settled = true;
-        if (unfiled.length) {
+        if (Number(after[4]) > Number(after[8])) {
           // Everyone here is now permanently unfiled: `resolve` is shut and this closes the
           // books. They refund rather than win, so no money is lost, but a correct player just
           // failed to get paid and that must not be logged as a normal settlement.
-          step.unfiledAtSettle = unfiled.length;
+          step.unfiledAtSettle = Number(after[4]) - Number(after[8]);
         }
       } else {
         step.state = step.filed ? "filed, waiting out the window" : "waiting out the window";
