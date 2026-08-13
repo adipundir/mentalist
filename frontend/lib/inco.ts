@@ -70,12 +70,12 @@ async function withPatience<T>(attempt: () => Promise<T>): Promise<T> {
 /** Seal a person id for `Casebook`. Only that contract, for that account, can use it. */
 export async function sealPersonId(
   personId: number,
-  opts: { account: `0x${string}`; casebook: `0x${string}` },
+  opts: { account: `0x${string}`; game: `0x${string}` },
 ): Promise<Hex> {
   const zap = await getZap();
   return (await zap.encrypt(BigInt(personId), {
     accountAddress: opts.account,
-    dappAddress: opts.casebook,
+    dappAddress: opts.game,
     handleType: handleTypes.euint256,
   })) as Hex;
 }

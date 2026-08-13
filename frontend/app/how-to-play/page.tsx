@@ -96,12 +96,6 @@ export default function HowToPlay() {
         >
           OPEN THE BOARD
         </Link>
-        <Link
-          href="/about"
-          className="border border-ink-3 px-5 py-2 font-mono text-[10px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
-        >
-          THE TECHNICAL SIDE
-        </Link>
       </div>
 
       <PoweredBy fixed />

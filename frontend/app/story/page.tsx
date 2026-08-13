@@ -8,7 +8,7 @@ import { useAccount, usePublicClient } from "wagmi";
 import { CASEBOOK } from "@/lib/casebook";
 import { FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
-import { CASEBOOK_ABI, CASEBOOK_ADDRESS } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { releaseOf } from "@/lib/schedule";
 import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
@@ -75,8 +75,8 @@ function StoryInner() {
     const read = async () => {
       try {
         const c = await pub.readContract({
-          address: CASEBOOK_ADDRESS,
-          abi: CASEBOOK_ABI,
+          address: MENTALIST_ADDRESS,
+          abi: MENTALIST_ABI,
           functionName: "cases",
           args: [index],
         });
@@ -93,8 +93,8 @@ function StoryInner() {
         // not be made to walk the room again to reach it.
         if (address) {
           const staked = await pub.readContract({
-            address: CASEBOOK_ADDRESS,
-            abi: CASEBOOK_ABI,
+            address: MENTALIST_ADDRESS,
+            abi: MENTALIST_ABI,
             functionName: "hasStaked",
             args: [index, address],
           });

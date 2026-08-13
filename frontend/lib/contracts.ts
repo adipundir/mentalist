@@ -15,7 +15,7 @@ import { activeChain, NETWORK } from "@/lib/network";
  * Holds Red John's person id per case as a ciphertext, takes encrypted bets against it,
  * and pays whoever named him in Megapot tickets bought with the losers' stakes.
  */
-export const CASEBOOK_ADDRESS = (process.env.NEXT_PUBLIC_CASEBOOK_ADDRESS ??
+export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ??
   "") as `0x${string}`;
 
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
@@ -42,7 +42,7 @@ export const MEGAPOT = {
       : ("0x036CbD53842c5426634e7929541eC2318f3dCF7e" as `0x${string}`),
 } as const;
 
-export const CASEBOOK_ABI = [
+export const MENTALIST_ABI = [
   {
     // Authoring only. The answer is encrypted on the author's machine and this contract
     // never sees it in the clear, which is why it is payable: ingesting costs an Inco fee.

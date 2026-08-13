@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { CASEBOOK_ABI, CASEBOOK_ADDRESS, txUrl } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS, txUrl } from "@/lib/contracts";
 import { attestVerdict } from "@/lib/inco";
 import { usdc } from "@/lib/market";
 import { countdown } from "@/lib/schedule";
@@ -70,9 +70,9 @@ export function Settlement({
     if (!pub || !address) return;
     try {
       const [c, b, share] = await Promise.all([
-        pub.readContract({ address: CASEBOOK_ADDRESS, abi: CASEBOOK_ABI, functionName: "cases", args: [caseId] }),
-        pub.readContract({ address: CASEBOOK_ADDRESS, abi: CASEBOOK_ABI, functionName: "bets", args: [caseId, address] }),
-        pub.readContract({ address: CASEBOOK_ADDRESS, abi: CASEBOOK_ABI, functionName: "shareOf", args: [caseId, address] }),
+        pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "cases", args: [caseId] }),
+        pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "bets", args: [caseId, address] }),
+        pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "shareOf", args: [caseId, address] }),
       ]);
       setRow({
         closesAt: Number(c[0]) * 1000,
@@ -135,15 +135,15 @@ export function Settlement({
     setError(null);
     try {
       const handle = await pub.readContract({
-        address: CASEBOOK_ADDRESS,
-        abi: CASEBOOK_ABI,
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
         functionName: "verdictHandle",
         args: [caseId, address],
       });
       const { won, attestation, signatures } = await attestVerdict(wallet, handle);
       const hash = await wallet.writeContract({
-        address: CASEBOOK_ADDRESS,
-        abi: CASEBOOK_ABI,
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
         functionName: "resolve",
         args: [caseId, attestation, signatures],
         account: address,
@@ -214,8 +214,8 @@ export function Settlement({
             onClick={() =>
               send("settling", "BOOKS CLOSED", () =>
                 wallet!.writeContract({
-                  address: CASEBOOK_ADDRESS,
-                  abi: CASEBOOK_ABI,
+                  address: MENTALIST_ADDRESS,
+                  abi: MENTALIST_ABI,
                   functionName: "settle",
                   args: [caseId],
                   account: address!,
@@ -254,8 +254,8 @@ export function Settlement({
             onClick={() =>
               send("refunding", "STAKE RETURNED", () =>
                 wallet!.writeContract({
-                  address: CASEBOOK_ADDRESS,
-                  abi: CASEBOOK_ABI,
+                  address: MENTALIST_ADDRESS,
+                  abi: MENTALIST_ABI,
                   functionName: "refund",
                   args: [caseId],
                   account: address!,
@@ -280,8 +280,8 @@ export function Settlement({
             onClick={() =>
               send("paying", "TICKETS BOUGHT", () =>
                 wallet!.writeContract({
-                  address: CASEBOOK_ADDRESS,
-                  abi: CASEBOOK_ABI,
+                  address: MENTALIST_ADDRESS,
+                  abi: MENTALIST_ABI,
                   functionName: "payout",
                   args: [caseId],
                   account: address!,

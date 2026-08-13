@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { CASEBOOK_ABI, CASEBOOK_ADDRESS, ERC20_ABI, MEGAPOT } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS, ERC20_ABI, MEGAPOT } from "@/lib/contracts";
 import { getZap, sealPersonId } from "@/lib/inco";
 import { MAX_STAKE, MIN_STAKE, usdc } from "@/lib/market";
 import * as sfx from "@/lib/sound";
@@ -98,8 +98,8 @@ export function Stake({
       try {
         const [staked, bal] = await Promise.all([
           pub.readContract({
-            address: CASEBOOK_ADDRESS,
-            abi: CASEBOOK_ABI,
+            address: MENTALIST_ADDRESS,
+            abi: MENTALIST_ABI,
             functionName: "hasStaked",
             args: [caseId, address],
           }),
@@ -139,10 +139,10 @@ export function Stake({
       // never appears in the calldata, the logs, or on any explorer.
       setStep("sealing");
       const [sealed, fee] = await Promise.all([
-        sealPersonId(seat, { account: address, casebook: CASEBOOK_ADDRESS }),
+        sealPersonId(seat, { account: address, game: MENTALIST_ADDRESS }),
         pub.readContract({
-          address: CASEBOOK_ADDRESS,
-          abi: CASEBOOK_ABI,
+          address: MENTALIST_ADDRESS,
+          abi: MENTALIST_ABI,
           functionName: "quoteFee",
         }),
       ]);
@@ -151,7 +151,7 @@ export function Stake({
         address: MEGAPOT.usdc,
         abi: ERC20_ABI,
         functionName: "allowance",
-        args: [address, CASEBOOK_ADDRESS],
+        args: [address, MENTALIST_ADDRESS],
       });
       if (allowance < amount) {
         setStep("approving");
@@ -159,7 +159,7 @@ export function Stake({
           address: MEGAPOT.usdc,
           abi: ERC20_ABI,
           functionName: "approve",
-          args: [CASEBOOK_ADDRESS, amount],
+          args: [MENTALIST_ADDRESS, amount],
           account: address,
           chain: wallet.chain,
         });
@@ -176,8 +176,8 @@ export function Stake({
       setStep("staking");
       sfx.stabAccuse();
       const hash = await wallet.writeContract({
-        address: CASEBOOK_ADDRESS,
-        abi: CASEBOOK_ABI,
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
         functionName: "stake",
         args: [caseId, sealed, amount],
         value: fee,
@@ -213,7 +213,7 @@ export function Stake({
       <div className="text-center">
         <p className="font-mono text-[10px] tracking-file text-bone-dim">IN THE POT</p>
         <p className="font-type text-[22px] leading-none text-brass">
-          {pot === null ? "—" : `$${usdc(pot)}`}
+          {pot === null ? "…" : `$${usdc(pot)}`}
         </p>
         <p className="font-mono text-[9px] tracking-file text-bone-dim">
           {entrants === null

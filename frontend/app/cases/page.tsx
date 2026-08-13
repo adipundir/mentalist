@@ -7,7 +7,7 @@ import { useAccount, usePublicClient } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { CASEBOOK } from "@/lib/casebook";
 import { lineup } from "@/lib/canon";
-import { CASEBOOK_ABI, CASEBOOK_ADDRESS } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { usdc } from "@/lib/market";
 import { SEASON_START, countdown, nextRelease, schedule } from "@/lib/schedule";
 import { Character } from "@/components/Character";
@@ -56,16 +56,16 @@ export default function Board() {
         CASEBOOK.map(async (_, i) => {
           try {
             const c = await pub.readContract({
-              address: CASEBOOK_ADDRESS,
-              abi: CASEBOOK_ABI,
+              address: MENTALIST_ADDRESS,
+              abi: MENTALIST_ABI,
               functionName: "cases",
               args: [i],
             });
             let played = false;
             if (address) {
               played = await pub.readContract({
-                address: CASEBOOK_ADDRESS,
-                abi: CASEBOOK_ABI,
+                address: MENTALIST_ADDRESS,
+                abi: MENTALIST_ABI,
                 functionName: "hasStaked",
                 args: [i, address],
               });

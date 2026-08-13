@@ -13,8 +13,6 @@ import { PoweredBy } from "@/components/PoweredBy";
  *
  * A game's front door is a title, a promise, and a way in, not a README. Everything that
  * used to live here (how the mechanic works, why it needs confidential compute, the honest
- * TEE framing) is real and worth saying, but it belongs on /about, where someone who wants
- * it can go and find it.
  */
 export default function Home() {
   const router = useRouter();
