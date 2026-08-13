@@ -145,12 +145,20 @@ contract Mentalist is Ownable, ReentrancyGuard {
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
     bytes32 public constant SOURCE = bytes32("mentalist");
 
-    /// @dev How long after a case closes a player has to file. `settle` is permissionless and
+    /// @dev How long after a case closes a player has to file.
+    ///
+    ///      Sized against the keeper's REAL cadence, not its nominal one. The schedule asks
+    ///      GitHub for every five minutes and GitHub delivers roughly hourly, with gaps of an
+    ///      hour and a half observed, because it throttles scheduled workflows hard. At ten
+    ///      minutes the keeper never once arrived inside the window: it turned up late, found
+    ///      filing closed, and settled a case whose winner had never been filed. Nobody lost
+    ///      money, because a case with no filed winner refunds in full, but the player who
+    ///      read the room correctly did not get paid, which is the same thing as being wrong. `settle` is permissionless and
     ///      every extra filing shrinks the shares of everyone who filed already, so whoever is
     ///      in first is paid to close the books at the first legal instant. Bounding both ends
     ///      with the same window is what stops that being a race: by the moment anybody may
     ///      settle, nobody may still file, so settling early wins nothing.
-    uint64 public constant FILING_WINDOW = 10 minutes;
+    uint64 public constant FILING_WINDOW = 2 hours;
 
     // ─────────────────────────────────────────── events
 

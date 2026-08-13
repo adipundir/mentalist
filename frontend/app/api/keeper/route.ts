@@ -33,7 +33,7 @@ export const maxDuration = 60;
  * keeper was one rate limit away from never settling anything. There are no logs before the
  * contract existed, so this loses nothing and every provider serves it.
  */
-const DEPLOY_BLOCK = 45473373n;
+const DEPLOY_BLOCK = 45477636n;
 
 const STAKED = parseAbiItem(
   "event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot)",
@@ -91,6 +91,15 @@ export async function GET(request: Request) {
   const publicClient = createPublicClient({ chain: activeChain, transport });
   const wallet = createWalletClient({ account, chain: activeChain, transport });
   const now = BigInt(Math.floor(Date.now() / 1000));
+
+  // Read rather than hardcoded. A constant here that drifts from the contract's makes the
+  // keeper skip filing on cases that are still open for it, which is exactly the failure that
+  // settled a case with its winner unfiled.
+  const filingWindow = (await publicClient.readContract({
+    address: MENTALIST_ADDRESS,
+    abi: MENTALIST_ABI,
+    functionName: "FILING_WINDOW",
+  })) as bigint;
   const report: Record<string, unknown>[] = [];
 
   for (let caseId = 0; caseId < CASEBOOK.length; caseId++) {
@@ -134,7 +143,7 @@ export async function GET(request: Request) {
         if (!bet[1]) unfiled.push(player);
       }
 
-      const filingClosed = now >= closesAt + 600n; // FILING_WINDOW
+      const filingClosed = now >= closesAt + filingWindow;
 
       if (unfiled.length && !filingClosed) {
         // One transaction takes the keys to the whole room. Nothing is readable before the
@@ -206,6 +215,12 @@ export async function GET(request: Request) {
         });
         await publicClient.waitForTransactionReceipt({ hash });
         step.settled = true;
+        if (unfiled.length) {
+          // Everyone here is now permanently unfiled: `resolve` is shut and this closes the
+          // books. They refund rather than win, so no money is lost, but a correct player just
+          // failed to get paid and that must not be logged as a normal settlement.
+          step.unfiledAtSettle = unfiled.length;
+        }
       } else {
         step.state = step.filed ? "filed, waiting out the window" : "waiting out the window";
       }
