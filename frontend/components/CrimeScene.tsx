@@ -235,23 +235,8 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
         <path key={i} d={sp.d} fill={BLOOD} opacity={sp.o} />
       ))}
 
-      {/* ── the pool ── */}
-      <path d={scene.pool} fill={BLOOD} opacity={0.88} />
-      <g transform={`translate(${scene.bodyX} ${scene.bodyY + 2.5}) scale(0.66) translate(${-scene.bodyX} ${-(scene.bodyY + 2.5)})`}>
-        <path d={scene.pool} fill={BLOOD_WET} opacity={0.35} />
-      </g>
-
-      {/* ── the victim ── */}
-      <ellipse
-        cx={scene.bodyX}
-        cy={scene.bodyY + 2.2}
-        rx="13"
-        ry="2.6"
-        fill="#000"
-        opacity="0.42"
-      />
-      <Victim x={scene.bodyX} y={scene.bodyY} left={scene.left} />
-
+      {/* ── the trail. Drawn before the body and the blood it lies in, because it is on the
+          floor and they are on top of it. Painted last, the prints walked over the victim. */}
       {/* ── prints walking out ──
           A shoe, not a pill. The old pair of stacked ovals read as a red capsule lying on
           the floor: no toe, no arch, no heel, and nothing to say which way it was going.
@@ -276,6 +261,24 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
         </g>
       ))}
 
+      {/* ── the pool ── */}
+      <path d={scene.pool} fill={BLOOD} opacity={0.88} />
+      <g transform={`translate(${scene.bodyX} ${scene.bodyY + 2.5}) scale(0.66) translate(${-scene.bodyX} ${-(scene.bodyY + 2.5)})`}>
+        <path d={scene.pool} fill={BLOOD_WET} opacity={0.35} />
+      </g>
+
+      {/* ── the victim ── */}
+      <ellipse
+        cx={scene.bodyX}
+        cy={scene.bodyY + 2.2}
+        rx="13"
+        ry="2.6"
+        fill="#000"
+        opacity="0.42"
+      />
+      <Victim x={scene.bodyX} y={scene.bodyY} left={scene.left} />
+
+      
     </svg>
   );
 }

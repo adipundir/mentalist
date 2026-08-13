@@ -252,7 +252,7 @@ export function Settlement({
   return (
     <div className="mt-5 border-t border-ink-3 pt-4">
       <h3 className="mb-2 font-mono text-[10px] tracking-file text-bone-dim">
-        CLOSING THE CASE ON-CHAIN
+        THE RESULT
       </h3>
 
       {row === null ? (
@@ -263,11 +263,9 @@ export function Settlement({
         </p>
       ) : !closed ? (
         <p className="font-body text-[13px] leading-relaxed text-bone">
-          Your stake is in and the case is still taking money. Nobody else can read the name
-          you gave or whether it was right, and the contract will not take your filing until
-          the case closes.{" "}
-          <span className="text-brass">Come back in {countdown(row.closesAt - now)}</span> and
-          file your verdict.
+          Your money is on a name nobody else can read, and nobody can find out whether it was
+          right until the case stops taking bets. That includes us.{" "}
+          <span className="text-brass">The result is in {countdown(row.closesAt - now)}.</span>
         </p>
       ) : /* Filing is only possible until the filing window runs out, and the books can only
               be closed after it has. The clock is the guard, NOT the `settled` flag: `_credit`
@@ -279,27 +277,31 @@ export function Settlement({
       !row.resolved && !row.settled && now < row.closesAt + graceMs ? (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
-            The case has closed. Ask the covalidator to attest the one bit that says whether
-            you named him, and hand it to the contract:{" "}
-            <span className="text-blood-hot">it</span> decides, not this browser.
+            The case has closed and the result is being worked out. The{" "}
+            <span className="text-blood-hot">contract</span> decides who was right, not this
+            page, so it happens on chain and takes a few minutes. Leave this open and it will
+            tell you the moment it knows.
           </p>
-          <Button tone="brass" onClick={fileVerdict} disabled={busy !== null}>
-            {busy === "resolving" ? "FILING YOUR VERDICT…" : "FILE YOUR VERDICT"}
+          {/* The keeper does this for the whole room on a schedule, so nobody has to press
+              anything. The button stays for the case where it is running late, and for anyone
+              who would rather not wait on a machine they do not control. */}
+          <Button tone="dim" onClick={fileVerdict} disabled={busy !== null}>
+            {busy === "resolving" ? "GETTING YOUR RESULT…" : "GET IT NOW"}
           </Button>
         </>
       ) : !row.settled ? (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
             {!row.resolved
-              ? "The window to file on this case has passed and no verdict was filed for you, so it pays you nothing. The books still need closing before anyone can collect."
+              ? "This case closed without a result being recorded for you, so it pays you nothing. The books still need closing before anyone can collect."
               : row.won
-                ? "Filed, and the contract agrees: you named him. The books close once everyone else has had their window to file."
-                : "Filed. Wrong man, so your stake stays in the pot for whoever got it right."}
+                ? "You named him. The contract agrees, and your share is waiting: it is released once everyone else in the room has had their result recorded too."
+                : "Wrong man. Your stake stays in the pot for whoever got it right."}
           </p>
           <Button
             tone={row.won ? "blood" : "dim"}
             onClick={() =>
-              send("settling", "BOOKS CLOSED", () =>
+              send("settling", "MONEY RELEASED", () =>
                 wallet!.writeContract({
                   address: MENTALIST_ADDRESS,
                   abi: MENTALIST_ABI,
@@ -313,10 +315,10 @@ export function Settlement({
             disabled={busy !== null || !canSettle}
           >
             {busy === "settling"
-              ? "CLOSING THE BOOKS…"
+              ? "RELEASING…"
               : canSettle
-                ? "CLOSE THE BOOKS"
-                : `BOOKS CLOSE IN ${countdown(row.closesAt + graceMs - now)}`}
+                ? "RELEASE THE MONEY"
+                : `MONEY RELEASES IN ${countdown(row.closesAt + graceMs - now)}`}
           </Button>
         </>
       ) : row.paid ? (

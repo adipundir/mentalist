@@ -157,7 +157,6 @@ function StoryInner() {
       {/* The masthead rides on top of the room rather than above it. */}
       <div
         className="pointer-events-none absolute inset-x-0 top-0 z-[60] flex flex-wrap items-center gap-3 px-4 pb-6 pt-4 sm:px-7"
-        style={{ background: "linear-gradient(rgb(6 5 7 / 0.92), transparent)" }}
       >
         <Link href="/cases" className="pointer-events-auto font-type text-[15px] tracking-wide text-bone hover:text-blood-hot">
           MENTALIST
@@ -178,9 +177,6 @@ function StoryInner() {
           ))}
         </ol>
 
-        <span className="ml-auto border border-blood-hot/70 bg-blood-hot/15 px-2 py-1 font-mono text-[10px] tracking-file text-blood-hot">
-          BASE SEPOLIA
-        </span>
       </div>
 
       <Scene

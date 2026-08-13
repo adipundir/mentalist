@@ -77,11 +77,21 @@ export function Scene({
     return () => clearTimeout(id);
   }, [g.n]);
 
-  // Room tone runs for the life of the scene.
+  // Room tone and the music both run for the life of the scene.
   useEffect(() => {
     sfx.startRoomTone();
-    return () => sfx.stopRoomTone();
+    sfx.startRoomBed();
+    return () => {
+      sfx.stopRoomTone();
+      sfx.stopRoomBed();
+    };
   }, []);
+
+  // The music gets out of the way while somebody is speaking. The alibis are the whole game,
+  // and a score you have to listen past is worse than no score.
+  useEffect(() => {
+    sfx.duckRoomBed(!!g.saying);
+  }, [g.saying]);
 
   // An account takes over the bar the moment it lands.
   useEffect(() => {
@@ -153,7 +163,7 @@ export function Scene({
         {/* HUD: which case this is, and how long it stands. */}
         <div
           className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 px-4 pb-12 pt-14 sm:px-7 sm:pt-16"
-          style={{ background: "linear-gradient(rgb(6 5 7 / 0.92), rgb(6 5 7 / 0.55) 55%, transparent)" }}
+          style={{ background: "linear-gradient(rgb(6 5 7 / 0.72), rgb(6 5 7 / 0.3) 60%, transparent)" }}
         >
           <div>
             {chapter && (
@@ -164,13 +174,6 @@ export function Scene({
             </h1>
           </div>
 
-          <div className="text-right">
-            <p className="font-mono text-[10px] tracking-file text-bone-dim">HEARD OUT</p>
-            <p className="font-type text-[26px] leading-none text-bone">
-              {g.spoken.length}
-              <span className="text-[14px] text-bone-dim">/{g.n}</span>
-            </p>
-          </div>
         </div>
 
         {closesAt !== undefined && <Countdown closesAt={closesAt} />}

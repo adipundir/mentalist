@@ -361,7 +361,45 @@ export function stingSolved() {
 
 /** Wrong, a falling minor second, the sound of the door closing behind him. */
 export function stingMissed() {
-  brass([116.5, 110], { peak: 0.18, decay: 1.2, sweepFrom: 1800, sweepTo: 90, detune: 16 });
+  const ac = audio();
+  if (!ac) return;
+  const t0 = ac.currentTime;
+
+  // Four notes walking down and giving up, each one flatter and slower than the last. The
+  // pitch of every note also sags across its own length, which is what makes it read as
+  // deflating rather than merely descending.
+  const notes = [
+    { hz: 233.1, at: 0.0, len: 0.34 },
+    { hz: 207.7, at: 0.3, len: 0.36 },
+    { hz: 185.0, at: 0.64, len: 0.42 },
+    { hz: 155.6, at: 1.02, len: 1.5 },
+  ];
+
+  for (const n of notes) {
+    const o = ac.createOscillator();
+    o.type = "sawtooth";
+    o.frequency.setValueAtTime(n.hz, t0 + n.at);
+    o.frequency.linearRampToValueAtTime(n.hz * 0.945, t0 + n.at + n.len);
+
+    // Rolled well off, or a sawtooth is a buzzer rather than a horn.
+    const lp = ac.createBiquadFilter();
+    lp.type = "lowpass";
+    lp.frequency.setValueAtTime(1500, t0 + n.at);
+    lp.frequency.exponentialRampToValueAtTime(420, t0 + n.at + n.len);
+    lp.Q.value = 3;
+
+    const g = ac.createGain();
+    g.gain.setValueAtTime(0.0001, t0 + n.at);
+    g.gain.exponentialRampToValueAtTime(0.16, t0 + n.at + 0.05);
+    // The last note eases out over a second and a half instead of being cut, so the sound
+    // ends by running out rather than by stopping.
+    g.gain.setTargetAtTime(0.0001, t0 + n.at + n.len * 0.45, n.len * 0.4);
+
+    o.connect(lp).connect(g);
+    toBus(g, 0.55);
+    o.start(t0 + n.at);
+    o.stop(t0 + n.at + n.len + 1.4);
+  }
 }
 
 /** The stamp on the verdict card. */
@@ -510,6 +548,103 @@ export function startTitleBed() {
       }, 2600);
     },
   };
+}
+
+let roomBed: { stop: () => void; duck: (on: boolean) => void } | null = null;
+
+/**
+ * The music the room stands in.
+ *
+ * Deliberately underneath the speech rather than beside it. The suspects are the thing you
+ * came to hear, so this sits low and ducks further the moment one of them opens his mouth:
+ * background music that has to be talked over is just noise with a key signature.
+ *
+ * Same D minor as the title so the two rooms belong to one film, but sparser and slower, and
+ * with a heartbeat under it that the title does not have.
+ */
+export function startRoomBed() {
+  const ac = audio();
+  if (!ac || roomBed) return;
+
+  const out = ac.createGain();
+  out.gain.setValueAtTime(0.0001, ac.currentTime);
+  out.gain.exponentialRampToValueAtTime(0.032, ac.currentTime + 6);
+
+  const lp = ac.createBiquadFilter();
+  lp.type = "lowpass";
+  lp.frequency.value = 300;
+  lp.Q.value = 0.5;
+
+  // Slower than the title's breath, and shallower. A room does not swell.
+  const sweep = ac.createOscillator();
+  sweep.frequency.value = 0.028; // once every thirty six seconds
+  const depth = ac.createGain();
+  depth.gain.value = 120;
+  sweep.connect(depth).connect(lp.frequency);
+  sweep.start();
+
+  // Root, minor third, and the octave. No fifth, so it never resolves into comfort.
+  const voices = [
+    { hz: 36.7, type: "sine" as const, gain: 0.5 },
+    { hz: 73.4, type: "triangle" as const, gain: 0.2, detune: -9 },
+    { hz: 87.3, type: "triangle" as const, gain: 0.13, detune: 7 },
+  ];
+  const oscs = voices.map((v) => {
+    const o = ac.createOscillator();
+    o.type = v.type;
+    o.frequency.value = v.hz;
+    if (v.detune) o.detune.value = v.detune;
+    const g = ac.createGain();
+    g.gain.value = v.gain;
+    o.connect(g).connect(lp);
+    o.start();
+    return o;
+  });
+
+  // A pulse just under the chord, near a resting heart rate. It is felt more than heard.
+  const pulse = ac.createOscillator();
+  pulse.type = "sine";
+  pulse.frequency.value = 27.5;
+  const pulseGain = ac.createGain();
+  pulseGain.gain.value = 0.0001;
+  const beat = ac.createOscillator();
+  beat.frequency.value = 0.9; // 54 bpm
+  const beatDepth = ac.createGain();
+  beatDepth.gain.value = 0.16;
+  beat.connect(beatDepth).connect(pulseGain.gain);
+  pulse.connect(pulseGain).connect(lp);
+  pulse.start();
+  beat.start();
+
+  lp.connect(out);
+  toBus(out, 0.85);
+
+  roomBed = {
+    duck: (on: boolean) => {
+      if (!ctx) return;
+      out.gain.setTargetAtTime(on ? 0.011 : 0.032, ctx.currentTime, 0.25);
+    },
+    stop: () => {
+      if (!ctx) return;
+      out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.6);
+      setTimeout(() => {
+        oscs.forEach((o) => o.stop());
+        sweep.stop();
+        pulse.stop();
+        beat.stop();
+      }, 2400);
+    },
+  };
+}
+
+export function stopRoomBed() {
+  roomBed?.stop();
+  roomBed = null;
+}
+
+/** Pull the music down while somebody is talking, and let it back up when they stop. */
+export function duckRoomBed(on: boolean) {
+  roomBed?.duck(on);
 }
 
 export function stopTitleBed() {
