@@ -14,8 +14,13 @@ import { DEPLOY_BLOCK, MENTALIST_ADDRESS } from "@/lib/contracts";
  * them, so the sum of `ticketIds` across a player's payouts is exactly what they hold from
  * this game.
  *
- * Renders nothing at all until there is something to show. A wallet that has never collected
- * does not need to be told it holds nothing.
+ * Shown from the moment a wallet is connected, zero included. Hiding it until the count was
+ * positive meant a player who had not collected yet could not tell the counter existed, which
+ * reads as a missing feature rather than an empty one.
+ *
+ * Counts only what was won on the live contract, since the scan starts at its deployment
+ * block. A redeploy therefore starts everyone at zero, which is correct: the old contract's
+ * tickets are still in the old contract's payouts.
  */
 const PAID_OUT = parseAbiItem(
   "event PaidOut(uint16 indexed caseId, address indexed player, uint256 share, uint256[] ticketIds)",
@@ -55,7 +60,7 @@ export function TicketBalance() {
     };
   }, [pub, address]);
 
-  if (!address || tickets === 0) return null;
+  if (!address) return null;
 
   return (
     <a
@@ -63,11 +68,15 @@ export function TicketBalance() {
       target="_blank"
       rel="noreferrer"
       title="Megapot tickets won in these cases"
-      className="flex items-center gap-1.5 border border-brass/40 bg-brass/10 px-2.5 py-1.5 transition-colors hover:border-brass/70"
+      className={`flex items-center gap-1.5 border px-2.5 py-1.5 transition-colors ${
+        tickets > 0
+          ? "border-brass/40 bg-brass/10 hover:border-brass/70"
+          : "border-ink-3 bg-ink hover:border-bone-dim/40"
+      }`}
     >
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img src="/brand/megapot-light.svg" alt="Megapot" className="block h-[10px] w-auto shrink-0" />
-      <span className="font-mono text-[10px] leading-none tracking-file text-brass">
+      <span className={`font-mono text-[10px] leading-none tracking-file ${tickets > 0 ? "text-brass" : "text-bone-dim"}`}>
         {tickets} {tickets === 1 ? "TICKET" : "TICKETS"}
       </span>
     </a>
