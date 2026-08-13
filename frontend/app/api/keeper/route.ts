@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, createWalletClient, http, parseAbiItem } from "viem";
+import { createPublicClient, createWalletClient, fallback, http, parseAbiItem } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { activeChain } from "@/lib/network";
@@ -70,8 +70,17 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "no keeper key configured" }, { status: 503 });
   }
 
-  const publicClient = createPublicClient({ chain: activeChain, transport: http() });
-  const wallet = createWalletClient({ account, chain: activeChain, transport: http() });
+  // Not the chain's default RPC. sepolia.base.org rate limits hard enough to fail a whole
+  // run, and this one walks every case and reads a bet per entrant, so it is exactly the
+  // caller that trips the limit. Ordered by how they have actually behaved, with the default
+  // kept last so a bad day for one host is not a missed settlement.
+  const transport = fallback([
+    http("https://base-sepolia-rpc.publicnode.com"),
+    http("https://base-sepolia.gateway.tenderly.co"),
+    http("https://sepolia.base.org"),
+  ]);
+  const publicClient = createPublicClient({ chain: activeChain, transport });
+  const wallet = createWalletClient({ account, chain: activeChain, transport });
   const now = BigInt(Math.floor(Date.now() / 1000));
   const report: Record<string, unknown>[] = [];
 

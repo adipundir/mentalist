@@ -155,9 +155,7 @@ contract AuditTest is IncoTest {
         _resolve(cho, CASE_ID);
         _settle(CASE_ID);
 
-        uint256 rake = book.reserved() == 0 ? 0 : 0; // silence
-        rake;
-        uint256 surplusBefore = usdc.balanceOf(address(book)) - book.reserved();
+        uint256 surplusBefore = usdc.balanceOf(address(book)) - book.reserved(); // == the rake
         uint256 share = book.shareOf(CASE_ID, jane);
         uint256 cashBefore = usdc.balanceOf(jane);
 
@@ -168,58 +166,69 @@ contract AuditTest is IncoTest {
         uint256 spentOnTickets = ids.length * 10_000;
         uint256 bonus = (share * 500) / 10_000;
 
-        emit log_named_uint("share            ", share);
-        emit log_named_uint("bonus (5% share) ", bonus);
-        emit log_named_uint("tickets bought   ", ids.length);
-        emit log_named_uint("spent on tickets ", spentOnTickets);
-        emit log_named_uint("CASH handed over ", cash);
-        emit log_named_uint("rake collected   ", surplusBefore);
-        emit log_named_uint("referral earned  ", megapot.referralOwed());
+        emit log_named_uint("share             ", share);
+        emit log_named_uint("bonus (5% share)  ", bonus);
+        emit log_named_uint("tickets bought    ", ids.length);
+        emit log_named_uint("spent on tickets  ", spentOnTickets);
+        emit log_named_uint("CASH handed over  ", cash);
+        emit log_named_uint("rake collected    ", surplusBefore);
+        emit log_named_uint("referral earned   ", megapot.referralOwed());
+        emit log_named_uint("house left holding", usdc.balanceOf(address(book)));
 
         assertEq(spentOnTickets + cash, share + bonus, "the full bonus was paid");
-        // The doc says the bonus "is only ever spent on tickets: it is not a cash prize".
-        assertGt(cash, share, "yet MORE than the whole share came back as cash: the bonus is cash");
-        // The doc says the referral on the purchase covers twice the bonus.
-        assertLt(megapot.referralOwed(), bonus, "and the referral it triggered does not cover it");
-        // Net house position on this case: rake in, bonus out.
-        emit log_named_int(
-            "house net (rake - bonus + referral)",
-            int256(surplusBefore) - int256(bonus) + int256(megapot.referralOwed())
-        );
-        assertLt(int256(surplusBefore) - int256(bonus) + int256(megapot.referralOwed()), int256(surplusBefore));
+
+        // The share alone already overshoots the hundred-ticket ceiling, so the bonus bought
+        // NOT ONE extra ticket. Every unit of it went out of the door as cash.
+        uint256 ticketsOnShareAlone = share / 10_000;
+        if (ticketsOnShareAlone > 100) ticketsOnShareAlone = 100;
+        assertEq(ids.length, ticketsOnShareAlone, "the bonus bought zero additional tickets");
+        assertEq(cash, share + bonus - spentOnTickets, "so the whole bonus left as cash");
+
+        // The comment says the referral on the purchase is 10% of the spend and therefore
+        // covers twice the bonus. At the live ticket price it covers a seventh of it.
+        assertLt(megapot.referralOwed(), bonus, "the referral it triggered does not cover it");
+        assertLt(megapot.referralOwed() * 7, bonus, "not within a factor of seven of covering it");
+
+        // And the bonus is paid out of the rake, which is what the house actually banked.
+        assertLt(usdc.balanceOf(address(book)), surplusBefore, "the rake was eaten by the bonus");
+        emit log_named_uint("rake left after ONE payout", usdc.balanceOf(address(book)));
     }
 
-    /// A cheaper framing: with `wantTickets = true` a winner is strictly richer in *cash*
-    /// terms than the identical winner who asked for cash, which is the opposite of the design.
-    function test_A2_WantTicketsIsAFreeCashUpliftForEveryWinner() public {
+    /// The same defect with a live attacker rather than a leak: `setRake` bounds the rake at
+    /// MAX_RAKE_BPS but does not bound the bonus at all. Set the bonus above the rake and any
+    /// player who solves the (public) puzzle mints house money, one case at a time.
+    function test_A2_AnUnboundedBonusLetsASolverMintHouseMoney() public {
         megapot.setTicketPrice(10_000);
-        book.setRake(500, 500);
-        usdc.mint(address(book), 10_000_000); // referral fees already swept in
+        book.setRake(500, 2000); // 5% rake, 20% bonus. setRake accepts this without complaint.
+        usdc.mint(address(book), 50_000_000); // referral fees the house has swept in
+
+        uint256 houseBefore = usdc.balanceOf(address(book));
+        uint256 herBefore = usdc.balanceOf(jane);
 
         _open(CASE_ID, RED_JOHN);
-        _stake(jane, CASE_ID, RED_JOHN, 5_000_000);
-        _stake(lisbon, CASE_ID, RED_JOHN, 5_000_000);
-        _stake(cho, CASE_ID, SOMEONE_ELSE, 5_000_000);
+        _stake(jane, CASE_ID, RED_JOHN, 5_000_000); // she read the alibis; she is alone in the room
         _reachClose(CASE_ID);
         _resolve(jane, CASE_ID);
-        _resolve(lisbon, CASE_ID);
-        _resolve(cho, CASE_ID);
         _settle(CASE_ID);
 
-        uint256 hisBefore = usdc.balanceOf(lisbon);
-        vm.prank(lisbon);
-        book.payout(CASE_ID, false);
-        uint256 hisCash = usdc.balanceOf(lisbon) - hisBefore;
-
-        uint256 hersBefore = usdc.balanceOf(jane);
         vm.prank(jane);
         uint256[] memory ids = book.payout(CASE_ID, true);
-        uint256 herCash = usdc.balanceOf(jane) - hersBefore;
 
-        emit log_named_uint("lisbon cash (wantTickets=false)", hisCash);
-        emit log_named_uint("jane   cash (wantTickets=true) ", herCash);
-        emit log_named_uint("jane   tickets                 ", ids.length);
-        assertGt(herCash, hisCash, "identical winners, but the ticket-taker got MORE cash too");
+        // what she ended the round with, counting her tickets at face value
+        uint256 value = usdc.balanceOf(jane) + ids.length * 10_000;
+        emit log_named_uint("she staked                   ", uint256(5_000_000));
+        emit log_named_uint("wallet+tickets, net of stake ", value + 5_000_000 - herBefore);
+        emit log_named_uint("house before", houseBefore);
+        emit log_named_uint("house after ", usdc.balanceOf(address(book)));
+
+        assertGt(value, herBefore, "risk-free profit on a puzzle whose answer ships in the repo");
+        assertLt(usdc.balanceOf(address(book)), houseBefore, "and it came straight out of the house");
+    }
+
+    /// `setRake` will take any bonus at all, including 655%.
+    function test_A3_SetRakeDoesNotBoundTheBonus() public {
+        book.setRake(book.MAX_RAKE_BPS(), type(uint16).max);
+        assertEq(book.ticketBonusBps(), type(uint16).max, "a 655% ticket bonus was accepted");
     }
 
     // ─────────────────────────────────────────────────────────────
@@ -297,6 +306,81 @@ contract AuditTest is IncoTest {
 
         assertGe(usdc.balanceOf(address(book)), book.reserved(), "held >= reserved still holds");
         assertGe(usdc.balanceOf(address(book)), 10_000_000, "case 2's stakes are all still here");
+    }
+
+    /// The owner drains every unit of surplus between settlement and the winners collecting.
+    /// Do the winners still get paid in full afterwards?
+    function test_E_OwnerDrainsSurplusBeforeWinnersCollect() public {
+        book.setRake(1000, 500);
+        _open(1, RED_JOHN);
+        _stake(jane, 1, RED_JOHN, 3_000_000);
+        _stake(lisbon, 1, RED_JOHN, 1_000_000);
+        _stake(cho, 1, SOMEONE_ELSE, 5_000_000);
+        // a second, still-open case whose money must not be reachable
+        _open(2, 2);
+        _stake(dana, 2, 2, 5_000_000);
+
+        _reachClose(1);
+        _resolve(jane, 1);
+        _resolve(lisbon, 1);
+        _resolve(cho, 1);
+        _settle(1);
+
+        uint256 a = book.shareOf(1, jane);
+        uint256 b = book.shareOf(1, lisbon);
+
+        book.withdrawSurplus(address(this)); // takes the rake, and only the rake
+        assertEq(usdc.balanceOf(address(this)), uint256(9_000_000) * 1000 / 10_000, "exactly the rake");
+        assertEq(usdc.balanceOf(address(book)), book.reserved(), "held == reserved, to the unit");
+
+        uint256 janeBefore = usdc.balanceOf(jane);
+        vm.prank(jane);
+        uint256[] memory ids = book.payout(1, true);
+        assertEq(
+            usdc.balanceOf(jane) - janeBefore + ids.length * megapot.price(),
+            a,
+            "paid in full, bonus silently zero"
+        );
+
+        uint256 lisbonBefore = usdc.balanceOf(lisbon);
+        vm.prank(lisbon);
+        book.payout(1, false);
+        assertEq(usdc.balanceOf(lisbon) - lisbonBefore, b, "and so is he");
+
+        assertEq(book.reserved(), 5_000_000, "only the open case is still owed");
+        assertEq(usdc.balanceOf(address(book)), 5_000_000, "and its money never moved");
+    }
+
+    /// Two winners, identical stakes, identical shares. The one who calls payout first eats
+    /// the whole house surplus as their bonus; the second gets the crumbs.
+    function test_F_TheBonusIsFirstComeFirstServedBetweenEqualWinners() public {
+        megapot.setTicketPrice(10_000);
+        book.setRake(500, 500);
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 5_000_000);
+        _stake(lisbon, CASE_ID, RED_JOHN, 5_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 5_000_000);
+        _reachClose(CASE_ID);
+        _resolve(jane, CASE_ID);
+        _resolve(lisbon, CASE_ID);
+        _resolve(cho, CASE_ID);
+        _settle(CASE_ID);
+
+        assertEq(book.shareOf(CASE_ID, jane), book.shareOf(CASE_ID, lisbon), "identical shares");
+
+        uint256 janeBefore = usdc.balanceOf(jane);
+        vm.prank(jane);
+        uint256[] memory a = book.payout(CASE_ID, true);
+        uint256 janeGot = usdc.balanceOf(jane) - janeBefore + a.length * 10_000;
+
+        uint256 lisbonBefore = usdc.balanceOf(lisbon);
+        vm.prank(lisbon);
+        uint256[] memory b = book.payout(CASE_ID, true);
+        uint256 lisbonGot = usdc.balanceOf(lisbon) - lisbonBefore + b.length * 10_000;
+
+        emit log_named_uint("jane   (first)  total value", janeGot);
+        emit log_named_uint("lisbon (second) total value", lisbonGot);
+        assertGt(janeGot, lisbonGot, "same share, different money, decided by call order");
     }
 
     /// Invariant sweep over the whole lifecycle.

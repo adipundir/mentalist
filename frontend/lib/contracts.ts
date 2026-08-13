@@ -22,7 +22,7 @@ import { activeChain, NETWORK } from "@/lib/network";
  * it is set, which is what a local fork or a redeploy needs.
  */
 export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ||
-  "0x70e3d7a434a63fa892d150ef5495b6bec631d277") as `0x${string}`;
+  "0x712fb2f8c6bdb1fb82ecfaf87d6dbf8652275187") as `0x${string}`;
 
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
 export const EXPLORER = activeChain.blockExplorers!.default.url;

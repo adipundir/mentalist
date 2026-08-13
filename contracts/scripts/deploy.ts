@@ -46,6 +46,22 @@ const MEGAPOT_BUYER = "0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746" as const;
  */
 const OPEN_FOR = BigInt(process.env.MENTALIST_OPEN_FOR ?? 30 * 60);
 
+/**
+ * How long each case takes money for, per case.
+ *
+ * A case can only run once on a given deployment, because `openCase` refuses an id that
+ * already exists. So a uniform short window means the whole game is over within the hour and
+ * anyone arriving later finds nothing to play. Staggering it keeps most of the board open for
+ * as long as anyone is likely to look, while the two short ones close soon enough that the
+ * settlement path actually runs on chain rather than only in the tests.
+ */
+const WINDOWS = (process.env.MENTALIST_WINDOWS ?? "")
+  .split(",")
+  .map((n) => n.trim())
+  .filter(Boolean)
+  .map(BigInt);
+const windowFor = (i: number) => WINDOWS[i] ?? OPEN_FOR;
+
 function artifact(name: string): { abi: Abi; bytecode: Hex } {
   const p = join(process.cwd(), "artifacts/contracts", `${name}.sol`, `${name}.json`);
   const j = JSON.parse(readFileSync(p, "utf8"));
@@ -133,11 +149,11 @@ async function main() {
       address: addr,
       abi: book.abi,
       functionName: "openCase",
-      args: [i, c.suspects, sealed, OPEN_FOR],
+      args: [i, c.suspects, sealed, windowFor(i)],
       value: fee,
     });
     await pub.waitForTransactionReceipt({ hash: tx });
-    console.log(`case ${i} open: ${c.title} (${c.suspects} suspects), taking money for ${OPEN_FOR}s`);
+    console.log(`case ${i} open: ${c.title} (${c.suspects} suspects), taking money for ${windowFor(i)}s`);
   }
 
   console.log("\nNEXT_PUBLIC_MENTALIST_ADDRESS=" + addr);
