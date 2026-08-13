@@ -227,38 +227,6 @@ export function tick(freq = 220, duration = 0.05, gain = 0.05) {
   n.stop(ac.currentTime + duration + 0.05);
 }
 
-/** A page turning. */
-export function paper() {
-  const ac = audio();
-  if (!ac) return;
-  const n = noise(ac);
-  const bp = ac.createBiquadFilter();
-  bp.type = "bandpass";
-  bp.frequency.setValueAtTime(2400, ac.currentTime);
-  bp.frequency.exponentialRampToValueAtTime(900, ac.currentTime + 0.24);
-  bp.Q.value = 0.8;
-  const g = env(ac, 0.07, 0.01, 0.24);
-  n.connect(bp).connect(g);
-  toBus(g, 0.5);
-  n.start();
-  n.stop(ac.currentTime + 0.32);
-}
-
-/** Committing a question: a hard mechanical switch. */
-export function switchClick() {
-  const ac = audio();
-  if (!ac) return;
-  const o = ac.createOscillator();
-  o.type = "square";
-  o.frequency.setValueAtTime(900, ac.currentTime);
-  o.frequency.exponentialRampToValueAtTime(220, ac.currentTime + 0.04);
-  const g = env(ac, 0.07, 0.001, 0.05);
-  o.connect(g);
-  toBus(g, 0.35);
-  o.start();
-  o.stop(ac.currentTime + 0.09);
-}
-
 /** The camera moving, a low air-swell under the push-in. */
 export function whoosh() {
   const ac = audio();
@@ -369,16 +337,6 @@ function brass(
   air.stop(ac.currentTime + 0.16);
 }
 
-/** A YES, the answer that narrows the room. Ominous, not triumphant. */
-export function stabYes() {
-  brass([110, 165, 220], { peak: 0.17, decay: 0.45 });
-}
-
-/** A NO, duller, lower, closes a door. */
-export function stabNo() {
-  brass([98, 131], { peak: 0.1, decay: 0.32, sweepFrom: 1400, sweepTo: 180 });
-}
-
 /** Naming someone. The room holds its breath. */
 export function stabAccuse() {
   brass([73.4, 110, 146.8], { peak: 0.22, decay: 0.9, sweepFrom: 3200, sweepTo: 150, detune: 11 });
@@ -406,27 +364,6 @@ export function stingMissed() {
   brass([116.5, 110], { peak: 0.18, decay: 1.2, sweepFrom: 1800, sweepTo: 90, detune: 16 });
 }
 
-/** The unmasking. The biggest sound in the game, and it happens once. */
-export function stingUnmask() {
-  brass([55, 58.3, 82.4, 110], { peak: 0.26, decay: 2.2, sweepFrom: 3600, sweepTo: 70, detune: 18 });
-  const ac = audio();
-  if (!ac) return;
-  // A reversed swell under it, for the drop.
-  const n = noise(ac);
-  const lp = ac.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.setValueAtTime(300, ac.currentTime);
-  lp.frequency.exponentialRampToValueAtTime(5000, ac.currentTime + 1.1);
-  const g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, ac.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.1, ac.currentTime + 1.1);
-  g.gain.exponentialRampToValueAtTime(0.0001, ac.currentTime + 1.5);
-  n.connect(lp).connect(g);
-  toBus(g, 1);
-  n.start();
-  n.stop(ac.currentTime + 1.7);
-}
-
 /** The stamp on the verdict card. */
 export function stamp() {
   const ac = audio();
@@ -450,73 +387,6 @@ export function stamp() {
   toBus(ng, 0.6);
   n.start();
   n.stop(ac.currentTime + 0.1);
-}
-
-/** Pen scratch, for a name being crossed out. */
-export function scratch() {
-  tick(260, 0.09, 0.06);
-}
-
-// ── the waiting drone ───────────────────────────────────────
-
-export interface Drone {
-  resolve(): void;
-  stop(): void;
-}
-
-/**
- * Two voices a minor second apart, beating against each other while the answer is computed,
- * resolving to unison the instant it lands. A stall becomes suspense for about twenty lines
- * of code, and it is the highest emotional return in the whole file.
- */
-export function drone(): Drone {
-  const ac = audio();
-  if (!ac) return { resolve() {}, stop() {} };
-
-  const low = ac.createOscillator();
-  const high = ac.createOscillator();
-  const amp = ac.createGain();
-  const lp = ac.createBiquadFilter();
-
-  low.type = "sine";
-  high.type = "sine";
-  low.frequency.value = 55;
-  high.frequency.value = 58.27; // ~3.3Hz beating
-
-  lp.type = "lowpass";
-  lp.frequency.value = 420;
-
-  amp.gain.setValueAtTime(0.0001, ac.currentTime);
-  amp.gain.exponentialRampToValueAtTime(0.075, ac.currentTime + 0.4);
-
-  low.connect(lp);
-  high.connect(lp);
-  lp.connect(amp);
-  toBus(amp, 0.7);
-  low.start();
-  high.start();
-
-  let stopped = false;
-  const kill = (after: number) => {
-    if (stopped || !ctx) return;
-    stopped = true;
-    amp.gain.cancelScheduledValues(ctx.currentTime);
-    amp.gain.setValueAtTime(amp.gain.value, ctx.currentTime);
-    amp.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + after);
-    low.stop(ctx.currentTime + after + 0.06);
-    high.stop(ctx.currentTime + after + 0.06);
-  };
-
-  return {
-    resolve() {
-      if (stopped || !ctx) return;
-      high.frequency.exponentialRampToValueAtTime(55, ctx.currentTime + 0.3);
-      kill(0.75);
-    },
-    stop() {
-      kill(0.12);
-    },
-  };
 }
 
 /**

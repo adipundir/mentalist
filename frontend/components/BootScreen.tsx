@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
-import { loadVoices, narrate, unlockNarrator } from "@/lib/narrator";
+import { loadVoices, unlockNarrator } from "@/lib/narrator";
 import * as sfx from "@/lib/sound";
 
 /**
@@ -26,7 +26,7 @@ import * as sfx from "@/lib/sound";
  */
 const STEPS = [
   {
-    label: "OPENING THE FILE",
+    // Opening the file: audio and the narrator's voices, the two things a click has to buy.
     work: async () => {
       sfx.startRoomTone();
       unlockNarrator();
@@ -34,7 +34,7 @@ const STEPS = [
     },
   },
   {
-    label: "WAKING THE WITNESSES",
+    // Waking the witnesses: the webfonts, so the opening card does not reflow mid-sentence.
     work: async () => {
       if (typeof document !== "undefined" && "fonts" in document) {
         await (document as unknown as { fonts: { ready: Promise<unknown> } }).fonts.ready;
@@ -44,8 +44,6 @@ const STEPS = [
 ];
 
 export function BootScreen({ onReady }: { onReady: () => void }) {
-  const [step, setStep] = useState(-1);
-  const [done, setDone] = useState(false);
   const started = useRef(false);
 
   useEffect(() => {
@@ -54,7 +52,8 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
 
     (async () => {
       for (let i = 0; i < STEPS.length; i++) {
-        setStep(i);
+        // The tick is the whole progress indicator now. Nothing on screen names the steps,
+        // so the beats are heard rather than read and there is no state to hold for them.
         sfx.tick(180 + i * 40, 0.04, 0.04);
         await STEPS[i].work();
         // Just enough of a floor to read as a beat rather than a flicker. It used to be
@@ -62,8 +61,7 @@ export function BootScreen({ onReady }: { onReady: () => void }) {
         await new Promise((r) => setTimeout(r, 170));
       }
       sfx.knock(0.7);
-      setDone(true);
-      // Do not hold the screen for the whole line: it carries on over the board.
+      // Hand off shortly after the knock; the first narrated line plays over the board.
       setTimeout(onReady, 650);
     })();
   }, [onReady]);

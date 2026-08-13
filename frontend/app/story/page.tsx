@@ -8,7 +8,6 @@ import { useAccount, usePublicClient } from "wagmi";
 import { CASEBOOK } from "@/lib/casebook";
 import { lineup, person } from "@/lib/canon";
 import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
-import { releaseOf } from "@/lib/schedule";
 import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
 import { Settlement } from "@/components/Settlement";

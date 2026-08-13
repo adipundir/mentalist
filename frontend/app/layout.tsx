@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Special_Elite, Crimson_Pro } from "next/font/google";
+import { SoundToggle } from "@/components/SoundToggle";
 
 /** Data, addresses, the terminal panel. */
 const mono = IBM_Plex_Mono({
@@ -37,6 +38,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         className={`grain vignette min-h-screen ${mono.variable} ${typewriter.variable} ${body.variable}`}
       >
         {children}
+        {/* The sounds play on every screen, so the switch for them belongs on every screen. */}
+        <SoundToggle />
       </body>
     </html>
   );

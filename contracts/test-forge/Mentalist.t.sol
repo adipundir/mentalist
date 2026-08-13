@@ -75,7 +75,11 @@ contract MockJackpot is IJackpot, IJackpotRandomTicketBuyer {
         uint256[] calldata,
         bytes32
     ) external returns (uint256[] memory ids) {
-        require(_count >= 1 && _count <= 10, "MockJackpot: count out of range");
+        // The live buyer rejects only zero (custom error 0x8e71bef9); counts of 50, 100 and
+        // 1000 all pass its count check and fail later on allowance. Verified by eth_call
+        // against 0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746 on Base Sepolia, so the mock
+        // must not invent an upper bound the chain does not enforce.
+        require(_count >= 1, "MockJackpot: count out of range");
         token.transferFrom(msg.sender, address(this), price * _count);
         ids = new uint256[](_count);
         for (uint256 i; i < _count; ++i) ids[i] = _nextId++;
@@ -221,8 +225,17 @@ contract CasebookTest is IncoTest {
         if (block.timestamp < closesAt) vm.warp(closesAt);
     }
 
+    /// @dev Take the key to your own verdict bit. Nothing can be filed without it, because
+    ///      the covalidator will not sign a decryption the on-chain ACL has not allowed.
+    function _unseal(address who, uint16 caseId) internal {
+        vm.prank(who);
+        book.unseal(caseId);
+        processAllOperations();
+    }
+
     /// @dev File the attestation over your own verdict bit. Model A: the contract rules.
     function _resolve(address who, uint16 caseId) internal {
+        _unseal(who, caseId);
         (DecryptionAttestation memory att, bytes[] memory sigs) = _attest(
             who,
             book.verdictHandle(caseId, who)
@@ -232,8 +245,9 @@ contract CasebookTest is IncoTest {
     }
 
     function _settle(uint16 caseId) internal {
+        uint64 window = book.FILING_WINDOW();
         uint64 closesAt = _closesAt(caseId);
-        if (block.timestamp < closesAt + 1 hours) vm.warp(closesAt + 1 hours + 1);
+        if (block.timestamp < closesAt + window) vm.warp(closesAt + window + 1);
         book.settle(caseId);
     }
 
@@ -452,6 +466,11 @@ contract CasebookTest is IncoTest {
      * @dev The privacy half. If verdict bits were public a spectator could watch which wallets
      *      came out right and simply follow the informed money next time; if they were
      *      readable by anyone at all, they could follow it *while the case was still open*.
+     *
+     *      And not even by their owner before the close, which is the timing this test exists
+     *      for. A verdict bit is the answer to anyone holding enough of them: one throwaway
+     *      wallet per seat at the minimum stake names the killer for well under a dollar, and
+     *      the last seat comes free. So the read has to wait for the money to stop moving.
      */
     function test_OnlyThePlayerCanReadTheirOwnVerdict() public {
         _open(CASE_ID, RED_JOHN);
@@ -462,6 +481,15 @@ contract CasebookTest is IncoTest {
         bytes32 his = book.verdictHandle(CASE_ID, lisbon);
         assertTrue(hers != his, "two players, two verdicts");
 
+        vm.expectRevert();
+        this.attestOrRevert(jane, hers);
+        vm.expectRevert();
+        this.attestOrRevert(lisbon, his);
+
+        // Once the case has stopped taking money, and only then, each of them may take theirs.
+        _reachClose(CASE_ID);
+        _unseal(jane, CASE_ID);
+        _unseal(lisbon, CASE_ID);
         this.attestOrRevert(jane, hers);
         this.attestOrRevert(lisbon, his);
 
@@ -523,6 +551,36 @@ contract CasebookTest is IncoTest {
         book.setStakeRange(1, 2);
     }
 
+    /**
+     * @notice And moving it sets the terms of the *next* case, not of one already taking money.
+     *
+     * @dev The bounds are what a player agreed to when they put money down. Reading them live
+     *      let the owner watch a pot form on the public `Staked` event and only then widen the
+     *      cap, sizing their own entry against a market everybody else had entered blind.
+     */
+    function test_MovingTheStakeRangeLeavesAnOpenCaseAlone() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+
+        book.setStakeRange(100_000, 30_000_000);
+
+        bytes memory ct = _betCipher(lisbon, SOMEONE_ELSE);
+        uint256 fee = book.quoteFee();
+        vm.prank(lisbon);
+        vm.expectRevert(
+            abi.encodeWithSelector(Mentalist.StakeOutOfRange.selector, 100_000, 5_000_000)
+        );
+        book.stake{ value: fee }(CASE_ID, ct, 30_000_000);
+
+        assertEq(book.caseMaxStake(CASE_ID), 5_000_000, "the case kept the cap it opened under");
+
+        // A case opened afterwards takes the new terms, which is the point of the setter.
+        _open(CASE_ID + 1, SOMEONE_ELSE);
+        _stake(cho, CASE_ID + 1, SOMEONE_ELSE, 30_000_000);
+        (uint128 pot, , , ) = _caseTotals(CASE_ID + 1);
+        assertEq(pot, 30_000_000);
+    }
+
     /// @dev The deadline is the whole reason the bet is a bet.
     function test_CannotStakeOnceTheCaseHasClosed() public {
         _open(CASE_ID, RED_JOHN);
@@ -558,24 +616,54 @@ contract CasebookTest is IncoTest {
     /**
      * @dev Not while money is still moving. A player who could decrypt their own verdict early
      *      could work out the answer from it and tell the entire lobby.
+     *
+     *      Which is why the lock is on `unseal` and not here. Refusing an early *filing* stops
+     *      nothing: the covalidator answers to the ACL alone, so a player who already held the
+     *      plaintext would simply wait and file it later, having spent the round knowing. The
+     *      check below is the last of three, and the least of them.
      */
     function test_CannotResolveBeforeTheCaseCloses() public {
         _open(CASE_ID, RED_JOHN);
         _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
 
-        (DecryptionAttestation memory att, bytes[] memory sigs) = _attest(
-            jane,
-            book.verdictHandle(CASE_ID, jane)
-        );
         vm.prank(jane);
         vm.expectRevert(Mentalist.CaseStillOpen.selector);
-        book.resolve(CASE_ID, att, sigs);
+        book.unseal(CASE_ID);
+
+        // Read the handle before the cheatcode: an external call inside an argument list
+        // spends the pending expectRevert on the wrong call.
+        bytes32 hers = book.verdictHandle(CASE_ID, jane);
+        vm.expectRevert();
+        this.attestOrRevert(jane, hers);
+
+        // And nothing that says it is an attestation gets in either: the clock is checked
+        // before the signatures are.
+        DecryptionAttestation memory att = DecryptionAttestation({ handle: hers, value: bytes32(0) });
+        vm.prank(jane);
+        vm.expectRevert(Mentalist.CaseStillOpen.selector);
+        book.resolve(CASE_ID, att, new bytes[](0));
+    }
+
+    /// @dev And it hands nobody a bit that was not already theirs.
+    function test_UnsealNeedsACaseAndAStakeInIt() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _reachClose(CASE_ID);
+
+        vm.prank(stranger);
+        vm.expectRevert(Mentalist.NothingStaked.selector);
+        book.unseal(CASE_ID);
+
+        vm.prank(jane);
+        vm.expectRevert(Mentalist.NoSuchCase.selector);
+        book.unseal(CASE_ID + 9);
     }
 
     function test_CannotResolveTwice() public {
         _open(CASE_ID, RED_JOHN);
         _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
         _reachClose(CASE_ID);
+        _unseal(jane, CASE_ID);
 
         (DecryptionAttestation memory att, bytes[] memory sigs) = _attest(
             jane,
@@ -604,6 +692,7 @@ contract CasebookTest is IncoTest {
         _stake(jane, CASE_ID, SOMEONE_ELSE, 1_000_000);
         _stake(lisbon, CASE_ID, RED_JOHN, 1_000_000);
         _reachClose(CASE_ID);
+        _unseal(lisbon, CASE_ID);
 
         (DecryptionAttestation memory his, bytes[] memory sigs) = _attest(
             lisbon,
@@ -619,6 +708,7 @@ contract CasebookTest is IncoTest {
         _open(CASE_ID, RED_JOHN);
         _stake(jane, CASE_ID, SOMEONE_ELSE, 1_000_000);
         _reachClose(CASE_ID);
+        _unseal(jane, CASE_ID);
 
         (DecryptionAttestation memory att, bytes[] memory sigs) = _attest(
             jane,
@@ -639,6 +729,7 @@ contract CasebookTest is IncoTest {
         _open(CASE_ID, RED_JOHN);
         _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
         _reachClose(CASE_ID);
+        _unseal(jane, CASE_ID);
 
         (DecryptionAttestation memory att, bytes[] memory sigs) = _attest(
             jane,
@@ -649,6 +740,8 @@ contract CasebookTest is IncoTest {
         book.resolve(CASE_ID, att, sigs);
     }
 
+    /// @dev Lisbon had `FILING_WINDOW` to file and let all three days of it go by. That is a
+    ///      clock nobody else can move, not a race the first filer gets to end.
     function test_CannotResolveOnceTheBooksAreClosed() public {
         _open(CASE_ID, RED_JOHN);
         _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
@@ -656,6 +749,7 @@ contract CasebookTest is IncoTest {
         _reachClose(CASE_ID);
         _resolve(jane, CASE_ID);
         _settle(CASE_ID);
+        _unseal(lisbon, CASE_ID);
 
         (DecryptionAttestation memory att, bytes[] memory sigs) = _attest(
             lisbon,
@@ -686,6 +780,44 @@ contract CasebookTest is IncoTest {
         _settle(CASE_ID);
         vm.expectRevert(Mentalist.AlreadySettled.selector);
         book.settle(CASE_ID);
+    }
+
+    /**
+     * @notice A slow winner still collects, and a fast one cannot end the window to take
+     *         their money.
+     *
+     * @dev The rule that makes this matter: `settle` is permissionless, and every filing after
+     *      yours shrinks your share. So the first winner in is *paid* to close the books on
+     *      everybody else, and while the two bounds were an hour apart that was worth the whole
+     *      pot: the slow winner's `resolve` reverted `AlreadySettled`, `payout` reverted
+     *      `NotResolved`, and `refund` reverted `DidNotWin` because the case did have a winner.
+     *      A correct read lost its entire principal for being asleep. Now the window closes on
+     *      a clock and settling opens exactly where it ends, so being first buys nothing.
+     */
+    function test_ASlowWinnerCannotBeSettledOutOfTheirWin() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 5_000_000);
+        _stake(lisbon, CASE_ID, RED_JOHN, 5_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 5_000_000);
+
+        _reachClose(CASE_ID);
+        _resolve(jane, CASE_ID);
+
+        // Jane has filed and would like the books shut. The old grace window has gone by and
+        // she still cannot have them.
+        uint64 closesAt = _closesAt(CASE_ID);
+        vm.warp(closesAt + 1 hours + 1);
+        vm.prank(jane);
+        vm.expectRevert(Mentalist.CaseStillOpen.selector);
+        book.settle(CASE_ID);
+
+        // Lisbon files on the last day of his window and takes his half.
+        vm.warp(closesAt + book.FILING_WINDOW() - 1);
+        _resolve(lisbon, CASE_ID);
+        _settle(CASE_ID);
+
+        assertEq(book.shareOf(CASE_ID, jane), 7_500_000, "half of everything, not all of it");
+        assertEq(book.shareOf(CASE_ID, lisbon), 7_500_000, "and the slow one is still a winner");
     }
 
     function test_CannotSettleACaseThatDoesNotExist() public {
@@ -811,6 +943,39 @@ contract CasebookTest is IncoTest {
         assertEq(ids.length, 25, "twenty-five tickets across three calls");
         assertEq(megapot.ticketsOf(jane), 25);
         for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole in the middle of the batch");
+    }
+
+    /// @notice At the price Megapot actually quotes, the hundred-ticket ceiling is the ordinary
+    ///         case rather than an edge one, and this is the only test that reaches it.
+    /// @dev The mock's default 1 USDC is a hundred times the live quote: `ticketPrice()` on
+    ///      0x465dA3c859f193A3807386387bEE941B2A4c3279 returns 10_000, so a share of one whole
+    ///      USDC already buys the full hundred. Every other payout test sits far under the clamp
+    ///      and under three batches, which is a shape no mainnet payout will ever have. Here a
+    ///      default-maximum stake would buy five hundred, gets a hundred, and the four USDC that
+    ///      the ceiling refused come back as cash instead of being kept.
+    function test_ClampAndFullBatchingAtTheLiveTicketPrice() public {
+        megapot.setTicketPrice(10_000);
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 5_000_000); // the default maxStake
+
+        _reachClose(CASE_ID);
+        _resolve(jane, CASE_ID);
+        _settle(CASE_ID);
+
+        uint256 before = usdc.balanceOf(jane);
+        vm.prank(jane);
+        uint256[] memory ids = book.payout(CASE_ID);
+
+        uint256 ceiling = book.TICKETS_PER_BATCH() * book.MAX_BATCHES();
+        assertEq(ceiling, 100, "the ceiling this test exists to reach");
+        assertEq(ids.length, ceiling, "clamped at a hundred across ten full batches");
+        assertEq(megapot.ticketsOf(jane), ceiling, "and Megapot issued every one of them to her");
+        for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole across ten calls");
+
+        assertEq(usdc.balanceOf(jane) - before, 4_000_000, "what the ceiling refused came back as cash");
+        assertEq(usdc.balanceOf(address(megapot)), 1_000_000, "and only the hundred tickets were paid for");
+        assertEq(book.reserved(), 0, "nothing of hers is still filed here");
+        assertEq(usdc.balanceOf(address(book)), 0, "with nothing stranded");
     }
 
     function test_LosersCannotBePaid() public {

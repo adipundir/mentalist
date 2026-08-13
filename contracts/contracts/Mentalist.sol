@@ -22,8 +22,12 @@ import { IJackpot, IJackpotRandomTicketBuyer } from "./Megapot.sol";
  *         the logs, and not readable afterwards by the account that put it there. The alibis
  *         themselves are public content and ship in the repository
  *         (`frontend/lib/casebook.ts`), so a careful reader can work the puzzle out. What the
- *         ciphertext buys is that settlement is trustless: the answer is fixed before the
- *         first bet and the operator can neither move it nor argue with it afterwards.
+ *         ciphertext buys is that settlement is trustless in one exact sense: the answer is
+ *         fixed before the first bet and the operator can neither move it nor argue with it
+ *         afterwards. It does not make the operator *correct*. Nothing on chain can check
+ *         that the sealed id belongs to the person whose alibi is impossible, so an author
+ *         who sealed the wrong name and staked on it would be indistinguishable from someone
+ *         who guessed well. `openCase` says what is and is not enforced there.
  *
  *         **Nor is anybody's bet.** A player stakes USDC together with an encrypted person
  *         id of their own. The contract compares the two inside Inco's enclave and keeps the
@@ -108,11 +112,28 @@ contract Mentalist is Ownable, ReentrancyGuard {
     uint256 public minStake = 100_000; // 0.10 USDC
     uint256 public maxStake = 5_000_000; // 5.00 USDC
 
-    /// @dev Megapot's quick-pick buyer rejects counts outside 1..10, so a large share batches.
+    /// @dev The bounds a case took money under, fixed the moment it opened. `stake` reads these
+    ///      rather than the live pair above, so moving the range cannot change the terms of a
+    ///      case that already has other people's money in it. Held beside the `Case` struct
+    ///      rather than in it so the public `cases` getter keeps the shape clients read it by.
+    mapping(uint16 => uint128) public caseMinStake;
+    mapping(uint16 => uint128) public caseMaxStake;
+
+    /// @dev Megapot's quick-pick buyer batches, so a large share takes several calls. The
+    ///      ceiling below is a bound on gas, not a promise about what a share converts to: at
+    ///      the price Base Sepolia quotes it is worth about a dollar of tickets, and the rest
+    ///      of the share leaves as USDC down the remainder path in `payout`.
     uint256 public constant TICKETS_PER_BATCH = 10;
     uint256 public constant MAX_BATCHES = 10;
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
     bytes32 public constant SOURCE = bytes32("mentalist");
+
+    /// @dev How long after a case closes a player has to file. `settle` is permissionless and
+    ///      every extra filing shrinks the shares of everyone who filed already, so whoever is
+    ///      in first is paid to close the books at the first legal instant. Bounding both ends
+    ///      with the same window is what stops that being a race: by the moment anybody may
+    ///      settle, nobody may still file, so settling early wins nothing.
+    uint64 public constant FILING_WINDOW = 3 days;
 
     // ─────────────────────────────────────────── events
 
@@ -197,6 +218,12 @@ contract Mentalist is Ownable, ReentrancyGuard {
             exists: true
         });
 
+        // Terms of the market, taken now rather than read live at `stake`. A player who put
+        // money down under one range must not find it widened underneath them by `setStakeRange`
+        // once the pot has formed and there is something to size an entry against.
+        caseMinStake[caseId] = uint128(minStake);
+        caseMaxStake[caseId] = uint128(maxStake);
+
         emit CaseOpened(caseId, suspects, closesAt);
     }
 
@@ -211,9 +238,8 @@ contract Mentalist is Ownable, ReentrancyGuard {
      *
      * @dev The comparison happens here rather than at settlement so the verdict exists the
      *      moment the bet does, and neither the bet nor the answer ever has to be moved or
-     *      re-ingested. `_correct` is granted to the player alone: they are the only account
-     *      that can decrypt whether they were right, and they cannot do it early because the
-     *      attestation is only accepted once the case has closed.
+     *      re-ingested. The *reading* of it does not happen here: see `unseal`. Only the
+     *      contract is granted the bit now, and the player gets it once the case has closed.
      */
     function stake(
         uint16 caseId,
@@ -224,14 +250,21 @@ contract Mentalist is Ownable, ReentrancyGuard {
         if (!c.exists) revert NoSuchCase();
         if (block.timestamp >= c.closesAt || c.settled) revert CaseClosed();
         if (bets[caseId][msg.sender].stake != 0) revert AlreadyStaked();
-        if (amount < minStake || amount > maxStake) revert StakeOutOfRange(minStake, maxStake);
+        uint256 lo = caseMinStake[caseId];
+        uint256 hi = caseMaxStake[caseId];
+        if (amount < lo || amount > hi) revert StakeOutOfRange(lo, hi);
         if (msg.value < inco.getFee()) revert FeeTooLow();
 
         usdc.safeTransferFrom(msg.sender, address(this), amount);
 
         euint256 named = encryptedBet.newEuint256(msg.sender);
         ebool right = e.eq(named, _answer[caseId]);
-        e.allow(right, msg.sender); // selective reveal: this player, and nobody else
+        // Deliberately no `e.allow(right, msg.sender)` here. An Inco grant is persistent and
+        // live the moment this transaction confirms, and the covalidator decrypts on the
+        // strength of that grant alone: it has no idea what `closesAt` is. Granting now would
+        // let anyone buy the answer by staking the minimum from a handful of throwaway wallets
+        // and reading the bits back, while the case is still taking money. `unseal` hands the
+        // player their bit after the close instead.
         e.allowThis(right);
 
         _correct[caseId][msg.sender] = right;
@@ -249,14 +282,38 @@ contract Mentalist is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────── the result
 
     /**
+     * @notice Take the key to your own verdict bit, once the case has stopped taking money.
+     *
+     * @dev This grant, and not the clock in `resolve`, is what keeps the answer from leaking
+     *      while money is still moving. The covalidator will decrypt for anyone the on-chain
+     *      ACL says may read, and that check has no time in it, so refusing an early *filing*
+     *      refuses nothing that matters: the player would already have the plaintext. Held
+     *      back to here, a bet buys nothing but a bet until the market is shut.
+     *
+     *      Permissionless within a case, because it only ever hands a player a bit that was
+     *      already theirs. `allowThis` at stake time is what lets the contract do this later,
+     *      so there is no re-ingest and no Inco fee: it is one ACL write.
+     */
+    function unseal(uint16 caseId) external {
+        Case storage c = cases[caseId];
+        if (!c.exists) revert NoSuchCase();
+        if (block.timestamp < c.closesAt) revert CaseStillOpen();
+        if (bets[caseId][msg.sender].stake == 0) revert NothingStaked();
+
+        e.allow(_correct[caseId][msg.sender], msg.sender);
+    }
+
+    /**
      * @notice File your result once the case has closed.
      *
      * @dev Model A settlement: the *contract* rules, by verifying a covalidator attestation
      *      over this player's own verdict bit and checking the handle is the one it stored.
      *      A market that took the client's word for who won would be a scoreboard.
      *
-     *      Only after `closesAt`, so nobody can learn the answer while money is still moving
-     *      and simply tell everyone.
+     *      The window is `closesAt` to `closesAt + FILING_WINDOW`, and it is a clock rather
+     *      than the `settled` flag on purpose. Reading the flag here would end the window the
+     *      instant somebody called `settle`, which is a thing a filed winner profits from
+     *      doing at the first legal second: every filing after theirs shrinks their share.
      */
     function resolve(
         uint16 caseId,
@@ -266,7 +323,8 @@ contract Mentalist is Ownable, ReentrancyGuard {
         Case storage c = cases[caseId];
         if (!c.exists) revert NoSuchCase();
         if (block.timestamp < c.closesAt) revert CaseStillOpen();
-        if (c.settled) revert AlreadySettled();
+        // Too late to file: the books are closed, or close the moment anyone asks.
+        if (block.timestamp >= c.closesAt + FILING_WINDOW) revert AlreadySettled();
 
         Bet storage b = bets[caseId][msg.sender];
         if (b.stake == 0) revert NothingStaked();
@@ -292,12 +350,16 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
     /**
      * @notice Close the books. Permissionless, once everyone has had time to file.
-     * @dev A grace window after `closesAt` so a slow filer is not cut out of their own win.
+     *
+     * @dev It opens exactly where `FILING_WINDOW` ends, so a slow filer is never cut out of
+     *      their own win by a fast one. Being first here used to be worth the whole pot: file,
+     *      settle, and every other winner is locked out of `resolve`, out of `payout` because
+     *      they never filed, and out of `refund` because the case did have a winner.
      */
     function settle(uint16 caseId) external {
         Case storage c = cases[caseId];
         if (!c.exists) revert NoSuchCase();
-        if (block.timestamp < c.closesAt + 1 hours) revert CaseStillOpen();
+        if (block.timestamp < c.closesAt + FILING_WINDOW) revert CaseStillOpen();
         if (c.settled) revert AlreadySettled();
 
         c.settled = true;
@@ -328,8 +390,19 @@ contract Mentalist is Ownable, ReentrancyGuard {
      * @notice Collect, in Megapot tickets.
      *
      * @dev Tickets rather than cash on purpose: reading a room correctly buys real lottery
-     *      entries, and the stakes of everyone who read it wrong are what buy them. Whatever
-     *      a whole ticket will not buy goes back as USDC rather than being kept.
+     *      entries, and the stakes of everyone who read it wrong are what buy them.
+     *
+     *      Up to `TICKETS_PER_BATCH * MAX_BATCHES` of them, and then no more, because each
+     *      batch is a separate call into Megapot. Everything the ceiling and the ticket price
+     *      between them leave over goes back as USDC rather than being kept. At the price Base
+     *      Sepolia quotes that remainder is most of a real winner's share, not the sub-ticket
+     *      change the ceiling was written for, so nothing that talks to a player may call it
+     *      dust.
+     *
+     *      Note for callers: the live buyer costs roughly a million gas a ticket, so a payout
+     *      at the ceiling is around ninety million. That is well inside a Base block and well
+     *      outside what the public RPCs will `eth_estimateGas`, which refuses anything past
+     *      about 16.7M. Send this with an explicit gas limit or it never leaves the wallet.
      */
     function payout(uint16 caseId) external nonReentrant returns (uint256[] memory ticketIds) {
         Case storage c = cases[caseId];
@@ -432,8 +505,10 @@ contract Mentalist is Ownable, ReentrancyGuard {
         jackpot.claimReferralFees();
     }
 
+    /// @dev Only ever the terms of the *next* case: an open one keeps the range it opened
+    ///      under. The uint128 bound is what makes the snapshot in `openCase` safe to narrow.
     function setStakeRange(uint256 min, uint256 max) external onlyOwner {
-        if (min == 0 || max < min) revert BadConfig();
+        if (min == 0 || max < min || max > type(uint128).max) revert BadConfig();
         minStake = min;
         maxStake = max;
     }

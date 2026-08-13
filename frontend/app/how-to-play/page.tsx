@@ -14,7 +14,7 @@ const STEPS = [
   {
     n: "01",
     title: "Pick a case",
-    body: "A new one opens every day and stays open until its round closes. Each is a separate murder, in its own room, with its own killer. Nothing you learn in one case carries into another.",
+    body: "All seven are open, and each stays open until its round closes. Each is a separate murder, in its own room, with its own killer. Nothing you learn in one case carries into another.",
   },
   {
     n: "02",

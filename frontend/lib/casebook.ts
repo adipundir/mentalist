@@ -15,6 +15,10 @@
  * trustless, since the answer is fixed before the first bet and the operator can neither
  * move it nor argue with it afterwards. And every bet is private, so nobody can watch the
  * informed money and simply follow it.
+ *
+ * Trustless there means immutable, not correct. No contract can check that the sealed index
+ * is the one marked `impossible` below, and there is no reveal afterwards to catch a case
+ * that was opened on a different one, so that much rests on whoever authored it.
  */
 
 export interface Alibi {

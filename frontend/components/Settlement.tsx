@@ -12,13 +12,17 @@ import * as sfx from "@/lib/sound";
  * The end of a case, and the only place the two stacks meet.
  *
  * **Inco** decides the outcome. Your verdict bit was computed inside the enclave the moment
- * you staked and granted to you alone; filing it means asking the covalidator to attest it
- * and handing those signatures to the contract. The *contract* rules on whether you were
- * right, not this browser. A market that settled on a number the client reported would be a
- * scoreboard.
+ * you staked, but it is not readable until the case has closed: `unseal` is what grants it to
+ * you, and that is deliberately a separate transaction. The covalidator answers to the
+ * on-chain ACL and knows nothing about closing times, so the grant is the only thing that can
+ * carry the timing. Filing then means asking the covalidator to attest the bit and handing
+ * those signatures to the contract. The *contract* rules on whether you were right, not this
+ * browser. A market that settled on a number the client reported would be a scoreboard.
  *
- * **Megapot** pays it out. Your share of the pot is bought as real lottery tickets with the
- * money of everyone who named the wrong man.
+ * **Megapot** pays it out. Your share of the pot buys real lottery tickets with the money of
+ * everyone who named the wrong man, up to the hundred-ticket ceiling in `payout`; the rest of
+ * the share comes back as USDC. At the price Base Sepolia quotes, that rest is most of it, so
+ * nothing here may tell a winner their whole share is arriving as tickets.
  *
  * Nothing here can happen while the case is still taking money. That is the contract's rule
  * and it is the right one: a player who could read the answer early would simply tell
@@ -39,8 +43,24 @@ interface Row {
   share: bigint;
 }
 
-/** The contract's grace window after close, so a slow filer is not cut out of their win. */
-const GRACE_MS = 60 * 60 * 1000;
+/**
+ * The contract's filing window, and the earliest anyone may close the books. Read off the
+ * chain below rather than assumed: an instance deployed before `FILING_WINDOW` existed runs
+ * the old one-hour grace, and offering its winners a settle button three days late would
+ * strand them as surely as offering it three days early would only ever revert.
+ */
+const DEFAULT_GRACE_MS = 60 * 60 * 1000;
+
+/**
+ * Gas for `payout`, set by hand instead of estimated.
+ *
+ * A Megapot ticket costs about a million gas on this chain and the contract buys up to a
+ * hundred of them, so a full collection is around ninety million. That is comfortably inside
+ * Base's block limit and comfortably outside the ~16.7M ceiling the public RPCs put on
+ * `eth_estimateGas`, which refuses anything larger outright. Left to estimate, the button
+ * below fails before the wallet ever opens. Unused gas is not charged.
+ */
+const PAYOUT_GAS = 120_000_000n;
 
 export function Settlement({
   caseId,
@@ -59,12 +79,33 @@ export function Settlement({
   const [error, setError] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<{ label: string; hash: string }[]>([]);
   const [now, setNow] = useState(0);
+  const [graceMs, setGraceMs] = useState(DEFAULT_GRACE_MS);
 
   useEffect(() => {
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!pub) return;
+    let live = true;
+    void pub
+      .readContract({
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
+        functionName: "FILING_WINDOW",
+      })
+      .then((w) => {
+        if (live) setGraceMs(Number(w) * 1000);
+      })
+      .catch(() => {
+        /* an instance without the constant is one that still runs the hour */
+      });
+    return () => {
+      live = false;
+    };
+  }, [pub]);
 
   const refresh = useCallback(async () => {
     if (!pub || !address) return;
@@ -125,6 +166,11 @@ export function Settlement({
   /**
    * File the one bit that decides your case.
    *
+   * Two transactions, and the first is the interesting one. `unseal` grants you your own
+   * verdict bit, which the contract holds back until the case has closed: the covalidator
+   * decrypts for whoever the on-chain ACL allows and has no notion of a closing time, so a
+   * grant made at stake time would have been an answer key on sale for the minimum bet.
+   *
    * The handle is the contract's own record of your verdict, so there is nothing to invent
    * and nothing to argue about: the covalidator signs the value, the contract checks the
    * handle it stored and the signatures, and rules.
@@ -134,6 +180,23 @@ export function Settlement({
     setBusy("resolving");
     setError(null);
     try {
+      try {
+        const unsealed = await wallet.writeContract({
+          address: MENTALIST_ADDRESS,
+          abi: MENTALIST_ABI,
+          functionName: "unseal",
+          args: [caseId],
+          account: address,
+          chain: wallet.chain,
+        });
+        await pub.waitForTransactionReceipt({ hash: unsealed });
+        setReceipts((r) => [...r, { label: "VERDICT UNSEALED", hash: unsealed }]);
+      } catch {
+        // An instance deployed before `unseal` existed granted the bit at stake time and has
+        // no such function to call. The decrypt below then succeeds on that older grant, so
+        // this is not fatal on its own: let the covalidator be the one to refuse.
+      }
+
       const handle = await pub.readContract({
         address: MENTALIST_ADDRESS,
         abi: MENTALIST_ABI,
@@ -165,7 +228,7 @@ export function Settlement({
   }
 
   const closed = row !== null && now >= row.closesAt;
-  const canSettle = row !== null && now >= row.closesAt + GRACE_MS;
+  const canSettle = row !== null && now >= row.closesAt + graceMs;
 
   return (
     <div className="mt-5 border-t border-ink-3 pt-4">
@@ -181,14 +244,15 @@ export function Settlement({
         </p>
       ) : !closed ? (
         <p className="font-body text-[13px] leading-relaxed text-bone">
-          Your stake is in and the case is still taking money. Nobody, including you, can
-          read the answer while that is true.{" "}
+          Your stake is in and the case is still taking money. Nobody else can read the name
+          you gave or whether it was right, and the contract will not take your filing until
+          the case closes.{" "}
           <span className="text-brass">Come back in {countdown(row.closesAt - now)}</span> and
           file your verdict.
         </p>
-      ) : /* Filing is only possible until somebody closes the books, which anyone may do an
-              hour after the case closes. Offering the button past that point would hand the
-              player a transaction that can only revert `AlreadySettled`, so a late filer falls
+      ) : /* Filing is only possible until the filing window runs out, and the books can only
+              be closed after it has. Offering the button past that point would hand the player
+              a transaction that can only revert `AlreadySettled`, so a late filer falls
               through instead: to the refund below if the case had no winners, and otherwise to
               the line that tells them the truth, which is that it is over. */
       !row.resolved && !row.settled ? (
@@ -206,7 +270,7 @@ export function Settlement({
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
             {row.won
-              ? "Filed, and the contract agrees: you named him. The books close once everyone has had their hour to file."
+              ? "Filed, and the contract agrees: you named him. The books close once everyone else has had their window to file."
               : "Filed. Wrong man, so your stake stays in the pot for whoever got it right."}
           </p>
           <Button
@@ -229,7 +293,7 @@ export function Settlement({
               ? "CLOSING THE BOOKS…"
               : canSettle
                 ? "CLOSE THE BOOKS"
-                : `BOOKS CLOSE IN ${countdown(row.closesAt + GRACE_MS - now)}`}
+                : `BOOKS CLOSE IN ${countdown(row.closesAt + graceMs - now)}`}
           </Button>
         </>
       ) : row.paid ? (
@@ -237,10 +301,11 @@ export function Settlement({
           {/* `refund` and `payout` both set the same paid flag, so this branch has to say
               which one happened or it tells a refunded player they are holding lottery
               tickets. `won` separates them exactly: only a winner can be paid out, and a
-              refund only exists in a case nobody won. It also stops the copy promising
-              tickets to a winner whose share was too small to buy a whole one. */}
+              refund only exists in a case nobody won. The tickets are capped at a hundred a
+              payout, so on a share of any size the USDC leg is the larger half and calling it
+              the change from a whole ticket would be a straight overstatement. */}
           {row.won
-            ? "Done. Your share is in your wallet: Megapot tickets for the next drawing, and USDC for whatever a whole ticket would not buy. Testnet drawings run every 30 minutes."
+            ? "Done. Your share is in your wallet: up to a hundred Megapot tickets for the next drawing, and the rest in USDC. Testnet drawings run every 30 minutes."
             : "Done. Your stake is back in your wallet."}
         </p>
       ) : row.winningStake === 0n ? (
@@ -272,8 +337,9 @@ export function Settlement({
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
             You&rsquo;re in for <span className="text-brass">${usdc(row.share)}</span> of a $
-            {usdc(row.pot)} pot. Collect it as real Megapot tickets, bought with the money of
-            everyone who read the room wrong.
+            {usdc(row.pot)} pot. It buys up to a hundred real Megapot tickets with the money of
+            everyone who read the room wrong, and whatever that ceiling and the ticket price
+            leave over comes back to you as USDC.
           </p>
           <Button
             tone="blood"
@@ -286,14 +352,13 @@ export function Settlement({
                   args: [caseId],
                   account: address!,
                   chain: wallet!.chain,
+                  gas: PAYOUT_GAS,
                 }),
               )
             }
             disabled={busy !== null}
           >
-            {busy === "paying"
-              ? "BUYING YOUR TICKETS…"
-              : `COLLECT $${usdc(row.share)} IN MEGAPOT TICKETS`}
+            {busy === "paying" ? "BUYING YOUR TICKETS…" : `COLLECT $${usdc(row.share)}`}
           </Button>
         </>
       ) : (

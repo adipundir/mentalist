@@ -71,6 +71,16 @@ export const MENTALIST_ABI = [
     outputs: [],
   },
   {
+    // Hands the player the key to their own verdict bit, and only after the case has closed.
+    // The covalidator decrypts on the strength of the on-chain ACL and nothing else, so this
+    // grant is the thing that has to wait for the close: an early one is an answer key.
+    type: "function",
+    name: "unseal",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "caseId", type: "uint16" }],
+    outputs: [],
+  },
+  {
     type: "function",
     name: "resolve",
     stateMutability: "nonpayable",
@@ -161,6 +171,15 @@ export const MENTALIST_ABI = [
       { name: "player", type: "address" },
     ],
     outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    // How long after the close a verdict may still be filed. `settle` opens exactly where
+    // this ends, so the two never overlap and nobody can shut the books on a slow filer.
+    type: "function",
+    name: "FILING_WINDOW",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint64" }],
   },
   {
     type: "function",
