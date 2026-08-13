@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { RedJohnMark } from "@/components/RedJohnMark";
 
 /**
  * The cold open.
@@ -20,30 +21,43 @@ import { AnimatePresence, motion } from "framer-motion";
  */
 const SEEN = "mentalist-cold-open";
 
+/** The wet edge of the wipe: opaque behind it, nothing in front of it, soft in between. */
+const MASK = "linear-gradient(to bottom, #000 calc(var(--paint) - 13%), transparent var(--paint))";
+
+/** How long the hand takes, plus the beat it hangs before the mask is dropped for good. */
+const PAINT_MS = 2900;
+
 export function ColdOpen() {
   const [show, setShow] = useState(false);
+  // The wipe is driven by a custom property, and a browser that will not animate one would
+  // otherwise hold the mask at its starting value forever — an empty wall for four seconds.
+  // Once the stroke has had its time, the mask comes off and the mark is simply there.
+  const [painted, setPainted] = useState(false);
+  // Whether this mount plays, decided once. The check has to be separate from the effect
+  // body: in dev the effect runs twice, and a version that wrote the session flag on the
+  // way past would make the second pass bail out — leaving the film on screen with its
+  // timer cleared and its skip listeners removed, which is a locked door.
+  const plays = useRef<boolean | null>(null);
 
   useEffect(() => {
-    if (sessionStorage.getItem(SEEN)) return;
-    sessionStorage.setItem(SEEN, "1");
+    if (plays.current === null) {
+      plays.current = !sessionStorage.getItem(SEEN);
+      sessionStorage.setItem(SEEN, "1");
+    }
+    if (!plays.current) return;
     setShow(true);
     const done = () => setShow(false);
+    const dry = setTimeout(() => setPainted(true), PAINT_MS);
     const timer = setTimeout(done, 4600);
     window.addEventListener("keydown", done);
     window.addEventListener("pointerdown", done);
     return () => {
+      clearTimeout(dry);
       clearTimeout(timer);
       window.removeEventListener("keydown", done);
       window.removeEventListener("pointerdown", done);
     };
   }, []);
-
-  // A stroke that paints itself: the dash covers the whole path, then the offset walks it on.
-  const paint = (delay: number, duration: number) => ({
-    initial: { pathLength: 0, opacity: 0.9 },
-    animate: { pathLength: 1, opacity: 1 },
-    transition: { delay, duration, ease: [0.4, 0, 0.4, 1] as const },
-  });
 
   return (
     <AnimatePresence>
@@ -62,51 +76,28 @@ export function ColdOpen() {
             }}
           />
 
-          <svg viewBox="-30 -30 60 60" className="relative h-[42vmin] w-[42vmin]">
-            <g
-              fill="none"
-              stroke="rgb(var(--blood-hot))"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              style={{ filter: "drop-shadow(0 0 6px rgb(var(--blood) / 0.55))" }}
-            >
-              {/* the face, opened at the top left the way a finger starts and finishes */}
-              <motion.path
-                d="M -3 -20.6 A 21 21 0 1 1 -5.5 -20.1"
-                strokeWidth="2.6"
-                {...paint(0.25, 1.15)}
-              />
-              {/* the eyes, stabbed in rather than drawn */}
-              <motion.path
-                d="M-8.6 -7 l0 0"
-                strokeWidth="6"
-                initial={{ opacity: 0, scale: 0.2 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 1.5, duration: 0.18 }}
-              />
-              <motion.path
-                d="M8.6 -7 l0 0"
-                strokeWidth="6"
-                initial={{ opacity: 0, scale: 0.2 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 1.72, duration: 0.18 }}
-              />
-              {/* the smile, last, and slower than the rest */}
-              <motion.path d="M-10 4.5 Q0 15.5 10 4.5" strokeWidth="2.6" {...paint(2.0, 0.85)} />
-            </g>
-
-            {/* it ran, because it was painted with a finger and nobody waited for it to dry */}
-            <motion.path
-              d="M13.4 10.5 q1.3 7.5 -0.4 14.5"
-              fill="none"
-              stroke="rgb(var(--blood))"
-              strokeWidth="1.15"
-              strokeLinecap="round"
-              initial={{ pathLength: 0, opacity: 0 }}
-              animate={{ pathLength: 1, opacity: 0.85 }}
-              transition={{ delay: 2.75, duration: 1.5, ease: "easeIn" }}
-            />
-          </svg>
+          {/* The mark, painting itself on.
+              A soft-edged wipe walks down the image, so the circle arrives first and the
+              runs arrive last, in the order a hand and gravity would have put them there.
+              The safety below drops the mask outright if the browser will not animate the
+              custom property, because a mark that never finishes arriving is a black screen. */}
+          <motion.div
+            className="relative h-[46vmin] w-[46vmin]"
+            initial={{ ["--paint" as string]: "0%" }}
+            animate={{ ["--paint" as string]: "125%" }}
+            transition={{ delay: 0.25, duration: 2.4, ease: [0.4, 0, 0.4, 1] }}
+            style={{
+              filter: "drop-shadow(0 0 14px rgb(var(--blood) / 0.4))",
+              ...(painted
+                ? {}
+                : {
+                    WebkitMaskImage: MASK,
+                    maskImage: MASK,
+                  }),
+            }}
+          >
+            <RedJohnMark className="h-full w-full object-contain" />
+          </motion.div>
 
           <motion.p
             className="relative mt-6 font-type text-[34px] tracking-wide text-bone sm:text-[46px]"

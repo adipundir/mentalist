@@ -96,8 +96,47 @@ export default function Board() {
   const next = useMemo(() => nextRelease(now), [now]);
 
   return (
-    <main className="min-h-screen px-5 pb-32 pt-6 sm:px-8">
-      <header className="mx-auto flex w-full max-w-[1100px] flex-wrap items-center gap-3">
+    <main className="relative min-h-screen overflow-hidden px-5 pb-32 pt-6 sm:px-8">
+      {/* The face of the show.
+          Key art running off the right edge of the frame and dissolving into the page, the
+          way a series presents itself on a streaming front page: cropped by the edge rather
+          than sitting in a box, lit from the side it faces, and graded down until it is
+          scenery for the type instead of competition for it. Held back on small screens,
+          where there is no room to be anything but in the way. */}
+      <div
+        className="pointer-events-none absolute right-0 top-0 z-0 hidden h-[400px] w-[min(54vw,620px)] select-none md:block lg:h-[470px]"
+        aria-hidden
+      >
+        {/* the light he is standing in */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              "radial-gradient(56% 60% at 74% 36%, rgb(var(--blood) / 0.18) 0%, transparent 72%)",
+          }}
+        />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/brand/jane.png"
+          alt=""
+          draggable={false}
+          className="absolute bottom-0 right-0 h-full w-auto max-w-none object-contain"
+          style={{
+            // Two fades at once — off the left into the text, off the bottom into the
+            // board — so no straight cut ever shows. `intersect` is what keeps them from
+            // cancelling each other out into a fully opaque rectangle.
+            maskImage:
+              "linear-gradient(to left, #000 44%, transparent 95%), linear-gradient(to bottom, #000 60%, transparent 98%)",
+            WebkitMaskImage:
+              "linear-gradient(to left, #000 44%, transparent 95%), linear-gradient(to bottom, #000 60%, transparent 98%)",
+            maskComposite: "intersect",
+            WebkitMaskComposite: "source-in",
+            filter: "grayscale(0.4) contrast(1.06) brightness(0.82) sepia(0.14)",
+          }}
+        />
+      </div>
+
+      <header className="relative z-10 mx-auto flex w-full max-w-[1100px] flex-wrap items-center gap-3">
         <Link href="/" className="font-type text-[15px] tracking-wide text-bone hover:text-blood-hot">
           MENTALIST
         </Link>
@@ -108,7 +147,7 @@ export default function Board() {
         </div>
       </header>
 
-      <div className="mx-auto mt-8 w-full max-w-[1100px]">
+      <div className="relative z-10 mx-auto mt-8 w-full max-w-[1100px]">
         <h1 className="font-type text-[30px] leading-tight text-bone sm:text-[38px]">
           Find Red John.
         </h1>
@@ -128,7 +167,7 @@ export default function Board() {
         )}
       </div>
 
-      <ol className="mx-auto mt-8 grid w-full max-w-[1100px] gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <ol className="relative z-10 mx-auto mt-8 grid w-full max-w-[1100px] gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {CASEBOOK.map((c, i) => {
           const rel = releases[i]!;
           const row = rows[i];
@@ -234,37 +273,32 @@ function CaseCard({
         {setting.toUpperCase()}
       </p>
 
-      {/* the lineup, in miniature */}
-      <div className="mb-3 mt-3 flex -space-x-1.5">
-        {faces.map((s) => (
-          <div
-            key={s.seat}
-            className="h-9 w-8 shrink-0 border border-ink-3 bg-[#211c1a]"
-            style={{ filter: released ? undefined : "grayscale(1) brightness(0.6)" }}
-          >
-            <Character spec={s.character} expression="neutral" className="h-full w-full" />
-          </div>
-        ))}
-        {suspects > faces.length && (
-          <div className="flex h-9 w-8 shrink-0 items-center justify-center border border-ink-3 bg-ink font-mono text-[9px] text-bone-dim">
-            +{suspects - faces.length}
-          </div>
-        )}
-      </div>
+      {/* The room on the left, what it is worth on the right.
+          The count that used to sit here said "4 IN THE ROOM" beside four faces you can
+          already see and count, which is the same fact twice and the less legible of the two.
+          The faces do that job on their own. */}
+      <div className="mt-auto flex items-end justify-between gap-3 border-t border-ink-3 pt-3">
+        <div className="flex -space-x-1.5">
+          {faces.map((s) => (
+            <div
+              key={s.seat}
+              className="h-9 w-8 shrink-0 border border-ink-3 bg-[#211c1a]"
+              style={{ filter: released ? undefined : "grayscale(1) brightness(0.6)" }}
+            >
+              <Character spec={s.character} expression="neutral" className="h-full w-full" />
+            </div>
+          ))}
+          {suspects > faces.length && (
+            <div className="flex h-9 w-8 shrink-0 items-center justify-center border border-ink-3 bg-ink font-mono text-[9px] text-bone-dim">
+              +{suspects - faces.length}
+            </div>
+          )}
+        </div>
 
-      <div className="mt-auto flex items-end justify-between gap-3 border-t border-ink-3 pt-2.5">
-        <div>
+        <div className="text-right">
           <p className="font-mono text-[9px] tracking-file text-bone-dim">IN THE POT</p>
           <p className="font-type text-[19px] leading-none text-brass">
             ${row ? usdc(row.pot) : "0.00"}
-          </p>
-        </div>
-        <div className="text-right">
-          {/* How many people are in the room, and nothing else. The liar count was always
-              one, so printing it told you the answer's shape for free, and an entrant count
-              on an empty board just says nobody is here. */}
-          <p className="font-mono text-[9px] tracking-file text-bone-dim">
-            {suspects} IN THE ROOM
           </p>
         </div>
       </div>

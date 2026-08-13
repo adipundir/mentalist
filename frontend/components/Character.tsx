@@ -608,11 +608,19 @@ export function Character({
 
         {/* Red John's calling card, on the unmasking */}
         {expression === "sinister" && (
-          <g className="smiley" stroke="#a81c1c" strokeWidth="3" fill="none" strokeLinecap="round">
-            <circle cx="50" cy="52" r="21" opacity="0.9" />
-            <path d="M40 46 L40 46 M60 46 L60 46" strokeWidth="7" />
-            <path d="M38 60 Q50 70 62 60" />
-          </g>
+          // The same photograph the title and the cold open use, scaled down onto his face.
+          // A path drawn at this size was always a different mark from the one on the wall,
+          // and this is the moment the two are supposed to be recognisably the same hand.
+          <image
+            className="smiley"
+            href="/brand/redjohn.png"
+            x="27"
+            y="30"
+            width="46"
+            height="46"
+            opacity="0.92"
+            preserveAspectRatio="xMidYMid meet"
+          />
         )}
       </g>
     </svg>
