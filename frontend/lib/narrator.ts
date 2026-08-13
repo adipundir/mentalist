@@ -99,11 +99,42 @@ export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
  *
  * Nothing here is guaranteed. A machine with one voice gets one voice, differently pitched.
  */
+/**
+ * macOS ships a pile of novelty voices, and they are the reason nobody could make out a word.
+ *
+ * They report `en-US` like any other, and they sort to the very front of an alphabetical list:
+ * Albert, Bad News, Bahh, Bells, Boing, Bubbles. Handing each seat the next name off that list
+ * gave the first several suspects a voice that sings, whispers, or gargles its lines. Every one
+ * of them is unusable for dialogue and none of them can be told apart from a real voice by
+ * anything the API exposes, so they have to be named.
+ */
+const NOVELTY = new Set([
+  "albert", "bad news", "bahh", "bells", "boing", "bubbles", "cellos", "deranged",
+  "good news", "hysterical", "jester", "organ", "princess", "superstar", "trinoids",
+  "whisper", "wobble", "zarvox", "grandma", "grandpa", "rocko", "shelley", "sandy",
+  "flo", "eddy", "reed", "junior", "kathy", "bruce", "fred", "ralph", "agnes",
+]);
+
+/** Names that mark a voice as one of the good modern ones, whatever the platform calls it. */
+const QUALITY = ["premium", "enhanced", "natural", "neural", "siri", "online"];
+
+/**
+ * A voice per suspect, drawn only from voices that can actually be understood.
+ *
+ * Prefers the platform's good voices and falls back to plain ones, but never to a novelty.
+ * If a machine has only one usable voice, everybody shares it: one voice the player can hear
+ * beats eight they cannot.
+ */
 export async function voiceForSeat(seat: number): Promise<SpeechSynthesisVoice | null> {
   const voices = await loadVoices();
   const english = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
-  const pool = english.length ? english : voices;
-  if (!pool.length) return null;
+  const usable = (english.length ? english : voices).filter(
+    (v) => !NOVELTY.has(v.name.trim().toLowerCase().replace(/\s*\(.*\)$/, "")),
+  );
+  if (!usable.length) return pickVoice();
+
+  const good = usable.filter((v) => QUALITY.some((q) => v.name.toLowerCase().includes(q)));
+  const pool = good.length ? good : usable;
 
   // Sorted by name so the assignment survives a reload. Left to the browser's own ordering,
   // a suspect can come back sounding like somebody else.
@@ -113,9 +144,13 @@ export async function voiceForSeat(seat: number): Promise<SpeechSynthesisVoice |
 
 /** How that seat carries the voice it was given. Deterministic, so a man keeps his manner. */
 export function toneForSeat(seat: number): { pitch: number; rate: number } {
+  // Kept close to natural. This used to bottom out at 0.82, which is the same figure the
+  // narration settings below were already corrected away from for exactly this reason:
+  // pitch-shifting a synthesised voice that far exposes every artefact in it and the words
+  // stop being words. A narrow band is enough to tell two men apart.
   return {
-    pitch: 0.82 + ((seat * 7) % 9) * 0.045,
-    rate: 0.88 + ((seat * 5) % 7) * 0.028,
+    pitch: 0.94 + ((seat * 7) % 9) * 0.022,
+    rate: 0.95 + ((seat * 5) % 7) * 0.017,
   };
 }
 

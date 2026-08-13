@@ -297,6 +297,12 @@ export function Room({
               key={s.suspect.seat}
               type="button"
               onClick={() => onFocus(s.suspect.seat)}
+              // A mouse click must not leave the figure focused. The ring below is meant for
+              // keyboard users and `focus-visible` is supposed to keep it to them, but the
+              // browser hands a clicked button focus anyway and draws a hard red box round the
+              // man you just picked. Refusing the mousedown default never gives him focus in
+              // the first place, so tabbing still shows the ring and clicking never does.
+              onMouseDown={(e) => e.preventDefault()}
               aria-label={`${s.suspect.name}, ${s.suspect.role}`}
               className="group absolute cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blood-hot/70"
               style={{

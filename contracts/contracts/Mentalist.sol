@@ -192,6 +192,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
     error InvalidAttestation();
     error BadConfig();
     error NotResolver();
+    error CaseHasMoneyIn();
     error LengthMismatch();
 
     constructor(IJackpotRandomTicketBuyer _ticketBuyer, address _owner) Ownable(_owner) {
@@ -647,6 +648,30 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
     function sweepReferralFees() external {
         jackpot.claimReferralFees();
+    }
+
+    /**
+     * @notice Re-time a case that nobody has bet on yet.
+     *
+     * @dev `closesAt` is otherwise written once, in `openCase`, and a case cannot be opened
+     *      twice. Without this, wanting a case to close sooner meant deploying the whole
+     *      contract again and re-opening every room, which is a lot of moving parts to get
+     *      wrong for the sake of a clock.
+     *
+     *      Refused the moment there is a single entrant, and that is the whole safety of it.
+     *      A player bets against a closing time: shortening it strands somebody who was still
+     *      reading, and lengthening it holds their money longer than they agreed to. An empty
+     *      room has made no such promise to anybody.
+     */
+    function reschedule(uint16 caseId, uint64 openFor) external onlyOwner {
+        Case storage c = cases[caseId];
+        if (!c.exists) revert NoSuchCase();
+        if (c.entrants != 0) revert CaseHasMoneyIn();
+        if (c.settled) revert AlreadySettled();
+        if (openFor < 10 minutes) revert BadConfig();
+
+        c.closesAt = uint64(block.timestamp) + openFor;
+        emit CaseOpened(caseId, c.suspects, c.closesAt);
     }
 
     /// @dev Only ever the terms of the *next* case: an open one keeps the range it opened

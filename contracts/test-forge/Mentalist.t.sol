@@ -1510,4 +1510,24 @@ contract CasebookTest is IncoTest {
         book.setRake(0, 0);
     }
 
+
+    /// @notice An empty room can be re-timed. A room with money in it cannot.
+    function test_ReschedulingIsRefusedOnceAnybodyHasBet() public {
+        _open(CASE_ID, RED_JOHN);
+        uint64 was = _closesAt(CASE_ID);
+
+        book.reschedule(CASE_ID, 10 minutes);
+        assertLt(_closesAt(CASE_ID), was, "an empty room takes the new clock");
+
+        // The moment one person is in, the closing time is a promise made to them.
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        vm.expectRevert(Mentalist.CaseHasMoneyIn.selector);
+        book.reschedule(CASE_ID, 1 hours);
+
+        // And it is the owner's to move, nobody else's.
+        vm.prank(cho);
+        vm.expectRevert();
+        book.reschedule(CASE_ID + 1, 1 hours);
+    }
+
 }
