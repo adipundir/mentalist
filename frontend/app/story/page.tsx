@@ -8,6 +8,7 @@ import { useAccount, usePublicClient } from "wagmi";
 import { CASEBOOK } from "@/lib/casebook";
 import { lineup, person } from "@/lib/canon";
 import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
+import { Character } from "@/components/Character";
 import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
 import { Settlement } from "@/components/Settlement";
@@ -185,11 +186,6 @@ function StoryInner() {
         alibis={chapter.alibis}
         title={chapter.title}
         chapter={`CASE ${index + 1} OF ${CASEBOOK.length}`}
-        nudge={{
-          name: person(chapter.nudge.speaker).name,
-          spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
-          line: chapter.nudge.line,
-        }}
         closesAt={row?.closesAt}
         variant={index}
         locked={locked}
@@ -217,6 +213,29 @@ function StoryInner() {
             body={chapter.opening}
             onContinue={() => setStage("playing")}
             continueLabel="WORK THE ROOM"
+            extra={
+              /* The hint, on the briefing rather than in the room. It used to sit bottom left
+                 over the floor, where the account bar and whoever was speaking covered it, so
+                 the one piece of guidance in the game was the one thing nobody could read.
+                 Here it is the last thing seen before the door opens. */
+              <div className="mt-6 flex items-start gap-3 border-l-2 border-brass/50 pl-4">
+                <div className="w-12 shrink-0 border border-ink-3 bg-ink">
+                  <Character
+                    spec={{ ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker }}
+                    expression="talking"
+                    className="h-14 w-full"
+                  />
+                </div>
+                <div>
+                  <p className="font-mono text-[9px] tracking-file text-brass">
+                    {person(chapter.nudge.speaker).name.toUpperCase()}
+                  </p>
+                  <p className="mt-1 font-body text-[14px] leading-snug text-bone-dim">
+                    &ldquo;{chapter.nudge.line}&rdquo;
+                  </p>
+                </div>
+              </div>
+            }
           />
         )}
 

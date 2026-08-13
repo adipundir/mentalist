@@ -57,7 +57,6 @@ export function Scene({
   alibis,
   chapter,
   title,
-  nudge,
   closesAt,
   variant = 0,
   stakePanel,
@@ -69,7 +68,6 @@ export function Scene({
   alibis: Alibi[];
   chapter?: string;
   title: string;
-  nudge?: { name: string; spec: CharacterSpec; line: string } | null;
   /** Unix ms this case stops accepting money. Drives the clock in the middle of the HUD. */
   closesAt?: number;
   /** Which crime scene this case is set in. */
@@ -211,28 +209,6 @@ export function Scene({
 
         {closesAt !== undefined && <Countdown closesAt={closesAt} />}
 
-        {/* the team, leaning in */}
-        {nudge && !line && (
-          <motion.div
-            initial={{ x: -20, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            transition={{ delay: 0.5 }}
-            className="pointer-events-none absolute bottom-32 left-4 flex max-w-[300px] items-end gap-2 sm:left-7"
-          >
-            <div className="w-14 shrink-0 border border-ink-3 bg-ink">
-              <Character spec={nudge.spec} expression="talking" className="h-16 w-full" />
-            </div>
-            <div className="border border-ink-3 bg-ink px-2.5 py-2">
-              <p className="font-mono text-[9px] tracking-file text-brass">
-                {nudge.name.toUpperCase()}
-              </p>
-              <p className="font-body text-[12px] leading-snug text-bone">
-                &ldquo;{nudge.line}&rdquo;
-              </p>
-            </div>
-          </motion.div>
-        )}
-
         {/* The bar and the stake panel both live on the bottom edge, and the bar is opaque
             and sits above it. Once the panel is up it is what the player came for, so the bar
             gives way: the account is not lost, the speaker still says his piece in a bubble
@@ -240,32 +216,19 @@ export function Scene({
         <Dialogue line={g.allSpoken && stakePanel ? null : line} />
       </div>
 
-      {/* ── one instruction, always telling you the next click ── */}
-      <div className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-12 sm:px-7">
-        {g.allSpoken && stakePanel ? (
-          // Nothing behind it. No box, no wash: the room runs all the way to the bottom of
-          // the frame and the money sits on top of it.
+      {/* ── the money, once the room has finished talking ──
+          There used to be a running instruction here too — "click anyone", then "that's 3 of
+          6" — but it sat underneath the account bar that covers this same edge of the screen,
+          so most of it was hidden behind whoever was speaking and the visible half read as a
+          sentence someone had cut in two. The room already tells the player what to do: the
+          figures are clickable and the account appears when one of them talks. */}
+      {g.allSpoken && stakePanel && (
+        <div className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-12 sm:px-7">
+          {/* Nothing behind it. No box, no wash: the room runs all the way to the bottom of
+              the frame and the money sits on top of it. */}
           <div className="mx-auto max-w-[1100px] py-1">{stakePanel}</div>
-        ) : (
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-0 flex-1 font-body text-[15px] leading-snug text-bone">
-              {g.witness === null ? (
-                <>
-                  They&rsquo;re in the room and they&rsquo;re waiting.{" "}
-                  <span className="text-blood-hot">Click anyone</span> and they&rsquo;ll tell
-                  you where they were.
-                </>
-              ) : (
-                <>
-                  That&rsquo;s {g.spoken.length} of {g.n}.{" "}
-                  <span className="text-blood-hot">Hear the rest of them out</span> before you
-                  put money on anybody.
-                </>
-              )}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
