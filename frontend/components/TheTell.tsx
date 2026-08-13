@@ -1,4 +1,5 @@
 import type { CaseFile } from "@/lib/casebook";
+import { person } from "@/lib/canon";
 
 /**
  * The reasoning, shown once a case is decided.
@@ -12,7 +13,8 @@ import type { CaseFile } from "@/lib/casebook";
 export function TheTell({ chapter }: { chapter: CaseFile }) {
   const seat = chapter.alibis.findIndex((a) => a.impossible);
   if (seat < 0) return null;
-  const name = chapter.roster[seat];
+  // `roster` holds lookup keys, not display names. The lineup shows the real one.
+  const name = person(chapter.roster[seat]).name;
 
   return (
     <div className="mt-6 border-l-2 border-blood/60 pl-4">

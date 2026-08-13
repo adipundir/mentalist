@@ -26,6 +26,15 @@ import { CASEBOOK } from "@/lib/casebook";
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
+/**
+ * The block this contract was deployed in. `fromBlock: 0` asks for a forty-five-million block
+ * range, which publicnode refuses outright (`exceed maximum block range: 50000`) and
+ * sepolia.base.org caps at 10,000. Only one provider in the fallback list served it, so the
+ * keeper was one rate limit away from never settling anything. There are no logs before the
+ * contract existed, so this loses nothing and every provider serves it.
+ */
+const DEPLOY_BLOCK = 45473373n;
+
 const STAKED = parseAbiItem(
   "event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot)",
 );
@@ -108,7 +117,7 @@ export async function GET(request: Request) {
         address: MENTALIST_ADDRESS,
         event: STAKED,
         args: { caseId },
-        fromBlock: 0n,
+        fromBlock: DEPLOY_BLOCK,
         toBlock: "latest",
       });
       const room = [...new Set(staked.map((l) => l.args.player as `0x${string}`))];
@@ -160,7 +169,13 @@ export async function GET(request: Request) {
           } catch (e) {
             // One player the covalidator will not sign for should not cost the rest of the
             // room its settlement. They keep the self-serve path, and the next run retries.
-            step.skipped = [...((step.skipped as string[]) ?? []), player];
+            // The reason is recorded: a bare list of addresses reads as a slow covalidator
+            // whatever the cause, which is exactly how a totally broken filing path stayed
+            // invisible through a green run.
+            step.skipped = [
+              ...((step.skipped as unknown[]) ?? []),
+              { player, why: e instanceof Error ? e.message.slice(0, 200) : String(e) },
+            ];
           }
         }
 
@@ -200,5 +215,6 @@ export async function GET(request: Request) {
     report.push(step);
   }
 
-  return NextResponse.json({ ok: true, cases: report });
+  const failed = report.some((s) => s.error || (s.skipped as unknown[])?.length);
+  return NextResponse.json({ ok: !failed, cases: report }, { status: failed ? 500 : 200 });
 }

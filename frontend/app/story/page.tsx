@@ -64,7 +64,12 @@ function StoryInner() {
     setPick(null);
     setVerdict(null);
     setRow(null);
-  }, [index]);
+    // Keyed on the account too. A verdict belongs to one wallet, and leaving it up through a
+    // switch showed the new account the old one's outcome, with the killer named underneath.
+    // The stage has to be re-decided as well, or the new account keeps the old one's room.
+    settled.current = false;
+    setStage(null);
+  }, [index, address]);
 
   // The pot and the clock, read straight from the contract. A read needs no wallet and no
   // signature, and the alternative is a countdown the frontend invented, which would

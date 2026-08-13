@@ -1,4 +1,3 @@
-"use client";
 
 /**
  * The two confidential operations this game needs, and nothing else.

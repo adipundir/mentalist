@@ -29,7 +29,7 @@ const STEPS = [
   {
     n: "04",
     title: "Find the story that cannot be true",
-    body: "Exactly one account in every room is impossible. Not suspicious, not unlikely: impossible. Someone waiting third in a queue with nobody in front of them. Someone asleep for an hour who is also certain nobody came up the stairs.",
+    body: "Exactly one account in every room is impossible. Not suspicious, not unlikely: impossible. Someone alone in a lift who held the door for the man behind him. Someone who read the evening paper by the window, after dark, in a room with no lamp lit.",
   },
   {
     n: "05",
@@ -79,13 +79,16 @@ export default function HowToPlay() {
       <div className="mt-2 border-l-2 border-blood pl-4">
         <p className="font-body text-[15px] leading-relaxed text-bone-dim">
           Five people. Four say they were reading, or on the phone, or out on the step with a
-          cigarette. The fifth says he was{" "}
-          <span className="text-bone">playing chess, alone, for the whole hour</span>.
+          cigarette. The fifth says he{" "}
+          <span className="text-bone">
+            walked the dog the long way round and was home before he set out
+          </span>
+          .
         </p>
         <p className="mt-2 font-body text-[15px] leading-relaxed text-bone-dim">
           Nothing about that man looks guilty. He is not sweating and he does not change his
-          story. He has simply said a thing that cannot happen, because chess needs someone
-          on the other side of the board. That is the whole game.
+          story. He has simply said a thing that cannot happen, because no walk ends before it
+          begins. That is the whole game.
         </p>
       </div>
 

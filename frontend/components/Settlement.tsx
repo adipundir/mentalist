@@ -68,7 +68,7 @@ export function Settlement({
 }: {
   caseId: number;
   /** Fires with the verdict the contract accepted, so the page can tell the story. */
-  onResolved?: (won: boolean) => void;
+  onResolved?: (won: boolean | null) => void;
 }) {
   const { address } = useAccount();
   const pub = usePublicClient();
@@ -78,6 +78,8 @@ export function Settlement({
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<{ label: string; hash: string }[]>([]);
+  /** Which form the payout took. Both buttons set the same `paid` flag on chain. */
+  const tookTickets = receipts.some((r) => r.label === "TICKETS BOUGHT");
   const [now, setNow] = useState(0);
   const [graceMs, setGraceMs] = useState(DEFAULT_GRACE_MS);
 
@@ -126,7 +128,9 @@ export function Settlement({
         paid: b[3],
         share,
       });
-      if (b[1]) onResolved?.(b[2]);
+      // Reported either way: only setting it on a filed bet leaves a stale verdict on
+      // screen when the account changes under us.
+      onResolved?.(b[1] ? b[2] : null);
     } catch {
       /* a cold read is not worth a message */
     }
@@ -266,11 +270,13 @@ export function Settlement({
           file your verdict.
         </p>
       ) : /* Filing is only possible until the filing window runs out, and the books can only
-              be closed after it has. Offering the button past that point would hand the player
-              a transaction that can only revert `AlreadySettled`, so a late filer falls
-              through instead: to the refund below if the case had no winners, and otherwise to
-              the line that tells them the truth, which is that it is over. */
-      !row.resolved && !row.settled ? (
+              be closed after it has. The clock is the guard, NOT the `settled` flag: `_credit`
+              reverts on `closesAt + FILING_WINDOW` and settling is a separate permissionless
+              call, so between those two moments `settled` is still false and this used to
+              offer a button that could only revert. It was not a free misclick either, since
+              `unseal` has no upper time bound: it mined, it cost gas, it posted a receipt, and
+              then the filing reverted anyway. A late filer falls through to the branch below. */
+      !row.resolved && !row.settled && now < row.closesAt + graceMs ? (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
             The case has closed. Ask the covalidator to attest the one bit that says whether
@@ -284,9 +290,11 @@ export function Settlement({
       ) : !row.settled ? (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
-            {row.won
-              ? "Filed, and the contract agrees: you named him. The books close once everyone else has had their window to file."
-              : "Filed. Wrong man, so your stake stays in the pot for whoever got it right."}
+            {!row.resolved
+              ? "The window to file on this case has passed and no verdict was filed for you, so it pays you nothing. The books still need closing before anyone can collect."
+              : row.won
+                ? "Filed, and the contract agrees: you named him. The books close once everyone else has had their window to file."
+                : "Filed. Wrong man, so your stake stays in the pot for whoever got it right."}
           </p>
           <Button
             tone={row.won ? "blood" : "dim"}
@@ -319,9 +327,11 @@ export function Settlement({
               refund only exists in a case nobody won. The tickets are capped at a hundred a
               payout, so on a share of any size the USDC leg is the larger half and calling it
               the change from a whole ticket would be a straight overstatement. */}
-          {row.won
-            ? "Done. Your share is in your wallet: up to a hundred Megapot tickets for the next drawing, and the rest in USDC. Testnet drawings run every 30 minutes."
-            : "Done. Your stake is back in your wallet."}
+          {!row.won
+            ? "Done. Your stake is back in your wallet."
+            : tookTickets
+              ? "Done. Your share is in your wallet: up to a hundred Megapot tickets for the next drawing, and the rest in USDC. Testnet drawings run every 30 minutes."
+              : "Done. Your share is in your wallet as USDC."}
         </p>
       ) : row.winningStake === 0n ? (
         <>
