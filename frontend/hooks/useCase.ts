@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useState, useRef } from "react";
 import type { Alibi } from "@/lib/casebook";
 import * as sfx from "@/lib/sound";
 import { narrate, unlockNarrator } from "@/lib/narrator";
@@ -19,6 +19,8 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
   const [spoken, setSpoken] = useState<number[]>([]);
   const [witness, setWitness] = useState<number | null>(null);
   const [saying, setSaying] = useState<{ seat: number; line: string } | null>(null);
+  /** Which utterance is current, so a finished one cannot silence the next speaker. */
+  const speechToken = useRef(0);
 
   /**
    * Walk up to one of them. That is the whole interaction.
@@ -40,8 +42,18 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
       setWitness(seat);
       setSpoken((v) => (v.includes(seat) ? v : [...v, seat]));
       setSaying({ seat, line });
-      void narrate(line, { rate: 0.96, pitch: 0.97 });
       sfx.pluck(300 + seat * 22);
+
+      // Close his mouth when he stops talking.
+      //
+      // `saying` is what drives the talking expression, and nothing used to clear it, so a
+      // suspect went on flapping his jaw for the rest of the case. `narrate` resolves when
+      // the utterance ends, so that is the moment to put the face back. The token guards
+      // against a stale utterance landing after the player has moved on to somebody else.
+      const token = ++speechToken.current;
+      void narrate(line, { rate: 0.96, pitch: 0.97 }).then(() => {
+        if (speechToken.current === token) setSaying(null);
+      });
     },
     [alibis],
   );

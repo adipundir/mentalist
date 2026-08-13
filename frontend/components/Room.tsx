@@ -298,7 +298,7 @@ export function Room({
               type="button"
               onClick={() => onFocus(s.suspect.seat)}
               aria-label={`${s.suspect.name}, ${s.suspect.role}`}
-              className="group absolute cursor-pointer"
+              className="group absolute cursor-pointer outline-none focus-visible:ring-2 focus-visible:ring-blood-hot/70"
               style={{
                 left: `${spot.x}%`,
                 bottom: `${spot.bottom}%`,
@@ -323,7 +323,14 @@ export function Room({
 
               {/* The name stays on, always. A room of strangers you have to hover to
                   identify is a room you cannot reason about. */}
-              <span className="name-tag pointer-events-none absolute -bottom-[13%] left-1/2 -translate-x-1/2 whitespace-nowrap border border-ink-3 bg-ink/90 px-1.5 py-[1px] font-mono text-[7px] tracking-file text-bone">
+              <span
+                className={[
+                  "name-tag pointer-events-none absolute -bottom-[13%] left-1/2 -translate-x-1/2",
+                  "whitespace-nowrap border px-1.5 py-[1px] font-mono text-[7px] tracking-file",
+                  "transition-colors",
+                  isFocus ? "border-brass/60 bg-ink text-brass" : "border-ink-3 bg-ink/90 text-bone",
+                ].join(" ")}
+              >
                 {s.suspect.name.toUpperCase()}
               </span>
 
@@ -370,17 +377,6 @@ export function Room({
                   </motion.div>
                 )}
               </AnimatePresence>
-
-              {/* nameplate, only for the figure under the light */}
-              <motion.div
-                animate={{ opacity: isFocus ? 1 : 0, y: isFocus ? 0 : 6 }}
-                transition={{ duration: 0.2 }}
-                className="pointer-events-none absolute inset-x-0 -bottom-1 text-center"
-              >
-                <span className="whitespace-nowrap border border-brass/60 bg-ink/90 px-1.5 py-0.5 font-mono text-[8px] tracking-file text-brass">
-                  {s.suspect.name.toUpperCase()}
-                </span>
-              </motion.div>
 
               {/* status pips. Nothing here is a deduction: the room proves nothing until
                   the case closes, so it only reports what the player has done. */}
