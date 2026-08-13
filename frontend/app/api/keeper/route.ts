@@ -33,7 +33,7 @@ export const maxDuration = 60;
  * keeper was one rate limit away from never settling anything. There are no logs before the
  * contract existed, so this loses nothing and every provider serves it.
  */
-const DEPLOY_BLOCK = 45482159n;
+const DEPLOY_BLOCK = 45482713n;
 
 const STAKED = parseAbiItem(
   "event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot)",

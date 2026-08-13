@@ -143,13 +143,18 @@ contract Mentalist is Ownable, ReentrancyGuard {
     ///      ceiling below is a bound on gas, not a promise about what a share converts to:
     ///      whatever it refuses leaves as USDC down the remainder path in `payout`.
     ///
-    ///      Twenty, measured rather than guessed. A quick-pick ticket costs about 410k gas on
-    ///      this chain, and the public RPCs refuse any single transaction over roughly 16.7M,
-    ///      so the old hundred-ticket ceiling was unreachable by a factor of five: a payout
-    ///      that tried for thirty-nine tickets burned 15.8M and died out of gas. Twenty lands
-    ///      near 8M, which leaves room for the settlement work around it.
-    uint256 public constant TICKETS_PER_BATCH = 10;
-    uint256 public constant MAX_BATCHES = 2;
+    ///      Five, and the figure comes off the chain rather than out of the air. A single
+    ///      quick-pick costs 1,305,946 gas here, measured by buying one: the buyer draws five
+    ///      unique normals and a bonusball per ticket, and that work does not get cheaper in
+    ///      bulk. The public RPCs refuse any transaction over roughly 16.7M, so ten tickets
+    ///      cannot fit and twenty was never close. Five lands near 6.5M and leaves the rest
+    ///      of the budget for the transfer and the bookkeeping around it.
+    ///
+    ///      This bounds the *form*, never the amount. Whatever the ceiling refuses leaves as
+    ///      USDC on the same path, and the ticket bonus is computed on the whole share, so a
+    ///      winner who takes tickets is still paid the full five percent extra.
+    uint256 public constant TICKETS_PER_BATCH = 5;
+    uint256 public constant MAX_BATCHES = 1;
     uint256 public constant FULL_REFERRAL_SPLIT = 1e18;
     bytes32 public constant SOURCE = bytes32("mentalist");
 

@@ -57,13 +57,13 @@ const DEFAULT_GRACE_MS = 60 * 60 * 1000;
 /**
  * Gas for `payout`, set by hand instead of estimated.
  *
- * A quick-pick ticket costs about 410k gas on this chain and the contract buys up to twenty,
- * so a full collection is around 8M. The public RPCs refuse any single transaction over
- * roughly 16.7M outright, which is what this figure has to stay under: it was set to 120M and
- * every ticket payout was rejected by the node before it was ever mined. Unused gas is not
- * charged, so the headroom above 8M costs nothing.
+ * A quick-pick ticket costs 1,305,946 gas on this chain, measured, and the contract buys up
+ * to five, so a full collection is around 6.5M. The public RPCs refuse any single transaction
+ * over roughly 16.7M outright, which is what this has to stay under: it was set to 120M and
+ * the node rejected every ticket payout before it was ever mined. Unused gas is not charged,
+ * so the headroom above 6.5M costs nothing.
  */
-const PAYOUT_GAS = 12_000_000n;
+const PAYOUT_GAS = 11_000_000n;
 
 export function Settlement({
   caseId,
