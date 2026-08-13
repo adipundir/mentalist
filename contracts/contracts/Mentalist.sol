@@ -7,7 +7,7 @@ import { asBool } from "@inco/lightning/src/shared/TypeUtils.sol";
 
 /**
  * @title  Mentalist: a confidential deduction game
- * @notice Nine suspects. One is the Tyger. Some of them lie, and the Tyger always does.
+ * @notice Nine suspects. One is Red John. Some of them lie, and Red John always does.
  *         You interrogate witnesses with yes/no questions about subsets of the lineup.
  *
  *         The mechanic this game exists for is one line:
@@ -49,7 +49,7 @@ contract Mentalist {
         uint8 focusLeft;
         uint8 questionsAsked;
         uint8 accusedSeat;
-        uint8 turnAt; // 0 = disabled; else the Tyger turns a witness after this many questions
+        uint8 turnAt; // 0 = disabled; else Red John turns a witness after this many questions
         bool turned; // has the turncoat event fired
         bool solved;
         Status status;
@@ -62,7 +62,7 @@ contract Mentalist {
 
     mapping(uint256 => Case) public cases;
 
-    /// @dev caseId => seat => "is this suspect the Tyger". Never granted to anyone.
+    /// @dev caseId => seat => "is this suspect Red John". Never granted to anyone.
     mapping(uint256 => mapping(uint8 => ebool)) internal _guilt;
     /// @dev caseId => seat => "does this suspect lie". Never granted to anyone.
     /// @dev caseId => questionId => the answer, granted to the detective only.
@@ -97,7 +97,7 @@ contract Mentalist {
 
     event RoomOpened(uint256 indexed caseId, address indexed detective, bytes32[] statementHandles);
 
-    /// @notice the Tyger got to the last witness you spoke to. Their honesty bit flipped.
+    /// @notice Red John got to the last witness you spoke to. Their honesty bit flipped.
 
     /// @param guiltHandles every seat's guilt bit, revealed, the case is over
     /// @dev No seat here on purpose: who you named is encrypted and must stay that way.
@@ -169,7 +169,7 @@ contract Mentalist {
     // ─────────────────────────────────────────── the game
 
     /**
-     * @notice Deal a fresh case. The TEE places the Tyger and the liars; nobody, not the
+     * @notice Deal a fresh case. The TEE places Red John and the liars; nobody, not the
      *         player, not this contract's deployer, not an observer, learns the layout.
      */
     function openCase(
@@ -246,7 +246,7 @@ contract Mentalist {
     }
 
     /**
-     * @notice Place the Tyger and the liars for a fresh case.
+     * @notice Place Red John and the liars for a fresh case.
      *
      * @dev The randomness lives in a *permutation*, not in N separate draws: build a list
      *      whose contents are public knowledge (one guilty, the rest innocent) and shuffle
@@ -417,7 +417,7 @@ contract Mentalist {
 
     /// @notice The encrypted answer to question `questionId`. Only the detective may decrypt it.
 
-    /// @notice Handle for "is seat `i` the Tyger". Publishing the *handle* discloses
+    /// @notice Handle for "is seat `i` Red John". Publishing the *handle* discloses
     ///         nothing, decryption requires an access grant, and this one is granted to
     ///         nobody until `accuse` reveals the board. The frontend needs it to paint the
     ///         post-mortem; tests need it to assert against ground truth.

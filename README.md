@@ -396,8 +396,7 @@ than overselling.
 
 The fiction is adapted from the Red John arc of *The Mentalist*, which is CBS-owned. No art,
 audio or text assets are taken from it: the cast is drawn from scratch as SVG and every line
-in the game is written for it. The contracts call the antagonist "the Tyger", from Blake's
-1794 poem, which is public domain, and which is also the arc's own passcode.
+in the game is written for it. 1794 poem, which is public domain, and which is also the arc's own passcode.
 
 ---
 

@@ -173,15 +173,31 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
 
     // Prints walking out of the pool and straight past you, growing as they come forward and
     // fading as the blood wears off the shoe.
+    // Where the walk goes: sideways out of the pool and a little toward the camera.
+    const px = (t: number) => bodyX + (exitX - bodyX) * t;
+    const py = (t: number) => bodyY + 2 + t * t * 12;
+
     const steps = 9;
     const prints = Array.from({ length: steps }, (_, i) => {
       const t = i / (steps - 1);
       const ease = t * t; // the floor recedes, so steps bunch up toward the back wall
+
+      // Point each foot along the direction of travel.
+      //
+      // These used to carry a fixed rotation near zero, which left every toe pointing
+      // straight up the screen while the trail itself ran sideways: a line of feet walking
+      // away from the direction they were facing. The sole is drawn toe-up, so rotating by
+      // atan2(dx, -dy) turns that default heading onto the tangent of the path.
+      const dx = px(Math.min(1, t + 0.02)) - px(Math.max(0, t - 0.02));
+      const dy = py(Math.min(1, t + 0.02)) - py(Math.max(0, t - 0.02));
+      const heading = (Math.atan2(dx, -dy) * 180) / Math.PI;
+
       return {
-        x: bodyX + (exitX - bodyX) * t,
-        y: bodyY + 2 + ease * 12,
+        x: px(t),
+        y: py(t),
         side: i % 2 === 0 ? -1 : 1,
-        rot: (left ? -8 : 8) + (r() - 0.5) * 12,
+        // A few degrees of toe-out per foot, because nobody walks with their feet parallel.
+        rot: heading + (r() - 0.5) * 7,
         o: Math.max(0.1, 0.8 - t * 0.55),
         s: 0.5 + ease * 1.5,
       };
@@ -245,7 +261,7 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
       {scene.prints.map((p, i) => (
         <g
           key={i}
-          transform={`translate(${p.x} ${p.y + p.side * 1.6}) rotate(${p.rot + p.side * 6}) scale(${p.s * 0.9})`}
+          transform={`translate(${p.x} ${p.y}) rotate(${p.rot + p.side * 5}) translate(${p.side * 1.7} 0) scale(${p.s * 0.9})`}
           opacity={p.o}
         >
           <g transform={`scale(${p.side} 1)`}>
