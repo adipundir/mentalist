@@ -209,8 +209,15 @@ export function Stake({
   const outOfRange = amount < MIN_STAKE || amount > MAX_STAKE;
 
   return (
-    <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
-      <div className="text-center">
+    // One shape, in every state.
+    //
+    // This used to be a plain wrap: naming somebody swapped the button's label for the full
+    // sentence "NAME DR. LINUS WAGNER, $1.00 ON IT", which no longer fitted, so the button
+    // dropped to a second row and the whole bar grew a line taller the moment you picked a
+    // man. Every column is fixed-width now and the labels are kept short enough to live
+    // inside them, so choosing someone lights the button up rather than rebuilding the bar.
+    <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-3 lg:flex-nowrap">
+      <div className="w-[104px] shrink-0 text-center">
         <p className="font-mono text-[10px] tracking-file text-bone-dim">IN THE POT</p>
         <p className="mt-1.5 font-type text-[22px] leading-none text-brass">
           {pot === null ? "…" : `$${usdc(pot)}`}
