@@ -1,19 +1,16 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { useAccount, usePublicClient, useWalletClient } from "wagmi";
+import { useAccount, usePublicClient } from "wagmi";
 import { CASEBOOK } from "@/lib/casebook";
 import { FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
-import { chainOracle, getZap, type ChainOracle } from "@/lib/chain-oracle";
-import { CASE_WINDOW_MS } from "@/lib/market";
-import { MARKET_ABI, MARKET_ADDRESS } from "@/lib/contracts";
+import { CASEBOOK_ABI, CASEBOOK_ADDRESS } from "@/lib/contracts";
 import { releaseOf } from "@/lib/schedule";
 import { Scene } from "@/components/Scene";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { StoryCard } from "@/components/StoryCard";
 import { Finale } from "@/components/Finale";
 import { Settlement } from "@/components/Settlement";
@@ -21,16 +18,26 @@ import { Stake } from "@/components/Stake";
 
 type Stage = "opening" | "playing" | "closing" | "finale";
 
+interface CaseRow {
+  /** Unix ms the contract stops taking money. */
+  closesAt: number;
+  pot: bigint;
+  entrants: number;
+  /** Open on chain, not settled, and still inside its window. */
+  open: boolean;
+}
+
 /**
  * THE RED JOHN CASES, the game.
  *
  * Seven cases following the real arc, the lineup shrinking the way the suspect list does.
  *
- * Every case runs on Base Sepolia: Red John is placed inside Inco's enclave, each answer is
- * decrypted for this player alone, the verdict is settled by the contract against a
- * covalidator attestation, and unspent questions buy real Megapot tickets. About ten
- * seconds a question, which the scene is built to spend as a dramatic beat rather than a
- * stall.
+ * The room costs nothing. You open a case, you hear every account in it, and you decide,
+ * with no wallet connected and nothing signed: the accounts are public data and the deal
+ * that hands them out is a public function. The chain enters the story exactly once, when
+ * you put money on a name, and that name goes out encrypted so nobody can trade on it.
+ * Afterwards the contract rules on the verdict against an Inco attestation, and the winners
+ * take the pot as real Megapot tickets.
  */
 function StoryInner() {
   const router = useRouter();
@@ -40,90 +47,92 @@ function StoryInner() {
     Number.isInteger(requested) && requested >= 0 && requested < CASEBOOK.length ? requested : 0,
   );
   const [stage, setStage] = useState<Stage>("opening");
-  const [solved, setSolved] = useState(false);
-  /** True once the verdict is filed on chain and recorded against the pot. */
-  const [banked, setBanked] = useState(false);
-  const [attempt, setAttempt] = useState(0);
-  const [txs, setTxs] = useState<{ hash: string; label: string }[]>([]);
+  /** Null until the contract has ruled. Nobody can know it while the case is still open. */
+  const [verdict, setVerdict] = useState<boolean | null>(null);
+  const [pick, setPick] = useState<{ seat: number; name: string } | null>(null);
+  const [row, setRow] = useState<CaseRow | null>(null);
+  /** True while the stake is on the wire, so the room cannot re-point a bet already sent. */
+  const [locked, setLocked] = useState(false);
 
-  // Each case stands for a fixed window. Set once per case so the clock does not restart
-  // every render.
-  const [closesAt, setClosesAt] = useState(0);
-
-  // The clock only means anything once a stake is down, because that is when the contract
-  // starts counting. Until then it is just how long the case would stand.
-  const [staked, setStaked] = useState<bigint | null>(null);
-  const [naming, setNaming] = useState<string | null>(null);
-  const pick = useRef<{ name: string | null; accuse: () => Promise<void> } | null>(null);
-
-  useEffect(() => {
-    setStaked(null);
-    setClosesAt(Date.now() + CASE_WINDOW_MS);
-  }, [index]);
-
-  // Never render a clock the server could not have computed the same way.
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
+  const pub = usePublicClient();
   const { address } = useAccount();
-  const publicClient = usePublicClient();
-  const { data: walletClient } = useWalletClient();
-
-  useEffect(() => {
-    void getZap().catch(() => {});
-  }, []);
 
   const chapter = CASEBOOK[index];
   const suspects = useMemo(() => lineup(chapter.roster), [chapter]);
 
-  // Every case is dealt and answered on-chain. There is no local fallback: a simulation of
-  // the game would be a different game, and the whole point is that the secret is somewhere
-  // neither the player nor the page can reach.
-  const oracle = useMemo(() => {
-    if (!publicClient || !walletClient || !address) return null;
-    return chainOracle({
-      publicClient,
-      walletClient,
-      account: address,
-      onTx: (hash, label) => setTxs((t) => [{ hash, label }, ...t].slice(0, 6)),
-    });
-  }, [publicClient, walletClient, address, index, attempt]);
+  useEffect(() => {
+    setPick(null);
+    setVerdict(null);
+    setRow(null);
+  }, [index]);
 
+  // The pot and the clock, read straight from the contract. A read needs no wallet and no
+  // signature, and the alternative is a countdown the frontend invented, which would
+  // eventually promise a player a window the contract will not honour.
+  useEffect(() => {
+    if (!pub) return;
+    let live = true;
+    const read = async () => {
+      try {
+        const c = await pub.readContract({
+          address: CASEBOOK_ADDRESS,
+          abi: CASEBOOK_ABI,
+          functionName: "cases",
+          args: [index],
+        });
+        if (!live) return;
+        const closesAt = Number(c[0]) * 1000;
+        setRow({
+          closesAt,
+          pot: c[2],
+          entrants: Number(c[4]),
+          open: c[7] && !c[6] && Date.now() < closesAt,
+        });
 
-  /**
-   * Take the seat, before a word is spoken.
-   *
-   * This runs between dealing the case and opening the room, and it has to: a seat can only
-   * be claimed while the room is still shut, which is what stops a player reading a room,
-   * disliking it, and going to look for an easier one to bet on.
-   */
-  const claimSeat = useCallback(
-    async (caseId: number) => {
-      if (!walletClient || !publicClient) return;
-      const hash = await walletClient.writeContract({
-        address: MARKET_ADDRESS,
-        abi: MARKET_ABI,
-        functionName: "claimSeat",
-        args: [index, BigInt(caseId)],
-      });
-      await publicClient.waitForTransactionReceipt({ hash });
-    },
-    [walletClient, publicClient, index],
-  );
+        // Somebody coming back to a case they already backed should land on the settlement,
+        // not be made to walk the room again to reach it.
+        if (address) {
+          const staked = await pub.readContract({
+            address: CASEBOOK_ADDRESS,
+            abi: CASEBOOK_ABI,
+            functionName: "hasStaked",
+            args: [index, address],
+          });
+          if (live && staked) setStage("closing");
+        }
+      } catch {
+        /* a cold read just leaves the room without a clock */
+      }
+    };
+    void read();
+    const id = setInterval(read, 15_000);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [pub, index, address]);
+
+  // `open` is a snapshot taken by a poll that runs every fifteen seconds, and the clock in the
+  // HUD is live, so between the clock reaching zero and the next read the panel would still
+  // offer a stake the contract now rejects. That costs a real approve transaction and a stake
+  // that reverts, so retire it on the same edge the clock does.
+  useEffect(() => {
+    if (!row?.open) return;
+    const ms = row.closesAt - Date.now();
+    const close = () => setRow((r) => (r ? { ...r, open: false } : r));
+    if (ms <= 0) return close();
+    // A delay past 2^31-1 ms fires immediately, and nothing bounds how long a case may be
+    // opened for.
+    const id = setTimeout(close, Math.min(ms, 2_147_483_000));
+    return () => clearTimeout(id);
+  }, [row?.open, row?.closesAt]);
 
   const isLast = index === CASEBOOK.length - 1;
 
-  function finishChapter(didSolve: boolean) {
-    setSolved(didSolve);
-    setBanked(false);
-    setStage("closing");
-  }
-
   function advance() {
-    if (!solved) {
-      // The case is spent: it has been accused on chain, and the market allows one entry
-      // per wallet per room. Sending them back into it would be a room where every click
-      // reverts, so they go back to the board and pick a case they can actually open.
+    // Only a win moves the arc on. Anything else goes back to the board, because the
+    // contract takes one entry per wallet per case and this room is spent.
+    if (verdict !== true) {
       router.push("/cases");
       return;
     }
@@ -136,8 +145,6 @@ function StoryInner() {
       return;
     }
     setIndex((i) => i + 1);
-    setAttempt(0);
-    setTxs([]);
     setStage("opening");
   }
 
@@ -173,49 +180,38 @@ function StoryInner() {
       </div>
 
       <Scene
-          key={`${index}-${attempt}`}
-          config={chapter}
-          oracle={oracle}
-          suspects={suspects}
-          title={chapter.title}
-          chapter={`CASE ${index + 1} OF ${CASEBOOK.length}`}
-          nudge={{
-            name: person(chapter.nudge.speaker).name,
-            spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
-            line: chapter.nudge.line,
-          }}
-          closesAt={mounted ? closesAt : undefined}
-          variant={index}
-          alibis={chapter.alibis}
-          beforeHearing={claimSeat}
-          onPick={(seat, name, accuse) => {
-            pick.current = { name, accuse };
-            setNaming(name);
-          }}
-          stakePanel={
-            <Stake
-              caseIndex={index}
-              naming={naming}
-              onStaked={async () => {
-                await pick.current?.accuse();
-              }}
-            />
-          }
-          connect={
-            oracle ? null : (
-              <>
-                <ConnectButton showBalance={false} chainStatus="icon" />
-              </>
-            )
-          }
-          onResolved={finishChapter}
-        />
+        key={index}
+        suspects={suspects}
+        alibis={chapter.alibis}
+        title={chapter.title}
+        chapter={`CASE ${index + 1} OF ${CASEBOOK.length}`}
+        nudge={{
+          name: person(chapter.nudge.speaker).name,
+          spec: { ...person(chapter.nudge.speaker).character, id: chapter.nudge.speaker },
+          line: chapter.nudge.line,
+        }}
+        closesAt={row?.closesAt}
+        variant={index}
+        locked={locked}
+        onPick={(seat, name) => setPick(seat === null || name === null ? null : { seat, name })}
+        stakePanel={
+          <Stake
+            caseId={index}
+            seat={pick?.seat ?? null}
+            naming={pick?.name ?? null}
+            pot={row?.pot ?? null}
+            entrants={row?.entrants ?? null}
+            open={row?.open ?? null}
+            onBusy={setLocked}
+            onStaked={() => setStage("closing")}
+          />
+        }
+      />
 
       <AnimatePresence>
-
-        {stage === "opening" && oracle && (
+        {stage === "opening" && (
           <StoryCard
-            key={`open-${index}-${attempt}`}
+            key={`open-${index}`}
             chapter={`CASE ${index + 1} OF ${CASEBOOK.length}, ${chapter.suspects} SUSPECTS, ${chapter.liars} OF THEM LYING`}
             title={chapter.title}
             body={chapter.opening}
@@ -226,23 +222,17 @@ function StoryInner() {
 
         {stage === "closing" && (
           <StoryCard
-            key={`close-${index}-${attempt}`}
-            chapter={solved ? "CASE CLOSED" : "HE WALKED"}
+            key={`close-${index}`}
+            chapter={verdict === null ? "THE MONEY IS DOWN" : verdict ? "CASE CLOSED" : "HE WALKED"}
             title={chapter.title}
-            body={solved ? chapter.successText : chapter.failureText}
-            onContinue={advance}
-            continueDisabled={!banked}
-            continueLabel={solved ? (isLast ? "THE CREEK" : "NEXT CASE") : "BACK TO THE CASES"}
-            extra={
-              oracle ? (
-                <Settlement
-                  oracle={oracle}
-                  solved={solved}
-                  caseIndex={index}
-                  onBanked={() => setBanked(true)}
-                />
-              ) : null
+            body={
+              verdict === null
+                ? "Your money is on a name nobody else can read, and it stays that way until the case closes. Nobody can watch what you did and copy it, and nobody, including whoever wrote this case, can move the answer now that there is money against it."
+                : `${verdict ? chapter.successText : chapter.failureText} ${chapter.tell}`
             }
+            onContinue={advance}
+            continueLabel={verdict === true ? (isLast ? "THE CREEK" : "NEXT CASE") : "BACK TO THE CASES"}
+            extra={<Settlement caseId={index} onResolved={setVerdict} />}
           />
         )}
 

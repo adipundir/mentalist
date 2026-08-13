@@ -7,7 +7,7 @@ import { useAccount, usePublicClient } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { CASEBOOK } from "@/lib/casebook";
 import { lineup } from "@/lib/canon";
-import { MARKET_ABI, MARKET_ADDRESS } from "@/lib/contracts";
+import { CASEBOOK_ABI, CASEBOOK_ADDRESS } from "@/lib/contracts";
 import { usdc } from "@/lib/market";
 import { SEASON_START, countdown, nextRelease, schedule } from "@/lib/schedule";
 import { Character } from "@/components/Character";
@@ -28,7 +28,8 @@ interface Row {
   pot: bigint;
   entrants: number;
   closesAt: number;
-  sealed: boolean;
+  settled: boolean;
+  /** This wallet already has money on this case. */
   played: boolean;
 }
 
@@ -54,27 +55,26 @@ export default function Board() {
       await Promise.all(
         CASEBOOK.map(async (_, i) => {
           try {
-            const round = await pub.readContract({
-              address: MARKET_ADDRESS,
-              abi: MARKET_ABI,
-              functionName: "rounds",
+            const c = await pub.readContract({
+              address: CASEBOOK_ADDRESS,
+              abi: CASEBOOK_ABI,
+              functionName: "cases",
               args: [i],
             });
             let played = false;
             if (address) {
-              const entry = await pub.readContract({
-                address: MARKET_ADDRESS,
-                abi: MARKET_ABI,
-                functionName: "entries",
+              played = await pub.readContract({
+                address: CASEBOOK_ADDRESS,
+                abi: CASEBOOK_ABI,
+                functionName: "hasStaked",
                 args: [i, address],
               });
-              played = entry[0] > 0n;
             }
             out[i] = {
-              pot: round[1],
-              entrants: Number(round[3]),
-              closesAt: Number(round[0]) * 1000,
-              sealed: round[5],
+              pot: c[2],
+              entrants: Number(c[4]),
+              closesAt: Number(c[0]) * 1000,
+              settled: c[6],
               played,
             };
           } catch {
@@ -132,7 +132,7 @@ export default function Board() {
           const rel = releases[i]!;
           const row = rows[i];
           const closed = row ? now >= row.closesAt : false;
-          const open = rel.released && !closed && !row?.sealed;
+          const open = rel.released && !closed && !row?.settled;
 
           return (
             <motion.li

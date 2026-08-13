@@ -29,13 +29,12 @@ import type { Suspect } from "@/lib/suspects";
 export interface RoomSubject {
   suspect: Suspect;
   expression: Expression;
-  cleared: boolean;
-  liar: boolean;
-  honest: boolean;
-  inQuestion: boolean;
-  turned: boolean;
+  /** Already given their account. Nothing is proven by it, it just tracks who is left. */
+  heard: boolean;
+  /** The man this player is putting money on. */
+  named: boolean;
   /** What they're saying right now, rendered as a bubble over their head. */
-  saying?: { line: string; answer: boolean } | null;
+  saying?: string | null;
   /** What they do when nobody is questioning them. */
   idle?: Idle;
 }
@@ -103,16 +102,12 @@ export function Room({
   subjects,
   focused,
   onFocus,
-  onToggle,
-  disabled,
   variant = 0,
 }: {
   subjects: RoomSubject[];
   /** Seat the camera is pushed in on, or null for the wide shot. */
   focused: number | null;
   onFocus: (seat: number) => void;
-  onToggle: (seat: number) => void;
-  disabled: boolean;
   /** Which crime scene to lay out. One per case. */
   variant?: number;
 }) {
@@ -301,11 +296,9 @@ export function Room({
             <motion.button
               key={s.suspect.seat}
               type="button"
-              disabled={disabled}
               onClick={() => onFocus(s.suspect.seat)}
-              onDoubleClick={() => onToggle(s.suspect.seat)}
               aria-label={`${s.suspect.name}, ${s.suspect.role}`}
-              className="group absolute cursor-pointer disabled:cursor-not-allowed"
+              className="group absolute cursor-pointer"
               style={{
                 left: `${spot.x}%`,
                 bottom: `${spot.bottom}%`,
@@ -315,7 +308,7 @@ export function Room({
                 transformOrigin: "50% 100%",
               }}
               animate={{
-                opacity: s.saying ? 1 : s.cleared ? 0.3 : dim ? 0.45 : 1,
+                opacity: s.saying ? 1 : dim ? 0.45 : 1,
                 y: isFocus ? -8 : 0,
                 scale: isFocus ? 1.06 : 1,
                 filter: s.saying ? "brightness(1)" : dim ? "brightness(0.5)" : "brightness(1)",
@@ -337,7 +330,6 @@ export function Room({
               <Character
                 spec={s.suspect.character}
                 expression={s.expression}
-                cleared={s.cleared}
                 fullBody
                 idle={s.idle}
                 className="h-auto w-full drop-shadow-[0_6px_10px_rgba(0,0,0,0.6)]"
@@ -358,26 +350,20 @@ export function Room({
                     <div
                       className="relative border-[2.5px] bg-[#f4ecd8] px-2.5 py-1.5 text-center"
                       style={{
-                        borderColor: s.saying.answer ? "#a81c1c" : "#1c1613",
+                        borderColor: "#1c1613",
                         borderRadius: 14,
                         boxShadow: "3px 4px 0 rgb(0 0 0 / 0.55)",
                       }}
                     >
                       <p className="font-type text-[10px] leading-tight text-[#1c1613]">
-                        &ldquo;{s.saying.line}&rdquo;
+                        &ldquo;{s.saying}&rdquo;
                       </p>
-                      <span
-                        className="font-mono text-[9px] tracking-file"
-                        style={{ color: s.saying.answer ? "#a81c1c" : "#4a423a" }}
-                      >
-                        {s.saying.answer ? "YES" : "NO"}
-                      </span>
                       <span
                         className="absolute left-1/2 top-full h-0 w-0 -translate-x-1/2"
                         style={{
                           borderLeft: "7px solid transparent",
                           borderRight: "7px solid transparent",
-                          borderTop: `10px solid ${s.saying.answer ? "#a81c1c" : "#1c1613"}`,
+                          borderTop: "10px solid #1c1613",
                         }}
                       />
                     </div>
@@ -396,27 +382,19 @@ export function Room({
                 </span>
               </motion.div>
 
-              {/* status pips */}
+              {/* status pips. Nothing here is a deduction: the room proves nothing until
+                  the case closes, so it only reports what the player has done. */}
               <div className="pointer-events-none absolute -top-2 left-1/2 flex -translate-x-1/2 gap-1">
-                {s.inQuestion && (
-                  <span className="border border-blood-hot bg-ink px-1 font-mono text-[7px] tracking-file text-blood-hot">
-                    IN
-                  </span>
-                )}
-                {s.liar && (
-                  <span className="border border-blood-hot bg-ink px-1 font-mono text-[7px] tracking-file text-blood-hot">
-                    LIAR
-                  </span>
-                )}
-                {s.honest && (
-                  <span className="border border-brass bg-ink px-1 font-mono text-[7px] tracking-file text-brass">
-                    TRUE
-                  </span>
-                )}
-                {s.turned && (
+                {s.named ? (
                   <span className="border border-blood-hot bg-blood-hot/20 px-1 font-mono text-[7px] tracking-file text-blood-hot">
-                    TURNED
+                    YOUR MAN
                   </span>
+                ) : (
+                  s.heard && (
+                    <span className="border border-brass/70 bg-ink px-1 font-mono text-[7px] tracking-file text-brass">
+                      HEARD
+                    </span>
+                  )
                 )}
               </div>
             </motion.button>

@@ -2,6 +2,16 @@
 
 **A confidential deduction game for the Inco Summer Game Jam 2026.**
 
+> **Superseded, kept for the record.** This document describes the interrogation design: a
+> case dealt per player by the TEE, one statement per witness passed through a hidden honesty
+> bit, `e.xor(truth, liarBit)`, settled by `Mentalist.sol`. The shipped game is not that. It
+> is seven hand-written cases whose alibis are public in `frontend/lib/casebook.ts`, exactly
+> one of which is logically impossible, with the impossible speaker's id encrypted once into
+> `Casebook.sol` and compared against each player's encrypted bet by `e.eq`. Nothing in
+> sections 0, 2.1, 2.2, 5 or 5.3 below is in the play path. **`README.md` is the current
+> description.** Section 3 (the seven cases) and section 4 (Megapot) still hold, except that
+> every shipped case has exactly one liar rather than the one to four in the section 3 table.
+
 > Nine suspects. One is Red John. Everyone lies, but Red John *always* lies.
 > Everyone in this room knows who did it. Not all of them will tell you.
 

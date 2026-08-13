@@ -14,6 +14,7 @@
     "test:forge": "forge test -vv",
     "play:onchain": "npx tsx scripts/play-onchain.ts",
     "deploy:market": "npx tsx scripts/deploy-market.ts",
+    "deploy:casebook": "npx tsx scripts/deploy-casebook.ts",
     "prove:market": "npx tsx scripts/prove-market.ts"
   },
   "devDependencies": {

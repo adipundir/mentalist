@@ -437,8 +437,6 @@ function Arms({
 export function Character({
   spec,
   expression = "neutral",
-  /** Dim and desaturate, used for suspects the notebook has ruled out. */
-  cleared = false,
   /** Draw the whole figure, standing, for the room scene. */
   fullBody = false,
   /** What they do when left alone. Only meaningful in `fullBody`. */
@@ -448,7 +446,6 @@ export function Character({
 }: {
   spec: CharacterSpec;
   expression?: Expression;
-  cleared?: boolean;
   fullBody?: boolean;
   idle?: Idle;
   className?: string;
@@ -460,7 +457,6 @@ export function Character({
 
   // Idle blinking. Irregular on purpose, a metronome blink reads as a machine.
   useEffect(() => {
-    if (cleared) return;
     let alive = true;
     const loop = () => {
       timer.current = setTimeout(
@@ -478,7 +474,7 @@ export function Character({
       alive = false;
       if (timer.current) clearTimeout(timer.current);
     };
-  }, [cleared]);
+  }, []);
 
   // Mouth flap while speaking.
   useEffect(() => {
@@ -503,12 +499,7 @@ export function Character({
     <svg
       viewBox={fullBody ? "8 10 84 244" : "14 6 72 100"}
       className={className}
-      style={{
-        filter: cleared ? "grayscale(1)" : undefined,
-        opacity: cleared ? 0.4 : 1,
-        transition: "opacity 250ms, filter 250ms",
-        ...style,
-      }}
+      style={{ transition: "opacity 250ms, filter 250ms", ...style }}
       aria-hidden
     >
       <g

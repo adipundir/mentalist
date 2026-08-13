@@ -17,38 +17,47 @@ export default function About() {
       <h1 className="mt-6 font-type text-[34px] leading-tight text-bone">How it works</h1>
 
       <p className="mt-5 font-body text-[17px] leading-relaxed text-bone">
-        Every suspect in the room belongs to the same circle, and every one of them knows
-        which of them is Red John. You point at a man and ask another whether it was him.
-        Some will tell you the truth; the rest are protecting him, and Red John is
-        protecting himself, so <span className="text-blood-hot">he always lies</span>.
+        The rooms are public. Every account is in the repository, the deal that decides who
+        gives which account is a function anyone can run, and exactly one of those accounts
+        is impossible.{" "}
+        <span className="text-blood-hot">The puzzle is solvable by anyone who reads
+        carefully</span>, and it is supposed to be. Nothing here is trying to hide the answer
+        from you.
       </p>
       <p className="mt-3 font-body text-[16px] leading-relaxed text-bone-dim">
-        The answer is computed inside an encrypted enclave and passed through that
-        witness&rsquo;s hidden honesty bit before it ever reaches you.
+        What is encrypted is the name you put money on. It is sealed in your browser, and the
+        contract compares it to a sealed answer without either side ever being in the clear:
       </p>
 
       <figure className="mt-6 border-l-2 border-blood pl-4">
         <pre className="overflow-x-auto font-mono text-[13px] leading-relaxed text-bone">
-          <code>{`ebool truth  = e.or(...);              // is Red John in this set?
-ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</code>
+          <code>{`euint256 named = encryptedBet.newEuint256(msg.sender);
+ebool    right = e.eq(named, _answer[caseId]);  // inside the enclave
+e.allow(right, msg.sender);                     // and readable by you alone`}</code>
         </pre>
       </figure>
 
-      <p className="mt-5 font-body text-[16px] leading-relaxed text-bone-dim">
-        The whole game is that second line. The chain sees the question; only you see the
-        answer. A transparent chain cannot run it, and commit-reveal cannot fake it, proving
-        the answer was computed honestly would mean opening the honesty bit, which is the very
-        thing the game is about.
+      <h2 className="mt-10 font-mono text-[10px] tracking-file text-bone-dim">
+        WHY ENCRYPT AN ANSWER ANYONE CAN WORK OUT
+      </h2>
+      <p className="mt-2 font-body text-[16px] leading-relaxed text-bone-dim">
+        Two reasons, and neither of them is keeping the solution from you. The first is that
+        settlement is trustless: the answer is fixed as a ciphertext before a single bet is
+        placed, so the house cannot change it afterwards and cannot argue about it either,
+        because the contract rules on a covalidator attestation rather than on anybody&rsquo;s
+        word. The second is that your bet is private. In a market where you can watch the
+        informed money, reading the room stops being the game and following it starts.
       </p>
 
       <h2 className="mt-10 font-mono text-[10px] tracking-file text-bone-dim">
         WHY THIS NEEDS CONFIDENTIAL COMPUTE
       </h2>
       <p className="mt-2 font-body text-[16px] leading-relaxed text-bone-dim">
-        Most confidential games hide a <em>value</em>, a card, a board, a role, a bid. This
-        hides a <em>transformation</em>: your measurement of one secret is corrupted by a
-        second secret you also can&rsquo;t see. That is the whole game, and a transparent
-        chain cannot hold it.
+        A hash commitment would not do it. A person id in a room of eight is brute-forced in
+        microseconds, so a commit-reveal either leaks the answer immediately or leaves the
+        operator holding it until settlement, which is exactly the trust we are trying to
+        remove. The answer has to stay <em>usable</em> while it is secret, because the
+        contract has to compare against it. That is what a TEE gives and a hash does not.
       </p>
 
       <h2 className="mt-10 font-mono text-[10px] tracking-file text-bone-dim">HONESTLY</h2>
@@ -62,7 +71,7 @@ ebool answer = e.xor(truth, liar[w]);  // ...as filtered through w's honesty`}</
       <h2 className="mt-10 font-mono text-[10px] tracking-file text-bone-dim">BUILT WITH</h2>
       <ul className="mt-2 space-y-1 font-body text-[15px] text-bone-dim">
         <li>Inco Lightning on Base Sepolia, encrypted state, attested settlement</li>
-        <li>Megapot, the questions you don&rsquo;t spend buy real lottery tickets</li>
+        <li>Megapot, the losing stakes buy the winners real lottery tickets</li>
         <li>No art or audio assets: every character is drawn SVG, every sound is synthesised</li>
       </ul>
 

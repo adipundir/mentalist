@@ -227,7 +227,7 @@ export function tick(freq = 220, duration = 0.05, gain = 0.05) {
   n.stop(ac.currentTime + duration + 0.05);
 }
 
-/** Notebook opening or closing. */
+/** A page turning. */
 export function paper() {
   const ac = audio();
   if (!ac) return;

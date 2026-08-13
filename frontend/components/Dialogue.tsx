@@ -8,8 +8,6 @@ export interface Line {
   /** Who is talking. Null for narration. */
   speaker?: { name: string; role?: string; spec: CharacterSpec } | null;
   text: string;
-  /** The mechanical answer, when this line is testimony. */
-  answer?: boolean | null;
   tone?: "normal" | "jane" | "narrator";
 }
 
@@ -19,10 +17,6 @@ export interface Line {
  * Visual-novel furniture: portrait on the left, nameplate, text that types itself. It sits
  * across the bottom of the scene so the room stays visible above it, the character you are
  * talking to should still be on screen, reacting, while they speak.
- *
- * The YES/NO chip is deliberately separate from the prose. The line is performance; the chip
- * is the bit the game actually runs on, and a player should never have to interpret one to
- * get the other.
  */
 export function Dialogue({ line, onDone }: { line: Line | null; onDone?: () => void }) {
   const [shown, setShown] = useState(0);
@@ -50,9 +44,18 @@ export function Dialogue({ line, onDone }: { line: Line | null; onDone?: () => v
           exit={{ y: 40, opacity: 0 }}
           transition={{ type: "spring", stiffness: 300, damping: 30 }}
           className="pointer-events-none absolute inset-x-0 bottom-0 z-[60] p-3 sm:p-5"
-          onClick={() => line && setShown(line.text.length)}
         >
-          <div className="mx-auto flex max-w-[900px] items-stretch gap-0 border-2 border-ink-3 bg-ink/95 backdrop-blur">
+          {/* Click the bar to stop waiting on the typewriter. Only the bar, and only while it
+              is still printing: the padding around it stays click-through, and a finished bar
+              goes back to ignoring the mouse so it never eats a click meant for the room or
+              the stake panel behind it. */}
+          <div
+            onClick={() => setShown(line.text.length)}
+            className={[
+              "mx-auto flex max-w-[900px] items-stretch gap-0 border-2 border-ink-3 bg-ink/95 backdrop-blur",
+              shown < line.text.length ? "pointer-events-auto cursor-pointer" : "",
+            ].join(" ")}
+          >
             {line.speaker && (
               <div className="w-20 shrink-0 self-end border-r-2 border-ink-3 bg-[#1b1719] sm:w-24">
                 <Character
@@ -80,22 +83,6 @@ export function Dialogue({ line, onDone }: { line: Line | null; onDone?: () => v
                     <span className="ml-2 text-bone-dim/75">{line.speaker.role}</span>
                   )}
                 </span>
-
-                {line.answer != null && shown >= line.text.length && (
-                  <motion.span
-                    initial={{ scale: 1.6, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 18 }}
-                    className={[
-                      "shrink-0 border-2 px-2 py-0.5 font-type text-[13px] tracking-file",
-                      line.answer
-                        ? "border-blood-hot text-blood-hot"
-                        : "border-bone-dim text-bone-dim",
-                    ].join(" ")}
-                  >
-                    {line.answer ? "YES" : "NO"}
-                  </motion.span>
-                )}
               </div>
 
               <p

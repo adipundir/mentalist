@@ -40,6 +40,12 @@ contract MockJackpot is IJackpot, IJackpotRandomTicketBuyer {
         open = v;
     }
 
+    /// @dev Megapot quotes its own price and nothing stops it quoting zero, which is worth
+    ///      being able to reproduce: a caller dividing by it would panic.
+    function setTicketPrice(uint256 v) external {
+        price = v;
+    }
+
     function ticketPrice() external view returns (uint256) {
         return price;
     }

@@ -15,11 +15,14 @@ import { IJackpot, IJackpotRandomTicketBuyer } from "./CaseRewards.sol";
  *
  * @notice Red John is one of the people in every case, and the market is a bet on which.
  *
- *         **Nothing about the answer is written down in the clear, anywhere.** When a case
- *         is opened, whoever writes it encrypts Red John's person id on their own machine
- *         and hands over a ciphertext. That is what this contract stores. It is not in the
- *         repository, not in the calldata, not in the logs, and not readable by the account
- *         that put it there.
+ *         **The answer reaches the chain only as ciphertext.** When a case is opened,
+ *         whoever writes it encrypts Red John's person id on their own machine and hands
+ *         over a ciphertext. That is what this contract stores: not in the calldata, not in
+ *         the logs, and not readable afterwards by the account that put it there. The alibis
+ *         themselves are public content and ship in the repository
+ *         (`frontend/lib/casebook.ts`), so a careful reader can work the puzzle out. What the
+ *         ciphertext buys is that settlement is trustless: the answer is fixed before the
+ *         first bet and the operator can neither move it nor argue with it afterwards.
  *
  *         **Nor is anybody's bet.** A player stakes USDC together with an encrypted person
  *         id of their own. The contract compares the two inside Inco's enclave and keeps the
@@ -93,6 +96,11 @@ contract Casebook is Ownable, ReentrancyGuard {
     /// @dev The handle each player must file an attestation over.
     mapping(uint16 => mapping(address => bytes32)) public verdictHandle;
 
+    /// @dev How much winning stake had already been filed when this winner filed. It is what
+    ///      lets the pot divide exactly rather than by a floor per winner, so nothing is left
+    ///      behind in `reserved`. See `shareOf`.
+    mapping(uint16 => mapping(address => uint128)) internal _winningStakeBefore;
+
     /// @dev Everything owed to open cases. The owner can never withdraw it.
     uint256 public reserved;
 
@@ -134,7 +142,6 @@ contract Casebook is Ownable, ReentrancyGuard {
     error HandleMismatch();
     error InvalidAttestation();
     error BadConfig();
-    error PurchasesDisabled();
 
     constructor(IJackpotRandomTicketBuyer _ticketBuyer, address _owner) Ownable(_owner) {
         ticketBuyer = _ticketBuyer;
@@ -168,7 +175,12 @@ contract Casebook is Ownable, ReentrancyGuard {
         if (suspects < 2 || openFor < 1 hours) revert BadConfig();
         if (msg.value < inco.getFee()) revert FeeTooLow();
 
-        euint256 answer = encryptedAnswer.newEuint256(msg.sender);
+        // Force the answer into 0..suspects-1 inside the enclave. An author who sealed an id
+        // no seat has would make every honest bet lose and themselves the only account that
+        // could ever win, and because both sides are ciphertexts nobody could tell that apart
+        // from a lucky guess. `rem` costs no Inco fee: it is an operation on an existing
+        // handle, not an ingest.
+        euint256 answer = e.rem(encryptedAnswer.newEuint256(msg.sender), uint256(suspects));
         e.allowThis(answer); // mandatory: without it the case is unusable next transaction
         _answer[caseId] = answer;
 
@@ -269,6 +281,7 @@ contract Casebook is Ownable, ReentrancyGuard {
         b.won = won;
 
         if (won) {
+            _winningStakeBefore[caseId][msg.sender] = c.winningStake;
             c.winningStake += b.stake;
             c.winners += 1;
         }
@@ -292,12 +305,22 @@ contract Casebook is Ownable, ReentrancyGuard {
 
     // ─────────────────────────────────────────── payout
 
-    /// @notice Your share: the whole pot, split by stake among everyone who named him.
+    /**
+     * @notice Your share: the whole pot, split by stake among everyone who named him.
+     *
+     * @dev Each winner takes the slice of the pot lying between the winning stake filed
+     *      before them and their own. Dividing per winner instead would floor once each, and
+     *      the few micro-USDC that left over would stay in `reserved` forever: it is counted
+     *      as owed, so `withdrawSurplus` can never reach it either. Cut this way the floors
+     *      telescope, the shares add up to the pot exactly, and `reserved` returns to zero.
+     */
     function shareOf(uint16 caseId, address player) public view returns (uint256) {
         Case memory c = cases[caseId];
         Bet memory b = bets[caseId][player];
         if (!b.won || c.winningStake == 0) return 0;
-        return (uint256(c.pot) * b.stake) / c.winningStake;
+        uint256 before = _winningStakeBefore[caseId][player];
+        uint256 upTo = (uint256(c.pot) * (before + b.stake)) / c.winningStake;
+        return upTo - ((uint256(c.pot) * before) / c.winningStake);
     }
 
     /**
@@ -323,12 +346,19 @@ contract Casebook is Ownable, ReentrancyGuard {
         // reserving only what they put in would lock their winnings in here forever.
         reserved -= share;
 
-        if (!jackpot.allowTicketPurchases()) revert PurchasesDisabled();
-
+        // Tickets are the preferred form of the payout, not a condition of it. If Megapot is
+        // shut (a drawing window, an LP lock, a permanent stop) or quoting a zero price, the
+        // share still leaves, as USDC, down the same remainder path below. Reverting here
+        // instead would strand the whole share: `refund` is closed to a case that had a
+        // winner and `withdrawSurplus` cannot reach reserved money.
+        uint256 count;
+        uint256 cost;
         uint256 price = jackpot.ticketPrice();
-        uint256 count = share / price;
-        if (count > TICKETS_PER_BATCH * MAX_BATCHES) count = TICKETS_PER_BATCH * MAX_BATCHES;
-        uint256 cost = price * count;
+        if (price != 0 && jackpot.allowTicketPurchases()) {
+            count = share / price;
+            if (count > TICKETS_PER_BATCH * MAX_BATCHES) count = TICKETS_PER_BATCH * MAX_BATCHES;
+            cost = price * count;
+        }
 
         if (cost != 0) {
             usdc.forceApprove(address(ticketBuyer), cost);
@@ -407,10 +437,24 @@ contract Casebook is Ownable, ReentrancyGuard {
         maxStake = max;
     }
 
-    /// @dev Only ever referral fees and rounding dust. Never staked funds.
+    /// @dev Only ever referral fees. Never staked funds.
     function withdrawSurplus(address to) external onlyOwner {
         uint256 bal = usdc.balanceOf(address(this));
         if (bal <= reserved) revert BadConfig();
         usdc.safeTransfer(to, bal - reserved);
+    }
+
+    /**
+     * @dev The Inco fee float only. Stakes are USDC and are covered by `reserved`, so there
+     *      is nothing of a player's in here to take.
+     *
+     *      `quoteFee` deliberately quotes twice the fee so a bump between the quote and the
+     *      send does not fail the transaction, and Inco draws the fee from this contract's
+     *      balance rather than from `msg.value`. So roughly one fee accretes per stake and
+     *      per case opened, and without this it would sit here forever.
+     */
+    function withdrawEth(address to) external onlyOwner {
+        (bool ok, ) = to.call{ value: address(this).balance }("");
+        if (!ok) revert BadConfig();
     }
 }

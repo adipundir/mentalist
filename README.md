@@ -54,7 +54,7 @@ Inco is **TEE-based confidential compute** running on Intel TDX. It is **not FHE
 
 The design in `contracts/contracts/Casebook.sol`:
 
-- The case author encrypts Red John's person id on their own machine and hands the contract a ciphertext. `openCase` ingests it straight into an `euint256` and calls `e.allowThis`. The person id is never in the repository, never in calldata, never in a log, and not readable afterwards by the account that put it there.
+- The case author encrypts Red John's person id on their own machine and hands the contract a ciphertext. `openCase` ingests it straight into an `euint256`, folds it into `0..suspects-1` so no author can seal a seat nobody sits at, and calls `e.allowThis`. The person id is never in calldata, never in a log, and not readable afterwards by the account that put it there. It is in the repository, in the casebook, along with the alibis, and that is the point above: the ciphertext is not hiding the puzzle from a reader.
 - A player calls `stake` with their USDC amount and their own encrypted person id.
 - The contract compares the two inside the enclave with `e.eq(named, _answer[caseId])`, gets an `ebool`, and grants it to that player alone with `e.allow(right, msg.sender)`. The handle is stored in `verdictHandle` so the contract knows exactly which ciphertext that player must later open.
 - After the case closes, the player files a `DecryptionAttestation` over their own verdict bit. `resolve` checks the handle matches the one it stored, then verifies the covalidator signatures through `inco.incoVerifier().isValidDecryptionAttestation`. The contract rules on who won, not the client.
@@ -99,7 +99,7 @@ Honest accounting, because it matters.
 | Megapot `JackpotRandomTicketBuyer` | [`0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746`](https://sepolia.basescan.org/address/0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746) |
 | USDC | [`0x036CbD53842c5426634e7929541eC2318f3dCF7e`](https://sepolia.basescan.org/address/0x036CbD53842c5426634e7929541eC2318f3dCF7e) |
 
-Those first two are the addresses in `frontend/.env.local`, in `frontend/.env.example`, and in the JavaScript the live site actually ships. The Megapot and USDC addresses are the ones in `frontend/lib/contracts.ts` and `contracts/scripts/deploy-market.ts`.
+Those first two are the pair the earlier design deployed. Nothing under `frontend/` points at them any more, for the reason below. The Megapot and USDC addresses are the ones in `frontend/lib/contracts.ts` and `contracts/scripts/deploy-market.ts`.
 
 ### The deployed pair is an earlier design
 
@@ -109,13 +109,13 @@ Those first two are the addresses in `frontend/.env.local`, in `frontend/.env.ex
 
 Checked with `eth_getCode` and `eth_call` against Base Sepolia rather than assumed. The build at `0xc937...` still carries `interrogate(uint256,uint8,uint16)` and a plaintext `accuse(uint256,uint8)`. It has no `beginHearing`, no `statementOf`, no `quoteNameFee`, and no ciphertext form of `accuse`. `CaseMarket`'s deployed bytecode, by contrast, matches its source function for function.
 
-That gap has a consequence, so it goes here rather than in a footnote: `frontend/lib/chain-oracle.ts` opens the room by calling `beginHearing`, and on the deployed game that call has nothing to hit. Its accusation path already probes `quoteNameFee` and falls back to a plaintext seat when the game is too old for the encrypted one, but the hearing step has no such fallback. Redeploying `Mentalist` is the same blocked step as everything else below: the deployer wallet is out of gas.
+That gap no longer costs the frontend anything, because the frontend no longer calls either contract: the code that opened a room with `beginHearing` has been deleted along with the rest of the old play path. It is recorded here because the deployed addresses in the table above are still what those links point at, and they are not the game described in this README.
 
 ### Casebook.sol is the corrected design and is not deployed
 
-`contracts/contracts/Casebook.sol` is the contract described in the Inco section above: one authored answer per case, encrypted once, everyone betting on the same name. It is **written but not deployed and not tested**. There is no test file for it and no deploy script for it, and the string `Casebook` does not appear anywhere in `contracts/scripts`, `contracts/test-forge` or `contracts/ignition`. The reason is mundane: the deployer wallet ran out of gas. Nothing in this section should be read as live.
+`contracts/contracts/Casebook.sol` is the contract described in the Inco section above: one authored answer per case, encrypted once, everyone betting on the same name. It is **written and tested but not deployed**. `contracts/test-forge/Casebook.t.sol` covers it with 42 passing Foundry tests, and `contracts/scripts/deploy-casebook.ts` deploys it and opens all seven cases. It has never been sent. The reason is mundane: the deployer wallet ran out of gas. Nothing in this section should be read as live.
 
-The frontend is likewise still pointed at the deployed pair. `frontend/lib/contracts.ts` reads `NEXT_PUBLIC_MENTALIST_ADDRESS` and `NEXT_PUBLIC_MARKET_ADDRESS` and knows nothing about a `Casebook` address yet.
+The frontend, by contrast, is already repointed. `frontend/lib/contracts.ts` reads a single `NEXT_PUBLIC_CASEBOOK_ADDRESS` and carries only the `Casebook` ABI; neither deployed address is referenced anywhere under `frontend/` any more. Because `Casebook` is not deployed that variable is blank, so every chain read comes back empty.
 
 ### Encrypted accusations: written and tested, not deployed
 
@@ -125,20 +125,19 @@ The seat a player names is encrypted client side and ingested with `newEuint256`
 
 ## What this does not do yet
 
-- **`Casebook.sol` has never run.** Not on a testnet, not against a local covalidator, not under `forge test`. It compiles and it is reviewed, and that is all that can be claimed for it.
-- **The live site cannot currently see a case through.** You can open one, and then the frontend asks the deployed game to open the room with a function that build does not have. Until `Mentalist` is redeployed, the URL above is a room you can walk into and not much else.
-- **The live site is the earlier design regardless.** Even once it is redeployed and playable, what is at that URL is the per-player-culprit version, not the shared-answer market. That waits on `Casebook`.
+- **`Casebook.sol` has never run on a chain.** It passes 42 Foundry tests under `forge test`, but all of them run against Inco's in-process mock. It has not been on a testnet and has not met a live covalidator.
+- **The live site cannot currently see a case through.** The frontend is pointed at `Casebook` and `Casebook` is not deployed, so `NEXT_PUBLIC_CASEBOOK_ADDRESS` is blank and every chain read comes back empty. You can walk into any of the seven rooms and hear every account in it, because none of that touches a chain, and then the stake panel has nothing to read. Deploying is one funded wallet away.
 - **Testnet only.** Base Sepolia, testnet USDC, Megapot's testnet jackpot. Real transactions, no real money. There is no mainnet deployment and no plan stated here for one.
 - **The seven cases are fixed content, not generated.** Once you have solved a case you know its answer permanently, so each room is single-use per person. There is no procedural case generator.
 - **No audit.** These are jam contracts. `Casebook.sol` in particular has had no adversarial review beyond the author's.
 - **The security claim rests on hardware.** If the TDX enclave or the covalidator set is compromised, the answer is readable. That is the honest boundary of what Inco provides.
-- **Encrypted accusations and the `Casebook` design have not been exercised together.** They are two pieces of unshipped work, not one tested system.
+- **Encrypted bets and the `Casebook` design have only been exercised against the mock.** `Casebook.stake` ingests the player's encrypted person id and compares it with `e.eq` inside the enclave, and the suite covers that path, but never against a live covalidator.
 
 ---
 
 ## Tests
 
-48 Foundry tests pass: 16 in `contracts/test-forge/Mentalist.t.sol`, 32 in `contracts/test-forge/CaseMarket.t.sol`. They cover the two contracts as they stand in this repository, which for `CaseMarket` is also what is deployed and for `Mentalist` is not. `Casebook.sol` has no suite.
+90 Foundry tests pass: 16 in `contracts/test-forge/Mentalist.t.sol`, 32 in `contracts/test-forge/CaseMarket.t.sol`, and 42 in `contracts/test-forge/Casebook.t.sol`. They cover the three contracts as they stand in this repository, which for `CaseMarket` is also what is deployed, and for `Mentalist` and `Casebook` is not.
 
 ```bash
 cd contracts
@@ -157,6 +156,9 @@ The ones worth naming:
 | `test_ReservedDrainsToZeroOnceWinnersArePaid` | payouts account exactly, with nothing stranded in the contract |
 | `test_SubTicketRemainderGoesBackToThePlayer` | rounding dust returns to the winner rather than to the house |
 | `test_OwnerCannotWithdrawAnotherRoundsStakes` | `withdrawSurplus` can only ever move referral fees and dust |
+| `test_AnAnswerNoSeatHasIsFoldedBackIntoTheRoom` | the case author cannot seal an id nobody sits at and be the only possible winner |
+| `test_MegapotBeingShutPaysTheShareOutInUsdcInstead` | a winner's money is not hostage to a third party's ticket-sales toggle |
+| `test_AnUnevenSplitStillLeavesNothingBehind` | a pot that does not divide evenly still leaves `reserved` at zero |
 
 Two notes on the harness, since they bound what the suite proves.
 
@@ -182,16 +184,15 @@ GIT_CONFIG_COUNT=2 \
   pnpm install
 ```
 
-Copy `frontend/.env.example` to `frontend/.env.local`. The addresses in it are the Base Sepolia deployment:
+Copy `frontend/.env.example` to `frontend/.env.local`. `Casebook` is not deployed, so the one address the frontend reads is blank:
 
 ```
-NEXT_PUBLIC_MENTALIST_ADDRESS=0xc93769517ff196330dfd9a6bf997adec0e322cf2
-NEXT_PUBLIC_MARKET_ADDRESS=0xbcf4b0ca661ecf415e382355cc05a5ec8ce8f653
+NEXT_PUBLIC_CASEBOOK_ADDRESS=
 NEXT_PUBLIC_NETWORK=testnet
 NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=      # optional, adds mobile wallets
 ```
 
-There is no offline mode. Without addresses the room paints but cannot be played, because a simulated case would be a different game. With those addresses it paints and still cannot be played to the end, for the reason in the status section above.
+There is no offline mode. Without an address the room paints and every account in it can be heard, because that is all public data, but the stake panel has no case to read and says so. A simulated case would be a different game. Fill the address in by deploying, below.
 
 To play you need two things in a Base Sepolia wallet: testnet USDC from [faucet.circle.com](https://faucet.circle.com), and a little test ETH for gas and for the Inco fee charged when a ciphertext is ingested. Listening to people costs nothing.
 
@@ -203,12 +204,18 @@ To play you need two things in a Base Sepolia wallet: testnet USDC from [faucet.
 cd contracts
 cp .env.sample .env          # set PRIVATE_KEY_BASE_SEPOLIA and BASE_SEPOLIA_RPC_URL
 pnpm compile
+pnpm deploy:casebook         # deploys Casebook, opens all seven cases
+```
+
+`deploy:casebook` is what the frontend needs. It deploys the contract, then encrypts each case's answer on your machine and opens the case with it, because `openCase` is `onlyOwner` and a case nobody has opened is a row the board shows as closed forever. The answers come from `frontend/lib/casebook.ts` directly rather than from a table in the script, so there is only one copy of them to be wrong. Put the printed `NEXT_PUBLIC_CASEBOOK_ADDRESS` into `frontend/.env.local`.
+
+The earlier design deploys separately, and only if you want the deployed pair back:
+
+```bash
 pnpm deploy:market           # deploys Mentalist + CaseMarket, opens all seven rounds
 ```
 
 `deploy:market` is one script for both contracts on purpose: the market checks that the case handed to it matches the lineup its round calls for, so the specs it is configured with and the rosters the frontend opens cases with have to be the same seven rows of data. The round table in `contracts/scripts/deploy-market.ts` mirrors `frontend/lib/casebook.ts`.
-
-Then put the two printed addresses into `frontend/.env.local`.
 
 Other scripts against the live chain:
 
@@ -217,7 +224,7 @@ pnpm play:onchain    # a full case against the live covalidator, not a mock
 pnpm prove:market    # stake, play, settle, and assert the market invariants end to end
 ```
 
-`Casebook.sol` has no deploy script yet. Adding one, funding the deployer, redeploying `Mentalist` so the frontend's hearing call resolves, and repointing the frontend is the remaining work.
+Both of those exercise the earlier pair. Funding the deployer and running `deploy:casebook` is the remaining work, and it is one step: the frontend is already pointed at whatever address that prints.
 
 ---
 
@@ -235,15 +242,17 @@ contracts/
                                  the earlier Focus-for-tickets contract. NOT DEPLOYED
   test-forge/Mentalist.t.sol     16 tests
   test-forge/CaseMarket.t.sol    32 tests
-  scripts/deploy-market.ts       deploys the pair and opens all seven rounds
+  test-forge/Casebook.t.sol      42 tests
+  scripts/deploy-casebook.ts     deploys Casebook and opens all seven cases
+  scripts/deploy-market.ts       deploys the earlier pair and opens all seven rounds
   scripts/play-onchain.ts        a real case against a live covalidator
   scripts/prove-market.ts        the full staking loop against the live contracts
   scripts/measure-latency.ts     on-chain timings
 frontend/
   lib/casebook.ts                the seven cases: rooms, rosters, every alibi, every tell
   lib/canon.ts                   the cast, drawn to the character system
-  lib/contracts.ts               addresses and the ABI fragments actually used
-  lib/chain-oracle.ts            Base plus Inco: the reveal loops and the races they hit
+  lib/contracts.ts               the one address and the ABI fragments actually used
+  lib/inco.ts                    the two confidential operations: seal a bet, attest a verdict
   lib/schedule.ts                one case a day from a fixed epoch
   lib/market.ts                  stake bounds and the case window
   lib/sound.ts                   the whole audio palette, synthesised at runtime
@@ -252,12 +261,12 @@ frontend/
   components/Room.tsx            the room itself, and everyone standing in it
   components/Character.tsx       every person, as parameterised SVG
   components/CrimeScene.tsx      the crime scene, generated per case
-  components/Stake.tsx           approve, open, hand it to the market
+  components/Stake.tsx           seal the name, approve, hand it to the casebook
   components/Settlement.tsx      file the verdict, record it, collect in tickets
-DESIGN.md                        why the game is shaped the way it is
+DESIGN.md                        the superseded interrogation design, kept for the record
 ```
 
-`frontend/lib/solver.ts`, `frontend/lib/oracle.ts`, `frontend/lib/suspects.ts` and `frontend/lib/script.ts` belong to the earlier design and are still in the tree because the deployed contracts still use it. `frontend/lib/story.ts` is not one of them: the chapters moved into `casebook.ts` and what is left in that file is the finale text, which `app/story/page.tsx` renders.
+`frontend/lib/solver.ts`, `frontend/lib/oracle.ts`, `frontend/lib/script.ts` and `frontend/lib/chain-oracle.ts` belonged to the earlier design and are gone with it. `frontend/lib/suspects.ts` survives, because the cast did. `frontend/lib/story.ts` was never one of them: the chapters moved into `casebook.ts` and what is left in that file is the finale text, which `app/story/page.tsx` renders.
 
 ---
 

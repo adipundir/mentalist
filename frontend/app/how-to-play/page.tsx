@@ -18,13 +18,13 @@ const STEPS = [
   },
   {
     n: "02",
-    title: "Take your seat",
-    body: "You commit to a room before you know anything about it. That is deliberate: if you could listen first and choose afterwards, you would only ever bet on the easy ones.",
+    title: "Walk in with nothing",
+    body: "No wallet, no signature, no transaction. The room is public data and you can open any case and stand in it without connecting anything at all.",
   },
   {
     n: "03",
     title: "Hear everyone out",
-    body: "Click each person. They tell you where they were and what they were doing. Everyone speaks once, it costs nothing, and there is no timer on any single answer.",
+    body: "Click each person. They tell you where they were and what they were doing, as many times as you like, and it costs you nothing to listen.",
   },
   {
     n: "04",
@@ -34,12 +34,12 @@ const STEPS = [
   {
     n: "05",
     title: "Put money on him",
-    body: "Name the man and stake what your read is worth. Bigger stake, bigger share of the pot if you are right. Once it is down it stays down until the case settles.",
+    body: "This is the first and only time the chain is involved. Name the man and stake what your read is worth: the name is encrypted in your browser, so nobody watching can see who you backed. Bigger stake, bigger share of the pot if you are right, and once it is down it stays down.",
   },
   {
     n: "06",
     title: "Collect",
-    body: "Everyone who named the wrong man leaves their stake behind. When the round closes, the people who got it right split the whole pot in proportion to what they staked, paid out as real Megapot lottery tickets.",
+    body: "When the case closes you file your result, and the contract rules on it against an attestation from the enclave rather than taking anyone's word. Everyone who named the wrong man leaves their stake behind, and the people who got it right split the whole pot in proportion to what they staked, paid out as real Megapot lottery tickets.",
   },
 ];
 

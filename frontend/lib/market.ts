@@ -1,15 +1,12 @@
 /**
- * The market's timing constants, shared by the clock in the room and by the contract calls.
+ * Money, in the units the market speaks.
  *
- * A case stands for a fixed window and then it settles. The window is short on purpose: it
- * is the reason a stake means anything. You are not betting on a puzzle you can grind at
- * forever, you are betting on what you can read out of a room before it closes.
+ * How long a case stands is not in here: the contract owns its own clock and the frontend
+ * reads it, because a window invented on this side would eventually promise a player a
+ * minute the contract will not honour.
  */
 
-/** How long a single case accepts a verdict once you have opened it. */
-export const CASE_WINDOW_MS = 20 * 60 * 1000;
-
-/** Stake bounds, in USDC's six decimals. Mirrors CaseMarket's own limits. */
+/** Stake bounds, in USDC's six decimals. Mirrors `Casebook.minStake` / `maxStake`. */
 export const MIN_STAKE = 100_000n;
 export const MAX_STAKE = 5_000_000n;
 

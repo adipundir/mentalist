@@ -26,7 +26,7 @@ const body = Crimson_Pro({
 export const metadata: Metadata = {
   title: "MENTALIST, everyone lies, Red John always does",
   description:
-    "A confidential deduction game on Base. The evidence is encrypted, testimony passes through a hidden honesty bit, and nobody, not even the deployer, knows who Red John is.",
+    "A confidential prediction market on Base. Seven rooms, one impossible alibi in each. The name you stake on is encrypted in your browser, and the winners split the pot in real Megapot tickets.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
