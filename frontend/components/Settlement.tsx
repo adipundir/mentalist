@@ -36,6 +36,9 @@ interface Row {
   pot: bigint;
   winningStake: bigint;
   settled: boolean;
+  entrants: number;
+  /** How many of them have a verdict recorded. */
+  filed: number;
   stake: bigint;
   resolved: boolean;
   won: boolean;
@@ -122,6 +125,8 @@ export function Settlement({
         pot: c[2],
         winningStake: c[3],
         settled: c[6],
+        entrants: Number(c[4]),
+        filed: Number(c[8]),
         stake: b[0],
         resolved: b[1],
         won: b[2],
@@ -247,7 +252,12 @@ export function Settlement({
   }
 
   const closed = row !== null && now >= row.closesAt;
-  const canSettle = row !== null && now >= row.closesAt + graceMs;
+  // The window only protects players who have not filed yet. Once the room is complete there
+  // is nobody left to protect, so the money releases immediately instead of making the winner
+  // sit out a wait that is doing nothing.
+  const roomComplete = row !== null && row.entrants > 0 && row.filed >= row.entrants;
+  const canSettle =
+    row !== null && now >= row.closesAt && (roomComplete || now >= row.closesAt + graceMs);
 
   return (
     <div className="mt-5 border-t border-ink-3 pt-4">
@@ -318,7 +328,7 @@ export function Settlement({
               ? "RELEASING…"
               : canSettle
                 ? "RELEASE THE MONEY"
-                : `MONEY RELEASES IN ${countdown(row.closesAt + graceMs - now)}`}
+                : `WAITING ON ${row.entrants - row.filed} MORE IN THE ROOM`}
           </Button>
         </>
       ) : row.paid ? (

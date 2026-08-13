@@ -33,7 +33,7 @@ export const maxDuration = 60;
  * keeper was one rate limit away from never settling anything. There are no logs before the
  * contract existed, so this loses nothing and every provider serves it.
  */
-const DEPLOY_BLOCK = 45478199n;
+const DEPLOY_BLOCK = 45479277n;
 
 const STAKED = parseAbiItem(
   "event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot)",
@@ -110,7 +110,7 @@ export async function GET(request: Request) {
         abi: MENTALIST_ABI,
         functionName: "cases",
         args: [caseId],
-      })) as readonly [bigint, number, bigint, bigint, number, number, boolean, boolean];
+      })) as readonly [bigint, number, bigint, bigint, number, number, boolean, boolean, number];
 
       const [closesAt, , , , entrants, , settled, exists] = c;
       if (!exists || settled) continue;
@@ -202,9 +202,18 @@ export async function GET(request: Request) {
         }
       }
 
-      // The books can only shut once the filing window has run out, so that a slow filer is
-      // never cut out of a win by a fast one.
-      if (filingClosed) {
+      // Shut the books as soon as the room is complete. The window exists to stop a fast
+      // filer settling a slow one out of a win, so a room where everybody is already filed
+      // has nothing left to wait for and the winner should not be made to.
+      const after = (await publicClient.readContract({
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
+        functionName: "cases",
+        args: [caseId],
+      })) as readonly [bigint, number, bigint, bigint, number, number, boolean, boolean, number];
+      const roomComplete = Number(after[4]) > 0 && Number(after[8]) >= Number(after[4]);
+
+      if (filingClosed || roomComplete) {
         const hash = await wallet.writeContract({
           address: MENTALIST_ADDRESS,
           abi: MENTALIST_ABI,

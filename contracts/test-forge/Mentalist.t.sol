@@ -222,7 +222,7 @@ contract CasebookTest is IncoTest {
     }
 
     function _closesAt(uint16 caseId) internal view returns (uint64 closesAt) {
-        (closesAt, , , , , , , ) = book.cases(caseId);
+        (closesAt, , , , , , , , ) = book.cases(caseId);
     }
 
     function _reachClose(uint16 caseId) internal {
@@ -259,7 +259,7 @@ contract CasebookTest is IncoTest {
     function _caseTotals(
         uint16 caseId
     ) internal view returns (uint128 pot, uint128 winningStake, uint32 entrants, uint32 winners) {
-        (, , pot, winningStake, entrants, winners, , ) = book.cases(caseId);
+        (, , pot, winningStake, entrants, winners, , , ) = book.cases(caseId);
     }
 
     function _bet(
@@ -307,7 +307,8 @@ contract CasebookTest is IncoTest {
             uint32 entrants,
             uint32 winners,
             bool settled,
-            bool exists
+            bool exists,
+
         ) = book.cases(CASE_ID);
 
         assertTrue(exists, "the case is on the books");
@@ -1528,6 +1529,64 @@ contract CasebookTest is IncoTest {
         vm.prank(cho);
         vm.expectRevert();
         book.reschedule(CASE_ID + 1, 1 hours);
+    }
+
+
+    /// @notice A room where everybody has filed settles at once. There is nobody left to wait for.
+    function test_AFullRoomSettlesWithoutWaitingOutTheWindow() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 1_000_000);
+        _reachClose(CASE_ID);
+
+        _resolve(jane, CASE_ID);
+        // One still missing, so the window is still doing its job.
+        vm.expectRevert(Mentalist.CaseStillOpen.selector);
+        book.settle(CASE_ID);
+
+        _resolve(cho, CASE_ID);
+        // Now the room is complete, and the winner does not wait two hours for her own money.
+        book.settle(CASE_ID);
+
+        (, , , , , , bool settled, , ) = book.cases(CASE_ID);
+        assertTrue(settled, "settled the moment the last verdict landed");
+
+        vm.prank(jane);
+        book.payout(CASE_ID, false);
+        assertGt(usdc.balanceOf(jane), 0, "and she is paid in the same breath");
+    }
+
+    /// @notice A room still missing somebody keeps the full window, which is the whole point of it.
+    function test_AnIncompleteRoomStillWaitsTheWholeWindow() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 1_000_000);
+        _reachClose(CASE_ID);
+
+        // Jane files and immediately tries to shut the books on Cho, who would then be locked
+        // out of `resolve`, out of `payout`, and out of `refund` all at once.
+        _resolve(jane, CASE_ID);
+        vm.prank(jane);
+        vm.expectRevert(Mentalist.CaseStillOpen.selector);
+        book.settle(CASE_ID);
+
+        uint64 closesAt = _closesAt(CASE_ID);
+        vm.warp(closesAt + book.FILING_WINDOW() - 1);
+        vm.expectRevert(Mentalist.CaseStillOpen.selector);
+        book.settle(CASE_ID);
+
+        // Cho files inside his window and keeps his refund.
+        _resolve(cho, CASE_ID);
+        book.settle(CASE_ID);
+    }
+
+    /// @notice Nothing settles while the case is still taking money, full room or not.
+    function test_NothingSettlesBeforeTheCaseCloses() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+
+        vm.expectRevert(Mentalist.CaseStillOpen.selector);
+        book.settle(CASE_ID);
     }
 
 }

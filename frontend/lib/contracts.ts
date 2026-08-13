@@ -22,7 +22,7 @@ import { activeChain, NETWORK } from "@/lib/network";
  * it is set, which is what a local fork or a redeploy needs.
  */
 export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ||
-  "0xfb02bb32da4fb09ebae15cc485cd7df262cd726c") as `0x${string}`;
+  "0x948743d699b9de4b18ac1972ec055cc54479f121") as `0x${string}`;
 
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
 export const EXPLORER = activeChain.blockExplorers!.default.url;
@@ -210,6 +210,9 @@ export const MENTALIST_ABI = [
       { name: "winners", type: "uint32" },
       { name: "settled", type: "bool" },
       { name: "exists", type: "bool" },
+      // How many entrants have a verdict recorded. When it reaches `entrants` the room is
+      // complete and the money releases at once, with no window left to wait out.
+      { name: "filed", type: "uint32" },
     ],
   },
   {

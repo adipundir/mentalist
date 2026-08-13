@@ -74,6 +74,9 @@ contract Mentalist is Ownable, ReentrancyGuard {
         /** Once true, no more verdicts may be filed and payouts are open. */
         bool settled;
         bool exists;
+        /** How many entrants have had a verdict recorded. Appended so the getter's existing
+            positions do not move. */
+        uint32 filed;
     }
 
     struct Bet {
@@ -247,7 +250,8 @@ contract Mentalist is Ownable, ReentrancyGuard {
             entrants: 0,
             winners: 0,
             settled: false,
-            exists: true
+            exists: true,
+            filed: 0
         });
 
         // Terms of the market, taken now rather than read live at `stake`. A player who put
@@ -442,6 +446,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
         bool won = asBool(attestation.value);
         b.resolved = true;
         b.won = won;
+        c.filed += 1;
 
         if (won) {
             _winningStakeBefore[caseId][player] = c.winningStake;
@@ -463,8 +468,19 @@ contract Mentalist is Ownable, ReentrancyGuard {
     function settle(uint16 caseId) external {
         Case storage c = cases[caseId];
         if (!c.exists) revert NoSuchCase();
-        if (block.timestamp < c.closesAt + FILING_WINDOW) revert CaseStillOpen();
         if (c.settled) revert AlreadySettled();
+        // Money must never move while the case is still taking it.
+        if (block.timestamp < c.closesAt) revert CaseStillOpen();
+
+        // The wait exists to stop a fast filer settling a slow one out of a win they had
+        // earned: once the books shut, an unfiled player is locked out of `resolve`, out of
+        // `payout` because they never filed, and out of `refund` because the case did have a
+        // winner. That risk is a function of who is still missing, not of the clock. With
+        // every entrant already filed there is nobody left to cut out, so the window has
+        // nothing to protect and waiting it out is dead time the winner pays for.
+        if (c.filed < c.entrants && block.timestamp < c.closesAt + FILING_WINDOW) {
+            revert CaseStillOpen();
+        }
 
         c.settled = true;
 
