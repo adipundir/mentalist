@@ -33,6 +33,13 @@
 
   html {
     color-scheme: dark;
+    /* The ink has to be on the root, not only on the body. Rubber-band scrolling drags the
+       page off its own background and what shows underneath is the browser's canvas, which
+       under a dark colour-scheme is grey. Painting the root the same colour means there is
+       nothing behind the page to see. */
+    background: rgb(var(--ink));
+    /* And stop the bounce itself, so the room does not slide around under a fixed layout. */
+    overscroll-behavior: none;
   }
 
   body {
@@ -41,6 +48,8 @@
     font-family: var(--font-body), ui-serif, Georgia, serif;
     -webkit-font-smoothing: antialiased;
     overflow-x: hidden;
+    overscroll-behavior: none;
+    min-height: 100dvh;
   }
 
   ::selection {
