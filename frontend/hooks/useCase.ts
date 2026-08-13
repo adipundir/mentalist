@@ -3,7 +3,7 @@
 import { useCallback, useState, useRef } from "react";
 import type { Alibi } from "@/lib/casebook";
 import * as sfx from "@/lib/sound";
-import { narrate, unlockNarrator } from "@/lib/narrator";
+import { narrate, toneForSeat, unlockNarrator } from "@/lib/narrator";
 
 /**
  * Working the room: who has spoken, and what they said.
@@ -51,7 +51,7 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
       // the utterance ends, so that is the moment to put the face back. The token guards
       // against a stale utterance landing after the player has moved on to somebody else.
       const token = ++speechToken.current;
-      void narrate(line, { rate: 0.96, pitch: 0.97 }).then(() => {
+      void narrate(line, { ...toneForSeat(seat), seat }).then(() => {
         if (speechToken.current === token) setSaying(null);
       });
     },

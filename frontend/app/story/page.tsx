@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
@@ -43,7 +43,9 @@ function StoryInner() {
   const [index, setIndex] = useState(
     Number.isInteger(requested) && requested >= 0 && requested < CASEBOOK.length ? requested : 0,
   );
-  const [stage, setStage] = useState<Stage>("opening");
+  const [stage, setStage] = useState<Stage | null>(null);
+  /** The opening stage is decided once, not on every poll. */
+  const settled = useRef(false);
   /** Null until the contract has ruled. Nobody can know it while the case is still open. */
   const [verdict, setVerdict] = useState<boolean | null>(null);
   const [pick, setPick] = useState<{ seat: number; name: string } | null>(null);
@@ -88,17 +90,31 @@ function StoryInner() {
 
         // Somebody coming back to a case they already backed should land on the settlement,
         // not be made to walk the room again to reach it.
-        if (address) {
-          const staked = await pub.readContract({
-            address: MENTALIST_ADDRESS,
-            abi: MENTALIST_ABI,
-            functionName: "hasStaked",
-            args: [index, address],
-          });
-          if (live && staked) setStage("closing");
+        //
+        // This decides the opening stage once and then leaves it alone. The read repeats on
+        // a timer for the pot and the clock, and letting it keep writing the stage would
+        // throw a player out of the room every fifteen seconds.
+        if (!settled.current) {
+          const staked = address
+            ? await pub.readContract({
+                address: MENTALIST_ADDRESS,
+                abi: MENTALIST_ABI,
+                functionName: "hasStaked",
+                args: [index, address],
+              })
+            : false;
+          if (live) {
+            settled.current = true;
+            setStage(staked ? "closing" : "opening");
+          }
         }
-      } catch {
-        /* a cold read just leaves the room without a clock */
+      } catch (err) {
+        // A failed read must not leave the page blank forever. Show the briefing: the room
+        // is playable without a chain, and the stake panel reports the trouble on its own.
+        if (live && !settled.current) {
+          settled.current = true;
+          setStage("opening");
+        }
       }
     };
     void read();

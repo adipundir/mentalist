@@ -19,6 +19,8 @@
  */
 
 export interface NarratorOptions {
+  /** Speak as this seat: its own voice and manner. Omit for the narrator's own voice. */
+  seat?: number;
   rate?: number;
   pitch?: number;
   volume?: number;
@@ -86,6 +88,37 @@ export function loadVoices(): Promise<SpeechSynthesisVoice[]> {
   });
 }
 
+/**
+ * A different mouth per suspect.
+ *
+ * One voice reading eight alibis is a man reading a list, and the room stops being people.
+ * Every English voice the machine has is put in a stable order and each seat takes one, so
+ * the man in seat three sounds like himself every time and never like his neighbour. Pitch
+ * and pace are nudged per seat on top, which matters because most machines ship only two or
+ * three English voices and the spread has to come from somewhere.
+ *
+ * Nothing here is guaranteed. A machine with one voice gets one voice, differently pitched.
+ */
+export async function voiceForSeat(seat: number): Promise<SpeechSynthesisVoice | null> {
+  const voices = await loadVoices();
+  const english = voices.filter((v) => v.lang?.toLowerCase().startsWith("en"));
+  const pool = english.length ? english : voices;
+  if (!pool.length) return null;
+
+  // Sorted by name so the assignment survives a reload. Left to the browser's own ordering,
+  // a suspect can come back sounding like somebody else.
+  const ordered = [...pool].sort((a, b) => a.name.localeCompare(b.name));
+  return ordered[seat % ordered.length]!;
+}
+
+/** How that seat carries the voice it was given. Deterministic, so a man keeps his manner. */
+export function toneForSeat(seat: number): { pitch: number; rate: number } {
+  return {
+    pitch: 0.82 + ((seat * 7) % 9) * 0.045,
+    rate: 0.88 + ((seat * 5) % 7) * 0.028,
+  };
+}
+
 export async function pickVoice(): Promise<SpeechSynthesisVoice | null> {
   if (cached) return cached;
   const voices = await loadVoices();
@@ -133,6 +166,7 @@ export function unlockNarrator() {
 }
 
 export function stopNarration() {
+  generation++; // any loop still queueing sentences gives up
   synth()?.cancel();
 }
 
@@ -140,10 +174,21 @@ export function stopNarration() {
  * Speak a line. Resolves when it finishes (or immediately if narration is off), so callers
  * can sequence beats without guessing at durations.
  */
+/**
+ * Which narration is current.
+ *
+ * `cancel()` stops what the engine is *saying*, but it cannot stop the loop below from
+ * queueing the rest of its sentences afterwards. So two overlapping calls used to interleave:
+ * the older one kept feeding utterances in behind the newer one, and you heard both at once.
+ * Every call claims a generation, and any loop whose generation is stale gives up.
+ */
+let generation = 0;
+
 export async function narrate(text: string, opts: NarratorOptions = {}): Promise<void> {
   const s = synth();
   if (!s || muted || !text.trim()) return;
 
+  const mine = ++generation;
   s.cancel(); // one narrator at a time
 
   // Speak sentence by sentence rather than as one block.
@@ -158,6 +203,7 @@ export async function narrate(text: string, opts: NarratorOptions = {}): Promise
     .filter(Boolean);
 
   for (let i = 0; i < sentences.length; i++) {
+    if (generation !== mine) return; // somebody else started talking
     if (muted) return;
     // Drift, not randomness: sentences trend slightly down in pitch across a paragraph,
     // the way a person's voice does as they finish a thought.
@@ -178,7 +224,8 @@ function speakOne(text: string, opts: NarratorOptions): Promise<void> {
   if (!s) return Promise.resolve();
 
   return new Promise<void>((resolve) => {
-    void pickVoice().then((voice) => {
+    const chooser = opts.seat === undefined ? pickVoice() : voiceForSeat(opts.seat);
+    void chooser.then((voice) => {
       const u = new SpeechSynthesisUtterance(stripForSpeech(text));
       if (voice) u.voice = voice;
       // Close to natural, and only *slightly* off it.

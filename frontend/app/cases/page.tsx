@@ -148,7 +148,6 @@ export default function Board() {
                 blurb={c.blurb}
                 setting={c.setting}
                 suspects={c.suspects}
-                liars={c.liars}
                 roster={c.roster}
                 released={rel.released}
                 until={rel.until}
@@ -173,7 +172,6 @@ function CaseCard({
   blurb,
   setting,
   suspects,
-  liars,
   roster,
   released,
   until,
@@ -187,7 +185,6 @@ function CaseCard({
   blurb: string;
   setting: string;
   suspects: number;
-  liars: number;
   roster: string[];
   released: boolean;
   until: number;
@@ -262,11 +259,11 @@ function CaseCard({
           </p>
         </div>
         <div className="text-right">
+          {/* How many people are in the room, and nothing else. The liar count was always
+              one, so printing it told you the answer's shape for free, and an entrant count
+              on an empty board just says nobody is here. */}
           <p className="font-mono text-[9px] tracking-file text-bone-dim">
-            {suspects} SUSPECTS · {liars} LYING
-          </p>
-          <p className="font-mono text-[9px] tracking-file text-bone-dim">
-            {row?.entrants ?? 0} {row?.entrants === 1 ? "PLAYER" : "PLAYERS"}
+            {suspects} IN THE ROOM
           </p>
         </div>
       </div>
