@@ -13,10 +13,11 @@ import { IJackpot, IJackpotRandomTicketBuyer } from "./Megapot.sol";
 /**
  * @title  Mentalist: a prediction market on a name nobody can read
  *
- * @notice Red John is one of the people in every case, and the market is a bet on which.
+ * @notice Every case is its own murder with its own killer, and the market is a bet on which
+ *         of the people in that room did it.
  *
  *         **The answer reaches the chain only as ciphertext.** When a case is opened,
- *         whoever writes it encrypts Red John's person id on their own machine and hands
+ *         whoever writes it encrypts the killer's person id on their own machine and hands
  *         over a ciphertext. That is what this contract stores: not in the calldata, not in
  *         the logs, and not readable afterwards by the account that put it there. The alibis
  *         themselves are public content and ship in the repository
@@ -88,7 +89,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
     mapping(uint16 => Case) public cases;
     mapping(uint16 => mapping(address => Bet)) public bets;
 
-    /// @dev Red John's person id, per case. Encrypted at rest and never revealed by this
+    /// @dev The killer's person id, per case. Encrypted at rest and never revealed by this
     ///      contract, not even after settlement: the same case can run again.
     mapping(uint16 => euint256) internal _answer;
     /// @dev Whether a given player named him. Encrypted, and readable only by that player.
@@ -156,7 +157,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
      *
      * @param caseId          which case this is, matching the casebook in the frontend
      * @param suspects        how many people are in the room
-     * @param encryptedAnswer Red John's person id, encrypted on the author's machine
+     * @param encryptedAnswer the killer's person id, encrypted on the author's machine
      * @param openFor         how long the case takes money, in seconds
      *
      * @dev The answer arrives as a ciphertext and is ingested straight into an `euint256`.

@@ -25,9 +25,9 @@ Seven hand-written cases. Each case is a room containing a body and a number of 
 | VI | Claret and Brimstone | the parlour where it happened | 5 |
 | VII | Sanguine | a chapel beside the graves | 3 |
 
-Red John is the killer in every case. He always leaves the same mark, a smiling face drawn in the victim's blood.
+Every case is a separate murder with its own killer. They are signed the same way, a smiling face drawn in the victim's blood, which is why each of them gets called a Red John. Nothing carries from one case to the next: the cast changes, the room changes, and solving one tells you nothing about another.
 
-Each person in the room gives exactly one spoken alibi. Exactly one of those alibis is logically **impossible**, and that person is Red John. Not suspicious, not shifty, not evasive: impossible. From Chapter VII, in the vestry of a chapel:
+Each person in the room gives exactly one spoken alibi. Exactly one of those alibis is logically **impossible**, and that person is the killer. Not suspicious, not shifty, not evasive: impossible. From Chapter VII, in the vestry of a chapel:
 
 > I shut myself in the vestry when the rain started and I bolted the door behind me. Nobody else in there the whole hour, just me and that little board they keep by the stove, and I got beaten before the candle was half down, which tells you exactly what kind of night I was having.
 
@@ -54,7 +54,7 @@ Inco is **TEE-based confidential compute** running on Intel TDX. It is **not FHE
 
 The design in `contracts/contracts/Casebook.sol`:
 
-- The case author encrypts Red John's person id on their own machine and hands the contract a ciphertext. `openCase` ingests it straight into an `euint256`, folds it into `0..suspects-1` so no author can seal a seat nobody sits at, and calls `e.allowThis`. The person id is never in calldata, never in a log, and not readable afterwards by the account that put it there. It is in the repository, in the casebook, along with the alibis, and that is the point above: the ciphertext is not hiding the puzzle from a reader.
+- The case author encrypts the killer's person id on their own machine and hands the contract a ciphertext. `openCase` ingests it straight into an `euint256`, folds it into `0..suspects-1` so no author can seal a seat nobody sits at, and calls `e.allowThis`. The person id is never in calldata, never in a log, and not readable afterwards by the account that put it there. It is in the repository, in the casebook, along with the alibis, and that is the point above: the ciphertext is not hiding the puzzle from a reader.
 - A player calls `stake` with their USDC amount and their own encrypted person id.
 - The contract compares the two inside the enclave with `e.eq(named, _answer[caseId])`, gets an `ebool`, and grants it to that player alone with `e.allow(right, msg.sender)`. The handle is stored in `verdictHandle` so the contract knows exactly which ciphertext that player must later open.
 - After the case closes, the player files a `DecryptionAttestation` over their own verdict bit. `resolve` checks the handle matches the one it stored, then verifies the covalidator signatures through `inco.incoVerifier().isValidDecryptionAttestation`. The contract rules on who won, not the client.

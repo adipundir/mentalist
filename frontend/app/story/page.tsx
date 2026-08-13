@@ -6,17 +6,15 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { useAccount, usePublicClient } from "wagmi";
 import { CASEBOOK } from "@/lib/casebook";
-import { FINALE } from "@/lib/story";
 import { lineup, person } from "@/lib/canon";
 import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { releaseOf } from "@/lib/schedule";
 import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
-import { Finale } from "@/components/Finale";
 import { Settlement } from "@/components/Settlement";
 import { Stake } from "@/components/Stake";
 
-type Stage = "opening" | "playing" | "closing" | "finale";
+type Stage = "opening" | "playing" | "closing";
 
 interface CaseRow {
   /** Unix ms the contract stops taking money. */
@@ -127,25 +125,10 @@ function StoryInner() {
     return () => clearTimeout(id);
   }, [row?.open, row?.closesAt]);
 
-  const isLast = index === CASEBOOK.length - 1;
-
   function advance() {
-    // Only a win moves the arc on. Anything else goes back to the board, because the
-    // contract takes one entry per wallet per case and this room is spent.
-    if (verdict !== true) {
-      router.push("/cases");
-      return;
-    }
-    if (isLast) {
-      setStage("finale");
-      return;
-    }
-    if (!releaseOf(index + 1).released) {
-      router.push("/cases");
-      return;
-    }
-    setIndex((i) => i + 1);
-    setStage("opening");
+    // Every case is its own murder with its own killer, so there is no arc to carry a win
+    // forward into. Whatever happened here, the next thing is the board.
+    router.push("/cases");
   }
 
   return (
@@ -231,12 +214,10 @@ function StoryInner() {
                 : `${verdict ? chapter.successText : chapter.failureText} ${chapter.tell}`
             }
             onContinue={advance}
-            continueLabel={verdict === true ? (isLast ? "THE CREEK" : "NEXT CASE") : "BACK TO THE CASES"}
+            continueLabel="BACK TO THE CASES"
             extra={<Settlement caseId={index} onResolved={setVerdict} />}
           />
         )}
-
-        {stage === "finale" && <Finale beats={FINALE} />}
       </AnimatePresence>
     </main>
   );

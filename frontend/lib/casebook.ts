@@ -20,7 +20,7 @@
 export interface Alibi {
   /** What he says, in his own words. */
   text: string;
-  /** The one account in each case that cannot be true. Its index is Red John's person id. */
+  /** The one account in each case that cannot be true. Its index is the killer's person id. */
   impossible?: true;
 }
 

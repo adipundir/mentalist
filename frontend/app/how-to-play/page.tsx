@@ -14,7 +14,7 @@ const STEPS = [
   {
     n: "01",
     title: "Pick a case",
-    body: "A new one opens every day and stays open until its round closes. Each is a room with a body in it, and the people who were there when it happened.",
+    body: "A new one opens every day and stays open until its round closes. Each is a separate murder, in its own room, with its own killer. Nothing you learn in one case carries into another.",
   },
   {
     n: "02",
@@ -52,11 +52,11 @@ export default function HowToPlay() {
 
       <h1 className="mt-6 font-type text-[38px] leading-tight text-bone">How to play</h1>
       <p className="mt-3 font-body text-[17px] leading-relaxed text-bone">
-        Red John is standing in every one of these rooms, and he always leaves the same mark:
-        a smiling face, drawn in his victim&rsquo;s blood. Everyone in the room gives an
-        account of themselves.{" "}
-        <span className="text-blood-hot">One of those accounts cannot be true.</span> That man
-        is Red John. Your job is to work out which, and to back yourself with money.
+        Seven cases, each its own murder, each with its own killer. They are signed the same
+        way, a smiling face drawn in the victim&rsquo;s blood, which is why the papers call
+        every one of them a Red John. Everyone in the room gives an account of themselves.{" "}
+        <span className="text-blood-hot">One of those accounts cannot be true.</span> That is
+        the man who did it. Your job is to work out which, and to back yourself with money.
       </p>
 
       <ol className="mt-9 space-y-6">
