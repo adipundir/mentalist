@@ -110,12 +110,13 @@ export default function Board() {
 
       <div className="mx-auto mt-8 w-full max-w-[1100px]">
         <h1 className="font-type text-[30px] leading-tight text-bone sm:text-[38px]">
-          Seven rooms. Seven killers.
+          Find Red John.
         </h1>
         <p className="mt-2 max-w-[620px] font-body text-[16px] leading-relaxed text-bone-dim">
-          Every case is its own murder, and the killer signs it the same way: a smiling face,
-          drawn in the victim&rsquo;s blood. That signature is what gets him called a Red John.
-          Everyone in the room gives an account of where they were.{" "}
+          Every room has a killer in it, and every one of them signs the work the same way: a
+          smiling face, drawn in the victim&rsquo;s blood. Red John is the name that signature
+          goes by. Finding him is the whole job. Everyone in the room gives an account of where
+          they were.{" "}
           <span className="text-bone">One account cannot be true</span>, and that is your man.
           Back him with money and you take a share of everything the people who were wrong put
           in, paid as <span className="text-brass">Megapot tickets</span>.

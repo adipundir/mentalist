@@ -109,6 +109,23 @@ contract Mentalist is Ownable, ReentrancyGuard {
     /// @dev Everything owed to open cases. The owner can never withdraw it.
     uint256 public reserved;
 
+    /// @dev The address the keeper files verdicts from. It is a courier and not an authority:
+    ///      `resolveFor` verifies a covalidator signature over a handle this contract stored,
+    ///      so the worst a captured resolver can do is decline to file. It cannot invent a
+    ///      winner, and every player keeps `unseal`/`resolve` to file for themselves.
+    address public resolver;
+
+    /// @dev The house cut, taken off the pot at `settle` and only when somebody won. A case
+    ///      nobody solved refunds in full: charging for a game that did not happen is not a
+    ///      rake, and leaving the refund path unraked keeps it exact.
+    uint16 public rakeBps = 500; // 5.00%
+    uint16 public constant MAX_RAKE_BPS = 1000; // the ceiling the owner cannot raise past
+
+    /// @dev Paid on top of a share that leaves as Megapot tickets, funded by the referral
+    ///      Megapot pays this contract on those same purchases. That referral is 10% of the
+    ///      spend, so a bonus of half it is covered by the purchase that triggers it.
+    uint16 public ticketBonusBps = 500; // 5.00%
+
     uint256 public minStake = 100_000; // 0.10 USDC
     uint256 public maxStake = 5_000_000; // 5.00 USDC
 
@@ -133,7 +150,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
     ///      in first is paid to close the books at the first legal instant. Bounding both ends
     ///      with the same window is what stops that being a race: by the moment anybody may
     ///      settle, nobody may still file, so settling early wins nothing.
-    uint64 public constant FILING_WINDOW = 3 days;
+    uint64 public constant FILING_WINDOW = 10 minutes;
 
     // ─────────────────────────────────────────── events
 
@@ -142,6 +159,8 @@ contract Mentalist is Ownable, ReentrancyGuard {
     event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot);
     event Resolved(uint16 indexed caseId, address indexed player, bool won);
     event Settled(uint16 indexed caseId, uint128 pot, uint128 winningStake, uint32 winners);
+    event RakeTaken(uint16 indexed caseId, uint256 amount);
+    event ResolverSet(address indexed resolver);
     event PaidOut(uint16 indexed caseId, address indexed player, uint256 share, uint256[] ticketIds);
     event Refunded(uint16 indexed caseId, address indexed player, uint256 amount);
 
@@ -164,6 +183,8 @@ contract Mentalist is Ownable, ReentrancyGuard {
     error HandleMismatch();
     error InvalidAttestation();
     error BadConfig();
+    error NotResolver();
+    error LengthMismatch();
 
     constructor(IJackpotRandomTicketBuyer _ticketBuyer, address _owner) Ownable(_owner) {
         ticketBuyer = _ticketBuyer;
@@ -194,7 +215,9 @@ contract Mentalist is Ownable, ReentrancyGuard {
         uint64 openFor
     ) external payable onlyOwner {
         if (cases[caseId].exists) revert CaseExists();
-        if (suspects < 2 || openFor < 1 hours) revert BadConfig();
+        // Ten minutes is the floor. A case shorter than the filing window would close
+        // and settle in the same breath, and nobody could get a verdict in.
+        if (suspects < 2 || openFor < 10 minutes) revert BadConfig();
         if (msg.value < inco.getFee()) revert FeeTooLow();
 
         // Force the answer into 0..suspects-1 inside the enclave. An author who sealed an id
@@ -304,6 +327,31 @@ contract Mentalist is Ownable, ReentrancyGuard {
     }
 
     /**
+     * @notice Hand the resolver the keys to a batch of verdict bits, so it can file for
+     *         players who would otherwise have to come back and do it themselves.
+     *
+     * @dev Gated to the resolver and to after the close, and the second half is the half that
+     *      matters. Every guard in `unseal` is here for the same reason: an ACL grant before
+     *      the close is the whole game, because the covalidator will decrypt for anyone the
+     *      ACL admits and that check has no clock in it. Whoever held this key early could
+     *      stake a dollar, read whether they were right, and repeat until the room fell.
+     *
+     *      Granting the resolver reveals nothing the market has not already ended: a bit
+     *      saying whether a player named him, after the last moment anybody could act on it.
+     */
+    function unsealFor(uint16 caseId, address[] calldata players) external {
+        if (msg.sender != resolver) revert NotResolver();
+        Case storage c = cases[caseId];
+        if (!c.exists) revert NoSuchCase();
+        if (block.timestamp < c.closesAt) revert CaseStillOpen();
+
+        for (uint256 i; i < players.length; ++i) {
+            if (bets[caseId][players[i]].stake == 0) continue;
+            e.allow(_correct[caseId][players[i]], msg.sender);
+        }
+    }
+
+    /**
      * @notice File your result once the case has closed.
      *
      * @dev Model A settlement: the *contract* rules, by verifying a covalidator attestation
@@ -320,17 +368,64 @@ contract Mentalist is Ownable, ReentrancyGuard {
         DecryptionAttestation calldata attestation,
         bytes[] calldata signatures
     ) external {
+        _credit(caseId, msg.sender, attestation, signatures);
+    }
+
+    /**
+     * @notice File somebody else's result. Permissionless, and it has to be no weaker for it.
+     *
+     * @dev Delegating settlement costs nothing in trust here, which is the property the whole
+     *      keeper rests on. This does not take the caller's word for anything: the handle must
+     *      be the one this contract stored for that player, and the value must carry a live
+     *      covalidator signature over it. A caller cannot forge a win, cannot move a bit from
+     *      one player to another, and cannot file twice. All they can do is carry a verdict
+     *      that was already true, which is why anyone may do it and why nobody has to.
+     */
+    function resolveFor(
+        uint16 caseId,
+        address player,
+        DecryptionAttestation calldata attestation,
+        bytes[] calldata signatures
+    ) external {
+        _credit(caseId, player, attestation, signatures);
+    }
+
+    /// @notice File a whole room in one transaction. What the keeper actually calls.
+    function resolveMany(
+        uint16 caseId,
+        address[] calldata players,
+        DecryptionAttestation[] calldata attestations,
+        bytes[][] calldata signatures
+    ) external {
+        if (players.length != attestations.length || players.length != signatures.length) {
+            revert LengthMismatch();
+        }
+        for (uint256 i; i < players.length; ++i) {
+            // One player already filed for themselves should not strand the rest of the room,
+            // so a duplicate is skipped rather than reverted. Everything else still throws:
+            // a bad signature or a mismatched handle is a broken batch, not a slow player.
+            if (bets[caseId][players[i]].resolved) continue;
+            _credit(caseId, players[i], attestations[i], signatures[i]);
+        }
+    }
+
+    function _credit(
+        uint16 caseId,
+        address player,
+        DecryptionAttestation calldata attestation,
+        bytes[] calldata signatures
+    ) internal {
         Case storage c = cases[caseId];
         if (!c.exists) revert NoSuchCase();
         if (block.timestamp < c.closesAt) revert CaseStillOpen();
         // Too late to file: the books are closed, or close the moment anyone asks.
         if (block.timestamp >= c.closesAt + FILING_WINDOW) revert AlreadySettled();
 
-        Bet storage b = bets[caseId][msg.sender];
+        Bet storage b = bets[caseId][player];
         if (b.stake == 0) revert NothingStaked();
         if (b.resolved) revert AlreadyResolved();
 
-        if (attestation.handle != verdictHandle[caseId][msg.sender]) revert HandleMismatch();
+        if (attestation.handle != verdictHandle[caseId][player]) revert HandleMismatch();
         if (!inco.incoVerifier().isValidDecryptionAttestation(attestation, signatures)) {
             revert InvalidAttestation();
         }
@@ -340,12 +435,12 @@ contract Mentalist is Ownable, ReentrancyGuard {
         b.won = won;
 
         if (won) {
-            _winningStakeBefore[caseId][msg.sender] = c.winningStake;
+            _winningStakeBefore[caseId][player] = c.winningStake;
             c.winningStake += b.stake;
             c.winners += 1;
         }
 
-        emit Resolved(caseId, msg.sender, won);
+        emit Resolved(caseId, player, won);
     }
 
     /**
@@ -363,6 +458,23 @@ contract Mentalist is Ownable, ReentrancyGuard {
         if (c.settled) revert AlreadySettled();
 
         c.settled = true;
+
+        // The cut comes off here rather than at the door. Taken on the way in it would have
+        // to be given back on the refund path, and a case nobody solved is a game that did
+        // not happen: there is nothing to charge for. Gated on `winners` it never touches a
+        // refund, and the pot the shares divide is the pot after the cut, so `shareOf` needs
+        // no knowledge of any of this and the shares still telescope to exactly `pot`.
+        if (c.winners != 0 && rakeBps != 0) {
+            uint256 rake = (uint256(c.pot) * rakeBps) / 10_000;
+            if (rake != 0) {
+                c.pot -= uint128(rake);
+                // It stops being owed to anyone, which is what makes it reachable by
+                // `withdrawSurplus` and by the ticket bonus below.
+                reserved -= rake;
+                emit RakeTaken(caseId, rake);
+            }
+        }
+
         emit Settled(caseId, c.pot, c.winningStake, c.winners);
     }
 
@@ -404,7 +516,11 @@ contract Mentalist is Ownable, ReentrancyGuard {
      *      outside what the public RPCs will `eth_estimateGas`, which refuses anything past
      *      about 16.7M. Send this with an explicit gas limit or it never leaves the wallet.
      */
-    function payout(uint16 caseId) external nonReentrant returns (uint256[] memory ticketIds) {
+    function payout(uint16 caseId, bool wantTickets)
+        external
+        nonReentrant
+        returns (uint256[] memory ticketIds)
+    {
         Case storage c = cases[caseId];
         if (!c.settled) revert NotSettled();
 
@@ -416,9 +532,25 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
         uint256 share = shareOf(caseId, msg.sender);
         b.paid = true;
+
+        // Taking tickets pays better than taking the cash, because Megapot pays this contract
+        // a referral on the purchase that is twice what the bonus costs. The bonus is capped
+        // at the surplus actually sitting here (rake plus swept referral, never staked money,
+        // since `reserved` is subtracted first) so it can only ever be paid out of money the
+        // house really has. If that well is dry the tickets still buy, just without the top
+        // up: a winner is never made to wait on the house's balance sheet.
+        uint256 bonus;
+        if (wantTickets && ticketBonusBps != 0) {
+            uint256 held = usdc.balanceOf(address(this));
+            uint256 surplus = held > reserved ? held - reserved : 0;
+            bonus = (share * ticketBonusBps) / 10_000;
+            if (bonus > surplus) bonus = surplus;
+        }
+
         // By the share, not the stake: a winner leaves with the losers' money too, and
         // reserving only what they put in would lock their winnings in here forever.
         reserved -= share;
+        uint256 budget = share + bonus;
 
         // Tickets are the preferred form of the payout, not a condition of it. If Megapot is
         // shut (a drawing window, an LP lock, a permanent stop) or quoting a zero price, the
@@ -428,8 +560,8 @@ contract Mentalist is Ownable, ReentrancyGuard {
         uint256 count;
         uint256 cost;
         uint256 price = jackpot.ticketPrice();
-        if (price != 0 && jackpot.allowTicketPurchases()) {
-            count = share / price;
+        if (wantTickets && price != 0 && jackpot.allowTicketPurchases()) {
+            count = budget / price;
             if (count > TICKETS_PER_BATCH * MAX_BATCHES) count = TICKETS_PER_BATCH * MAX_BATCHES;
             cost = price * count;
         }
@@ -455,10 +587,14 @@ contract Mentalist is Ownable, ReentrancyGuard {
             ticketIds = new uint256[](0);
         }
 
-        uint256 dust = share - cost;
+        // Whatever the tickets could not absorb leaves as cash, which on the USDC branch is
+        // the entire share. The bonus is only ever spent on tickets: it is not a cash prize,
+        // so a share that converted to nothing hands back the share and not a penny more.
+        uint256 paid = cost != 0 ? budget : share;
+        uint256 dust = paid - cost;
         if (dust != 0) usdc.safeTransfer(msg.sender, dust);
 
-        emit PaidOut(caseId, msg.sender, share, ticketIds);
+        emit PaidOut(caseId, msg.sender, paid, ticketIds);
     }
 
     /**
@@ -511,6 +647,24 @@ contract Mentalist is Ownable, ReentrancyGuard {
         if (min == 0 || max < min || max > type(uint128).max) revert BadConfig();
         minStake = min;
         maxStake = max;
+    }
+
+    /// @notice Name the address allowed to take keys on players' behalf, so the keeper can
+    ///         file a whole room and nobody has to come back to collect a win they already had.
+    /// @dev Losing this key loses nothing: it cannot forge a verdict, and every player can
+    ///      still `unseal` and `resolve` for themselves. Set it to zero to turn the keeper off.
+    function setResolver(address to) external onlyOwner {
+        resolver = to;
+        emit ResolverSet(to);
+    }
+
+    /// @dev Applies at `settle`, so it is only ever the terms of a case that has not yet been
+    ///      closed. Bounded by a constant the owner cannot raise, because a rake settable to
+    ///      100% after the money is in is not a rake, it is a switch that takes the pot.
+    function setRake(uint16 bps, uint16 bonusBps) external onlyOwner {
+        if (bps > MAX_RAKE_BPS) revert BadConfig();
+        rakeBps = bps;
+        ticketBonusBps = bonusBps;
     }
 
     /// @dev Only ever referral fees. Never staked funds.

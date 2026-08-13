@@ -1,5 +1,11 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "nextjs",
-  "installCommand": "cd .. && pnpm install --frozen-lockfile --filter frontend..."
+  "installCommand": "cd .. && pnpm install --frozen-lockfile --filter frontend...",
+  "crons": [
+    {
+      "path": "/api/keeper",
+      "schedule": "*/5 * * * *"
+    }
+  ]
 }

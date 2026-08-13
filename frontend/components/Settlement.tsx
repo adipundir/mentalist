@@ -29,7 +29,7 @@ import * as sfx from "@/lib/sound";
  * everybody.
  */
 
-type Busy = "resolving" | "settling" | "paying" | "refunding" | null;
+type Busy = "resolving" | "settling" | "paying" | "cashing" | "refunding" | null;
 
 interface Row {
   closesAt: number;
@@ -337,29 +337,54 @@ export function Settlement({
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
             You&rsquo;re in for <span className="text-brass">${usdc(row.share)}</span> of a $
-            {usdc(row.pot)} pot. It buys up to a hundred real Megapot tickets with the money of
-            everyone who read the room wrong, and whatever that ceiling and the ticket price
-            leave over comes back to you as USDC.
+            {usdc(row.pot)} pot, taken off the people who read the room wrong. Take it as cash,
+            or take it in Megapot tickets and the house adds{" "}
+            <span className="text-brass">five percent</span> on top: Megapot pays a referral on
+            that purchase worth twice the bonus, so the better deal for you is the better deal
+            for us. Tickets cap at a hundred a payout and the rest comes back as USDC.
           </p>
-          <Button
-            tone="blood"
-            onClick={() =>
-              send("paying", "TICKETS BOUGHT", () =>
-                wallet!.writeContract({
-                  address: MENTALIST_ADDRESS,
-                  abi: MENTALIST_ABI,
-                  functionName: "payout",
-                  args: [caseId],
-                  account: address!,
-                  chain: wallet!.chain,
-                  gas: PAYOUT_GAS,
-                }),
-              )
-            }
-            disabled={busy !== null}
-          >
-            {busy === "paying" ? "BUYING YOUR TICKETS…" : `COLLECT $${usdc(row.share)}`}
-          </Button>
+          <div className="flex flex-wrap gap-3">
+            <Button
+              tone="blood"
+              onClick={() =>
+                send("paying", "TICKETS BOUGHT", () =>
+                  wallet!.writeContract({
+                    address: MENTALIST_ADDRESS,
+                    abi: MENTALIST_ABI,
+                    functionName: "payout",
+                    args: [caseId, true],
+                    account: address!,
+                    chain: wallet!.chain,
+                    gas: PAYOUT_GAS,
+                  }),
+                )
+              }
+              disabled={busy !== null}
+            >
+              {busy === "paying"
+                ? "BUYING YOUR TICKETS…"
+                : `TAKE $${usdc((row.share * 105n) / 100n)} IN TICKETS`}
+            </Button>
+            <Button
+              tone="dim"
+              onClick={() =>
+                send("cashing", "PAID OUT", () =>
+                  wallet!.writeContract({
+                    address: MENTALIST_ADDRESS,
+                    abi: MENTALIST_ABI,
+                    functionName: "payout",
+                    args: [caseId, false],
+                    account: address!,
+                    chain: wallet!.chain,
+                    gas: PAYOUT_GAS,
+                  }),
+                )
+              }
+              disabled={busy !== null}
+            >
+              {busy === "cashing" ? "PAYING OUT…" : `TAKE $${usdc(row.share)} IN USDC`}
+            </Button>
+          </div>
         </>
       ) : (
         <p className="font-body text-[13px] leading-relaxed text-bone">

@@ -109,8 +109,79 @@ export const MENTALIST_ABI = [
     type: "function",
     name: "payout",
     stateMutability: "nonpayable",
-    inputs: [{ name: "caseId", type: "uint16" }],
+    inputs: [
+      { name: "caseId", type: "uint16" },
+      // Tickets or cash. Tickets pay a premium, funded by the referral Megapot pays this
+      // contract on that same purchase.
+      { name: "wantTickets", type: "bool" },
+    ],
     outputs: [{ name: "ticketIds", type: "uint256[]" }],
+  },
+  {
+    // What the keeper calls so a winner never has to come back and file to be counted.
+    // Permissionless: it verifies a covalidator signature over a handle this contract
+    // stored, so a caller can carry a verdict but cannot invent one.
+    type: "function",
+    name: "resolveFor",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseId", type: "uint16" },
+      { name: "player", type: "address" },
+      {
+        name: "attestation",
+        type: "tuple",
+        components: [
+          { name: "handle", type: "bytes32" },
+          { name: "value", type: "bytes32" },
+        ],
+      },
+      { name: "signatures", type: "bytes[]" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "resolveMany",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseId", type: "uint16" },
+      { name: "players", type: "address[]" },
+      {
+        name: "attestations",
+        type: "tuple[]",
+        components: [
+          { name: "handle", type: "bytes32" },
+          { name: "value", type: "bytes32" },
+        ],
+      },
+      { name: "signatures", type: "bytes[][]" },
+    ],
+    outputs: [],
+  },
+  {
+    // Resolver-only, and only after the close. An ACL grant before that is the whole game.
+    type: "function",
+    name: "unsealFor",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseId", type: "uint16" },
+      { name: "players", type: "address[]" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "setResolver",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "to", type: "address" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "ticketBonusBps",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint16" }],
   },
   {
     type: "function",

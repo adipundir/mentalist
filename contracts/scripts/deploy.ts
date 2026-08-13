@@ -44,7 +44,7 @@ const MEGAPOT_BUYER = "0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746" as const;
  * How long each case takes money. A week, so a season of one case a day is entirely open by
  * the time the last one lands. `openCase` refuses anything under an hour.
  */
-const OPEN_FOR = BigInt(process.env.MENTALIST_OPEN_FOR ?? 7 * 24 * 60 * 60);
+const OPEN_FOR = BigInt(process.env.MENTALIST_OPEN_FOR ?? 30 * 60);
 
 function artifact(name: string): { abi: Abi; bytecode: Hex } {
   const p = join(process.cwd(), "artifacts/contracts", `${name}.sol`, `${name}.json`);
@@ -62,7 +62,7 @@ function answerOf(index: number): number {
 async function main() {
   const key = process.env.PRIVATE_KEY_BASE_SEPOLIA;
   if (!key) throw new Error("PRIVATE_KEY_BASE_SEPOLIA is not set");
-  if (OPEN_FOR < 3600n) throw new Error("MENTALIST_OPEN_FOR must be at least an hour");
+  if (OPEN_FOR < 600n) throw new Error("MENTALIST_OPEN_FOR must be at least ten minutes");
 
   // Fail before spending gas rather than four cases in. Each room's alibi list has to match
   // the suspect count the contract is told, or a case is opened over a room that is not the
@@ -92,6 +92,23 @@ async function main() {
   console.log("Mentalist  ", addr, "\n");
 
   const zap = await Lightning.baseSepoliaTestnet();
+
+  // Name the keeper, so the winners of these cases never have to come back and file to be
+  // counted. It is not the owner and it holds no money: the most it can do is carry
+  // covalidator-signed verdicts on-chain, and refuse to.
+  const keeper = process.env.KEEPER_ADDRESS;
+  if (keeper) {
+    const tx = await wallet.writeContract({
+      address: addr,
+      abi: book.abi,
+      functionName: "setResolver",
+      args: [keeper as Hex],
+    });
+    await pub.waitForTransactionReceipt({ hash: tx });
+    console.log(`resolver set: ${keeper}`);
+  } else {
+    console.log("no KEEPER_ADDRESS, so players will file their own verdicts");
+  }
 
   for (const [i, c] of CASEBOOK.entries()) {
     // The ciphertext is bound to this account and this contract, and `openCase` ingests it

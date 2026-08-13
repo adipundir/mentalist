@@ -116,6 +116,7 @@ contract CasebookTest is IncoTest {
     address internal lisbon = address(0x115B0);
     address internal cho = address(0xC40);
     address internal stranger = address(0xBEEF);
+    address internal keeper = address(0xC0FFEE);
 
     uint16 internal constant CASE_ID = 1;
     uint8 internal constant SUSPECTS = 5;
@@ -131,6 +132,10 @@ contract CasebookTest is IncoTest {
         usdc = new MockUSDC();
         megapot = new MockJackpot(usdc);
         book = new Mentalist(IJackpotRandomTicketBuyer(address(megapot)), address(this));
+        // The distribution tests below are about the split, and a live rake would move every
+        // figure in them by five percent while proving nothing about the telescoping. It is
+        // switched off here and switched back on by the tests that are actually about it.
+        book.setRake(0, 0);
 
         // Inco fees come out of the *contract's* balance; msg.value only tops it up. Pre-funding
         // is the sponsored-fee model the deployed casebook uses, so a player never thinks about it.
@@ -264,6 +269,23 @@ contract CasebookTest is IncoTest {
         return book.bets(caseId, who);
     }
 
+    function _won(uint16 caseId, address who) internal view returns (bool won) {
+        (, , won, ) = book.bets(caseId, who);
+    }
+
+    /// @dev What the keeper builds off-chain: one attestation per player in the room, taken
+    ///      in a single covalidator round now that the ACL admits it to all of their bits.
+    function _attestRoom(
+        uint16 caseId,
+        address[] memory room
+    ) internal returns (DecryptionAttestation[] memory atts, bytes[][] memory sigs) {
+        atts = new DecryptionAttestation[](room.length);
+        sigs = new bytes[][](room.length);
+        for (uint256 i; i < room.length; ++i) {
+            (atts[i], sigs[i]) = _attest(keeper, book.verdictHandle(caseId, room[i]));
+        }
+    }
+
     // ── opening a case ─────────────────────────────────────────
 
     /**
@@ -352,13 +374,13 @@ contract CasebookTest is IncoTest {
         bytes memory ct = _answerCipher(RED_JOHN);
         uint256 fee = book.quoteFee();
 
-        // One person in the room is not a question, and a window that closes inside the hour
-        // is not a market.
+        // One person in the room is not a question, and a window shorter than the filing
+        // window is not a market: it would close and settle in the same breath.
         vm.expectRevert(Mentalist.BadConfig.selector);
         book.openCase{ value: fee }(CASE_ID, 1, ct, OPEN_FOR);
 
         vm.expectRevert(Mentalist.BadConfig.selector);
-        book.openCase{ value: fee }(CASE_ID, SUSPECTS, ct, 59 minutes);
+        book.openCase{ value: fee }(CASE_ID, SUSPECTS, ct, 9 minutes);
     }
 
     function test_OpeningPaysTheIngestFee() public {
@@ -803,10 +825,10 @@ contract CasebookTest is IncoTest {
         _reachClose(CASE_ID);
         _resolve(jane, CASE_ID);
 
-        // Jane has filed and would like the books shut. The old grace window has gone by and
-        // she still cannot have them.
+        // Jane has filed and would like the books shut. The case itself is over and she
+        // still cannot have them: Lisbon's filing window is running.
         uint64 closesAt = _closesAt(CASE_ID);
-        vm.warp(closesAt + 1 hours + 1);
+        vm.warp(closesAt + 1);
         vm.prank(jane);
         vm.expectRevert(Mentalist.CaseStillOpen.selector);
         book.settle(CASE_ID);
@@ -886,9 +908,9 @@ contract CasebookTest is IncoTest {
         assertEq(hers + his, pot, "every unit of the pot belongs to one of them");
 
         vm.prank(jane);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
         vm.prank(lisbon);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
 
         assertEq(book.reserved(), 0, "and the books agree once they have both collected");
         assertEq(usdc.balanceOf(address(book)), 0, "with nothing stranded here");
@@ -912,7 +934,7 @@ contract CasebookTest is IncoTest {
         uint256 before = usdc.balanceOf(jane);
 
         vm.prank(jane);
-        uint256[] memory ids = book.payout(CASE_ID);
+        uint256[] memory ids = book.payout(CASE_ID, true);
 
         assertEq(ids.length, 5, "five whole tickets");
         for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "every id came back filled in");
@@ -923,7 +945,7 @@ contract CasebookTest is IncoTest {
         assertTrue(paid);
 
         vm.prank(lisbon);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
         assertEq(megapot.ticketsOf(lisbon), 1, "one ticket on 1.4 USDC");
         assertEq(usdc.balanceOf(address(megapot)), 6_000_000, "the losing stake went to Megapot too");
     }
@@ -939,7 +961,7 @@ contract CasebookTest is IncoTest {
         _settle(CASE_ID);
 
         vm.prank(jane);
-        uint256[] memory ids = book.payout(CASE_ID);
+        uint256[] memory ids = book.payout(CASE_ID, true);
         assertEq(ids.length, 25, "twenty-five tickets across three calls");
         assertEq(megapot.ticketsOf(jane), 25);
         for (uint256 i; i < ids.length; ++i) assertGt(ids[i], 0, "no hole in the middle of the batch");
@@ -964,7 +986,7 @@ contract CasebookTest is IncoTest {
 
         uint256 before = usdc.balanceOf(jane);
         vm.prank(jane);
-        uint256[] memory ids = book.payout(CASE_ID);
+        uint256[] memory ids = book.payout(CASE_ID, true);
 
         uint256 ceiling = book.TICKETS_PER_BATCH() * book.MAX_BATCHES();
         assertEq(ceiling, 100, "the ceiling this test exists to reach");
@@ -990,7 +1012,7 @@ contract CasebookTest is IncoTest {
 
         vm.prank(lisbon);
         vm.expectRevert(Mentalist.DidNotWin.selector);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
     }
 
     function test_CannotBePaidTwice() public {
@@ -1001,9 +1023,9 @@ contract CasebookTest is IncoTest {
         _settle(CASE_ID);
 
         vm.startPrank(jane);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
         vm.expectRevert(Mentalist.AlreadyPaid.selector);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
         vm.stopPrank();
     }
 
@@ -1014,7 +1036,7 @@ contract CasebookTest is IncoTest {
 
         vm.prank(jane);
         vm.expectRevert(Mentalist.NotSettled.selector);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
 
         _reachClose(CASE_ID);
         _resolve(jane, CASE_ID);
@@ -1023,11 +1045,11 @@ contract CasebookTest is IncoTest {
         // Lisbon named the right man and never filed. The contract has no verdict from him.
         vm.prank(lisbon);
         vm.expectRevert(Mentalist.NotResolved.selector);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
 
         vm.prank(stranger);
         vm.expectRevert(Mentalist.NothingStaked.selector);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
     }
 
     /// @dev Megapot's ticket sales are a toggle somebody else owns, and it goes down for
@@ -1046,7 +1068,7 @@ contract CasebookTest is IncoTest {
 
         uint256 before = usdc.balanceOf(jane);
         vm.prank(jane);
-        uint256[] memory ids = book.payout(CASE_ID);
+        uint256[] memory ids = book.payout(CASE_ID, true);
 
         assertEq(ids.length, 0, "no tickets while Megapot is shut");
         assertEq(usdc.balanceOf(jane) - before, 1_000_000, "the whole share came back as USDC");
@@ -1066,7 +1088,7 @@ contract CasebookTest is IncoTest {
 
         uint256 before = usdc.balanceOf(jane);
         vm.prank(jane);
-        uint256[] memory ids = book.payout(CASE_ID);
+        uint256[] memory ids = book.payout(CASE_ID, true);
 
         assertEq(ids.length, 0, "no tickets at a price of nothing");
         assertEq(usdc.balanceOf(jane) - before, 1_000_000, "the whole share came back as USDC");
@@ -1165,9 +1187,9 @@ contract CasebookTest is IncoTest {
         _settle(CASE_ID);
 
         vm.prank(jane);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
         vm.prank(lisbon);
-        book.payout(CASE_ID);
+        book.payout(CASE_ID, true);
 
         assertEq(book.reserved(), 0, "nothing left owed on this case");
         assertEq(usdc.balanceOf(address(book)), 0, "and no stranded USDC");
@@ -1264,4 +1286,228 @@ contract CasebookTest is IncoTest {
         assertEq(firstPot, 1_000_000);
         assertEq(secondPot, 2_000_000);
     }
+
+    // ── the keeper, the rake, and the choice of payout ───────────────────────
+
+    /// @notice The keeper files a whole room, and nobody has to come back to collect.
+    function test_TheKeeperFilesTheRoomForEverybody() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(lisbon, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 1_000_000);
+        book.setResolver(keeper);
+        _reachClose(CASE_ID);
+
+        address[] memory room = new address[](3);
+        room[0] = jane;
+        room[1] = lisbon;
+        room[2] = cho;
+
+        // One grant for the whole room, then one transaction that files all three.
+        vm.prank(keeper);
+        book.unsealFor(CASE_ID, room);
+        processAllOperations();
+
+        (
+            DecryptionAttestation[] memory atts,
+            bytes[][] memory sigs
+        ) = _attestRoom(CASE_ID, room);
+        vm.prank(keeper);
+        book.resolveMany(CASE_ID, room, atts, sigs);
+
+        (, , , uint32 winners) = _caseTotals(CASE_ID);
+        assertEq(winners, 2, "both of the people who named him are counted");
+        assertTrue(_won(CASE_ID, jane), "and neither of them lifted a finger");
+        assertTrue(_won(CASE_ID, lisbon));
+        assertFalse(_won(CASE_ID, cho), "while the man who was wrong is filed as wrong");
+    }
+
+    /// @notice The keeper is a courier. It cannot invent a winner, only carry a real verdict.
+    function test_TheKeeperCannotForgeAWin() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 1_000_000);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        book.setResolver(keeper);
+        _reachClose(CASE_ID);
+
+        address[] memory room = new address[](2);
+        room[0] = cho;
+        room[1] = jane;
+        vm.prank(keeper);
+        book.unsealFor(CASE_ID, room);
+        processAllOperations();
+
+        // Cho was wrong. The keeper takes Jane's winning attestation and tries to file it
+        // under Cho's name, which is the whole attack a delegated settlement has to survive.
+        (DecryptionAttestation memory hers, bytes[] memory sigs) = _attest(
+            keeper,
+            book.verdictHandle(CASE_ID, jane)
+        );
+        vm.prank(keeper);
+        vm.expectRevert(Mentalist.HandleMismatch.selector);
+        book.resolveFor(CASE_ID, cho, hers, sigs);
+    }
+
+    /// @notice The grant is the whole secret, so the keeper cannot have it early either.
+    function test_TheKeeperCannotUnsealWhileMoneyIsStillMoving() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        book.setResolver(keeper);
+
+        address[] memory room = new address[](1);
+        room[0] = jane;
+
+        // Early, this is a probe oracle: stake a dollar, read the bit, learn the answer, and
+        // walk the room down for the price of the minimum bet.
+        vm.prank(keeper);
+        vm.expectRevert(Mentalist.CaseStillOpen.selector);
+        book.unsealFor(CASE_ID, room);
+
+        // And it is the resolver's key alone. A stranger cannot ask for the room's bits.
+        _reachClose(CASE_ID);
+        vm.prank(cho);
+        vm.expectRevert(Mentalist.NotResolver.selector);
+        book.unsealFor(CASE_ID, room);
+    }
+
+    /// @notice Filing twice is not an error the batch dies on. It just skips the duplicate.
+    function test_ABatchStepsOverSomebodyWhoAlreadyFiled() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(lisbon, CASE_ID, RED_JOHN, 1_000_000);
+        book.setResolver(keeper);
+        _reachClose(CASE_ID);
+
+        _resolve(jane, CASE_ID); // Jane got impatient and filed for herself.
+
+        address[] memory room = new address[](2);
+        room[0] = jane;
+        room[1] = lisbon;
+        vm.prank(keeper);
+        book.unsealFor(CASE_ID, room);
+        processAllOperations();
+
+        (
+            DecryptionAttestation[] memory atts,
+            bytes[][] memory sigs
+        ) = _attestRoom(CASE_ID, room);
+        vm.prank(keeper);
+        book.resolveMany(CASE_ID, room, atts, sigs);
+
+        (, , , uint32 winners) = _caseTotals(CASE_ID);
+        assertEq(winners, 2, "she is counted once, and the rest of the room still gets filed");
+    }
+
+    /// @notice The house takes its cut off a case somebody won, and the shares still telescope.
+    function test_TheRakeComesOffThePotAndNothingIsStranded() public {
+        book.setRake(500, 0); // five percent, and no ticket bonus muddying the arithmetic
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(lisbon, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 2_000_000);
+        _reachClose(CASE_ID);
+        _resolve(jane, CASE_ID);
+        _resolve(lisbon, CASE_ID);
+        _settle(CASE_ID);
+
+        (uint128 pot, , , ) = _caseTotals(CASE_ID);
+        assertEq(pot, 3_800_000, "four dollars in, five percent out");
+
+        uint256 hers = book.shareOf(CASE_ID, jane);
+        uint256 his = book.shareOf(CASE_ID, lisbon);
+        assertEq(hers + his, pot, "and what is left is divided down to the last unit");
+
+        vm.prank(jane);
+        book.payout(CASE_ID, false);
+        vm.prank(lisbon);
+        book.payout(CASE_ID, false);
+
+        assertEq(book.reserved(), 0, "nothing is still owed");
+        assertEq(usdc.balanceOf(address(book)), 200_000, "and the cut is the only thing left");
+    }
+
+    /// @notice A case nobody solved is a game that did not happen. It refunds in full.
+    function test_ARefundIsNeverRaked() public {
+        book.setRake(500, 0);
+        _open(CASE_ID, RED_JOHN);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 1_000_000);
+        _reachClose(CASE_ID);
+        _resolve(cho, CASE_ID);
+        _settle(CASE_ID);
+
+        uint256 before = usdc.balanceOf(cho);
+        vm.prank(cho);
+        book.refund(CASE_ID);
+
+        assertEq(usdc.balanceOf(cho) - before, 1_000_000, "every unit of it comes back");
+        assertEq(usdc.balanceOf(address(book)), 0, "and the house kept none of it");
+    }
+
+    /// @notice Taking tickets pays more than taking the cash, out of money the house has.
+    function test_TakingTicketsPaysThePremiumAndTakingCashDoesNot() public {
+        book.setRake(500, 500);
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(lisbon, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 2_000_000);
+        _reachClose(CASE_ID);
+        _resolve(jane, CASE_ID);
+        _resolve(lisbon, CASE_ID);
+        _settle(CASE_ID);
+
+        uint256 share = book.shareOf(CASE_ID, jane);
+
+        // Lisbon wants the cash. He gets his share and not a unit more.
+        uint256 hisBefore = usdc.balanceOf(lisbon);
+        vm.prank(lisbon);
+        uint256[] memory none = book.payout(CASE_ID, false);
+        assertEq(none.length, 0, "no tickets for the man who asked for money");
+        assertEq(usdc.balanceOf(lisbon) - hisBefore, share, "just the share");
+
+        // Jane wants tickets, and the referral Megapot will pay on them funds her premium.
+        uint256 hersBefore = usdc.balanceOf(jane);
+        vm.prank(jane);
+        uint256[] memory tickets = book.payout(CASE_ID, true);
+        uint256 spent = tickets.length * megapot.ticketPrice();
+        uint256 cash = usdc.balanceOf(jane) - hersBefore;
+
+        assertEq(spent + cash, share + (share * 500) / 10_000, "five percent on top");
+        assertGt(tickets.length, 0, "and it left as real Megapot entries");
+    }
+
+    /// @notice The premium is capped by what the house actually holds, and never reverts.
+    function test_ThePremiumIsCappedByTheHouseBalanceAndNeverStrandsAShare() public {
+        book.setRake(0, 500); // a bonus with no rake behind it: the well is dry
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+        _stake(cho, CASE_ID, SOMEONE_ELSE, 1_000_000);
+        _reachClose(CASE_ID);
+        _resolve(jane, CASE_ID);
+        _settle(CASE_ID);
+
+        uint256 share = book.shareOf(CASE_ID, jane);
+        uint256 before = usdc.balanceOf(jane);
+        vm.prank(jane);
+        uint256[] memory tickets = book.payout(CASE_ID, true);
+
+        uint256 spent = tickets.length * megapot.ticketPrice();
+        assertEq(
+            spent + (usdc.balanceOf(jane) - before),
+            share,
+            "she is paid in full, just without a premium the house could not fund"
+        );
+        assertEq(book.reserved(), 0, "and nothing is stranded waiting on a balance sheet");
+    }
+
+    /// @notice A rake settable to the whole pot is not a rake, it is a switch that takes it.
+    function test_TheRakeHasACeilingTheOwnerCannotRaise() public {
+        uint16 ceiling = book.MAX_RAKE_BPS();
+        vm.expectRevert(Mentalist.BadConfig.selector);
+        book.setRake(ceiling + 1, 0);
+
+        vm.prank(cho);
+        vm.expectRevert();
+        book.setRake(0, 0);
+    }
+
 }

@@ -11,6 +11,7 @@ import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
 import { Settlement } from "@/components/Settlement";
+import { TheTell } from "@/components/TheTell";
 import { Stake } from "@/components/Stake";
 
 type Stage = "opening" | "playing" | "closing";
@@ -226,11 +227,22 @@ function StoryInner() {
             body={
               verdict === null
                 ? "Your money is on a name nobody else can read, and it stays that way until the case closes. Nobody can watch what you did and copy it, and nobody, including whoever wrote this case, can move the answer now that there is money against it."
-                : `${verdict ? chapter.successText : chapter.failureText} ${chapter.tell}`
+                : verdict
+                  ? chapter.successText
+                  : chapter.failureText
             }
             onContinue={advance}
             continueLabel="BACK TO THE CASES"
-            extra={<Settlement caseId={index} onResolved={setVerdict} />}
+            extra={
+              <>
+                {/* The verdict on its own is a scoreboard. Once the case is decided the room
+                    is over, so the reasoning is no longer worth withholding: name the man,
+                    put his own words back in front of the player, and show the contradiction
+                    that was sitting in them the whole time. */}
+                {verdict !== null && <TheTell chapter={chapter} />}
+                <Settlement caseId={index} onResolved={setVerdict} />
+              </>
+            }
           />
         )}
       </AnimatePresence>
