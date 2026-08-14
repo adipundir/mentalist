@@ -233,7 +233,7 @@ export function Settlement({
       !row.resolved && !row.settled && now < row.closesAt + graceMs ? (
         <>
           <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
-            Case closed. The keeper is recording the room&rsquo;s results automatically.
+            Case closed. Final verdict incoming.
           </p>
         </>
       ) : !row.settled ? (
