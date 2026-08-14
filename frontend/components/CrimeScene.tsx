@@ -60,79 +60,122 @@ function Victim({ x, y, left }: { x: number; y: number; left: boolean }) {
   const HAIR = "#3a2a22";
   const flip = left ? 1 : -1;
 
-  /** A limb: one thick ink stroke for the outline, a thinner fill laid over it. */
-  const limb = (d: string, w: number, fill: string) => (
+  /**
+   * A limb: one thick ink stroke for the outline, a thinner fill laid over it.
+   *
+   * The hand or foot at the end of it goes in *before* the limb, so the sleeve or hem
+   * overlaps it. Drawn after, its own outline cuts across the end of the limb and the
+   * extremity reads as a ball parked next to an arm rather than as the end of one.
+   */
+  const limb = (d: string, w: number, fill: string, end?: React.ReactNode) => (
     <>
+      {end}
       <path d={d} fill="none" stroke={INK} strokeWidth={w + 3} strokeLinecap="round" strokeLinejoin="round" />
       <path d={d} fill="none" stroke={fill} strokeWidth={w} strokeLinecap="round" strokeLinejoin="round" />
     </>
   );
 
+  /**
+   * She has fallen, not been arranged.
+   *
+   * The old pose put every joint at a right angle and threw all four limbs out flat, which
+   * reads as a doll dropped from a height. A body that has gone down and stopped settles:
+   * the hips roll a little to one side, the knees come up and stay bent, the shoulders lag
+   * behind the hips, the arms fall wherever gravity leaves them, and the head lolls with
+   * the chin toward the shoulder. Everything below is one of those.
+   */
   return (
-    <g transform={`translate(${x} ${y}) scale(${0.3 * flip} 0.3) rotate(-4)`}>
-      {/* the far leg, folded under, drawn first so the near one reads as on top */}
-      {limb("M-4 -4 L-19 -12 L-31 -14", 11, DRESS_DARK)}
-      <ellipse cx="-34" cy="-15" rx="6" ry="4.5" fill="#241c17" stroke={INK} strokeWidth="2.2" transform="rotate(-26 -34 -15)" />
+    <g transform={`translate(${x} ${y}) scale(${0.34 * flip} 0.34) rotate(-6)`}>
+      {/* Far leg, underneath and mostly hidden by the near one: straight out, foot turned
+          over the way a leg lands when nothing is holding it. */}
+      {limb(
+        "M-7 -2 Q-22 -5 -34 -6",
+        9,
+        DRESS_DARK,
+        <ellipse cx="-38" cy="-7" rx="5" ry="3.6" fill="#241c17" stroke={INK} strokeWidth="2.2" transform="rotate(-22 -38 -7)" />,
+      )}
 
-      {/* the far arm, thrown out above her head */}
-      {limb("M15 -9 L8 -24 L17 -33", 9, DRESS_DARK)}
-      <circle cx="20" cy="-36" r="5.4" fill={SKIN} stroke={INK} strokeWidth="2.2" />
+      {/* Near leg: knee fallen open, foot rolled outward. The gap between the two legs is
+          what stops the lower half reading as one shape. */}
+      {limb(
+        "M-7 6 Q-21 11 -33 12",
+        10,
+        DRESS,
+        <ellipse cx="-37" cy="13" rx="5.2" ry="3.8" fill="#241c17" stroke={INK} strokeWidth="2.2" transform="rotate(16 -37 13)" />,
+      )}
 
-      {/* the near leg */}
-      {limb("M-4 5 L-22 7 L-37 12", 11, DRESS)}
-      <ellipse cx="-40" cy="13" rx="6" ry="4.5" fill="#241c17" stroke={INK} strokeWidth="2.2" transform="rotate(16 -40 13)" />
-
-      {/* torso */}
+      {/* Torso. Narrower at the waist and tipped, so the shoulders lag behind the hips
+          instead of lying square to them. */}
       <path
-        d="M20 -11 Q24 0 20 11 L-5 9 Q-9 0 -5 -9 Z"
+        d="M18 -10 Q23 -1 19 10 Q6 13 -6 9 Q-10 1 -6 -8 Q4 -12 18 -10 Z"
         fill={DRESS}
         stroke={INK}
         strokeWidth="2.4"
         strokeLinejoin="round"
       />
-      {/* a fold in the coat, so the torso is not one flat slab */}
-      <path d="M8 -8 Q5 0 8 8" fill="none" stroke={INK} strokeWidth="1.6" opacity="0.35" />
+      {/* The coat gathers where her weight has rolled onto one hip. */}
+      <path d="M6 -8 Q2 1 6 9" fill="none" stroke={INK} strokeWidth="1.5" opacity="0.32" />
+      <path d="M-2 -6 Q-5 1 -2 7" fill="none" stroke={INK} strokeWidth="1.2" opacity="0.2" />
 
-      {/* the near arm, fallen across into her own blood */}
-      {limb("M15 9 L3 21 L-9 24", 9, DRESS)}
-      <circle cx="-13" cy="25" r="5.4" fill={SKIN} stroke={INK} strokeWidth="2.2" />
-      <path d="M-16 21 l-3 -3 M-18 25 l-4 1 M-16 29 l-2 3" stroke={INK} strokeWidth="1.6" fill="none" strokeLinecap="round" />
+      {/* The one arm that shows. Her other is under her, which is where a rolled shoulder
+          puts it, and drawing it anyway was half the reason the figure read as a heap.
+          This one has come to rest out in her own blood, elbow bent, fingers open. */}
+      // Thinner than a leg and pointed a different way — down toward the camera rather than
+      // off along the same axis as her legs. Matched in weight and direction to them, it
+      // read as a third leg coming out of her hip.
+      {limb(
+        "M14 9 Q16 20 10 28",
+        6,
+        DRESS,
+        <>
+          <circle cx="9" cy="33.5" r="4.2" fill={SKIN} stroke={INK} strokeWidth="2.2" />
+          <path
+            d="M6 31.4 l-2.6 -1.4 M5.2 34.6 l-3.4 0.4 M7.4 37 l-1.4 2.6"
+            stroke={INK}
+            strokeWidth="1.4"
+            fill="none"
+            strokeLinecap="round"
+          />
+        </>,
+      )}
 
-      {/* neck */}
-      <path d="M20 -6 L28 -5 L28 5 L20 6 Z" fill={SKIN} stroke={INK} strokeWidth="2.2" strokeLinejoin="round" />
+      {/* Neck, short and angled: the head has rolled, it has not been set down straight. */}
+      <path d="M17 -6 L25 -6 L26 4 L18 5 Z" fill={SKIN} stroke={INK} strokeWidth="2.2" strokeLinejoin="round" />
 
-      {/* head, fallen to one side */}
-      <g transform="translate(37 1) rotate(16)">
-        {/* hair spread on the floor, behind the face */}
+      {/* Head, chin fallen toward her shoulder. Smaller than it was — the old one was nearly
+          as wide as the torso, which is what made the whole figure read as a rag doll. */}
+      <g transform="translate(32 0) rotate(24)">
+        {/* hair spread out on the floor under her, drawn behind the face */}
         <path
-          d="M2 -11 Q16 -17 20 -4 Q23 8 12 14 Q19 3 13 -3 Q8 -9 2 -11 Z"
+          d="M1 -9 Q14 -14 17 -3 Q19 7 10 12 Q16 2 11 -2 Q7 -7 1 -9 Z"
           fill={HAIR}
           stroke={INK}
-          strokeWidth="2"
+          strokeWidth="1.9"
           strokeLinejoin="round"
         />
         <path
-          d="M-2 -12 Q-14 -14 -18 -4 Q-11 -8 -3 -7 Z"
+          d="M-2 -10 Q-13 -12 -16 -3 Q-10 -7 -3 -6 Z"
           fill={HAIR}
           stroke={INK}
-          strokeWidth="1.8"
+          strokeWidth="1.7"
           strokeLinejoin="round"
         />
-        <ellipse cx="0" cy="0" rx="10.5" ry="11.5" fill={SKIN} stroke={INK} strokeWidth="2.4" />
+        <ellipse cx="0" cy="0" rx="8.6" ry="9.4" fill={SKIN} stroke={INK} strokeWidth="2.3" />
         {/* hairline over the top of the face */}
         <path
-          d="M-10.5 -3 Q-9 -13 0 -13 Q9 -13 10.5 -3 Q6 -8 0 -8 Q-6 -8 -10.5 -3 Z"
+          d="M-8.6 -2.4 Q-7.4 -10.6 0 -10.6 Q7.4 -10.6 8.6 -2.4 Q4.8 -6.6 0 -6.6 Q-4.8 -6.6 -8.6 -2.4 Z"
           fill={HAIR}
           stroke={INK}
-          strokeWidth="2"
+          strokeWidth="1.9"
           strokeLinejoin="round"
         />
-        {/* eyes crossed out, mouth slack open */}
-        <g stroke={INK} strokeWidth="2.1" strokeLinecap="round">
-          <path d="M-7.4 -2.6 l4.4 4.4 M-3 -2.6 l-4.4 4.4" />
-          <path d="M3 -2.6 l4.4 4.4 M7.4 -2.6 l-4.4 4.4" />
+        {/* Eyes closed, mouth slightly open. Crossed-out eyes are a cartoon gag, and this is
+            the reason every person in the room is being questioned. */}
+        <g stroke={INK} strokeWidth="1.8" strokeLinecap="round" fill="none">
+          <path d="M-6.4 -1 Q-4.2 1.2 -2 -1" />
+          <path d="M2 -1 Q4.2 1.2 6.4 -1" />
         </g>
-        <ellipse cx="0" cy="6.6" rx="2.4" ry="1.8" fill="#5b2b2b" stroke={INK} strokeWidth="1.6" />
+        <ellipse cx="0.4" cy="5.4" rx="1.9" ry="1.5" fill="#5b2b2b" stroke={INK} strokeWidth="1.4" />
       </g>
     </g>
   );
@@ -156,9 +199,19 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
     // behind a shoulder in an eight-man one, which is the wrong thing to leave to chance.
     // Downstage of everyone's feet she is always visible and always lit, and the men are
     // standing over her instead of in front of her.
-    const bodyX = gaps[Math.floor(r() * gaps.length)];
-    const left = bodyX < 80;
-    const bodyY = 66 + r() * 2;
+    // Centre of the room, every case.
+    //
+    // She used to be dealt into a random gap in the lineup, which put her under somebody's
+    // name tag as often as not and made the composition different for no reason each time.
+    // The room is symmetrical and the light hangs over the middle of it: that is where the
+    // camera is looking, so that is where she is.
+    const bodyX = 80;
+    // Which way she is lying, and therefore which way the killer walked out. Alternated by
+    // case rather than derived from her position, which is now the same in every room.
+    const left = variant % 2 === 0;
+    // Lifted with the lineup. Everything downstream — the pool, the spatter and the prints
+    // walking out — is measured from here, so the whole scene travels together.
+    const bodyY = 62 + r() * 2;
     const exitX = left ? 6 + r() * 14 : 154 - r() * 14;
 
     const pool = blob(r, bodyX + (r() < 0.5 ? 1.5 : -1.5), bodyY + 1.5, 7 + r() * 2);

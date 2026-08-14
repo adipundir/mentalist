@@ -56,7 +56,7 @@ function placement(i: number, n: number) {
     // off both edges, and a lineup with its outermost men cropped reads as a bug.
     x: 19 + t * 62,
     /** Percent up from the bottom of the scene, further back stands higher. */
-    bottom: 26 + bow * 8,
+    bottom: 30 + bow * 8,
     scale: 1 - bow * 0.24,
     /** Painter's algorithm, nearer figures draw over further ones. */
     z: Math.round((1 - bow) * 100),

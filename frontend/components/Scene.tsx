@@ -83,18 +83,9 @@ export function Scene({
   const [chosen, setChosen] = useState<number | null>(null);
   const [line, setLine] = useState<Line | null>(null);
 
-  // Open on the room, then a beat of narration so the player reads the space before the
-  // interface arrives.
-  useEffect(() => {
-    setLine({
-      text:
-        `Every one of these ${g.n} was here, and every one of them has an account of it. ` +
-        `One account cannot be true, and the man giving it is Red John.`,
-      tone: "narrator",
-    });
-    const id = setTimeout(() => setLine(null), 3200);
-    return () => clearTimeout(id);
-  }, [g.n]);
+  // No opening narration here. The case card the player just clicked through says the same
+  // thing at more length, and saying it again in a bar that slides away three seconds later
+  // is the same paragraph twice: once in a modal, once underneath it.
 
   // Room tone and the music both run for the life of the scene.
   useEffect(() => {
@@ -235,7 +226,16 @@ export function Scene({
           sentence someone had cut in two. The room already tells the player what to do: the
           figures are clickable and the account appears when one of them talks. */}
       {g.allSpoken && stakePanel && (
-        <div className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-12 sm:px-7">
+        <div
+          className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-14 sm:px-7"
+          // Not a panel: no edges, no box, just the floor going dark under the type. The
+          // room reaches the bottom of the frame either way, but a stake row laid over a
+          // body and a trail of blood is a stake row nobody can read.
+          style={{
+            background:
+              "linear-gradient(transparent, rgb(6 5 7 / 0.72) 38%, rgb(6 5 7 / 0.94) 100%)",
+          }}
+        >
           {/* Nothing behind it. No box, no wash: the room runs all the way to the bottom of
               the frame and the money sits on top of it. */}
           <div className="mx-auto max-w-[1100px] py-1">{stakePanel}</div>

@@ -54,16 +54,6 @@ interface Row {
  */
 const DEFAULT_GRACE_MS = 60 * 60 * 1000;
 
-/**
- * Gas for `payout`, set by hand instead of estimated.
- *
- * A quick-pick ticket costs 1,305,946 gas on this chain, measured, and the contract buys up
- * to five, so a full collection is around 6.5M. The public RPCs refuse any single transaction
- * over roughly 16.7M outright, which is what this has to stay under: it was set to 120M and
- * the node rejected every ticket payout before it was ever mined. Unused gas is not charged,
- * so the headroom above 6.5M costs nothing.
- */
-const PAYOUT_GAS = 11_000_000n;
 
 export function Settlement({
   caseId,
@@ -374,11 +364,8 @@ export function Settlement({
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
             You&rsquo;re in for <span className="text-brass">${usdc(row.share)}</span> of a $
-            {usdc(row.pot)} pot, taken off the people who read the room wrong. Take it as cash,
-            or take it in Megapot tickets and the house adds{" "}
-            <span className="text-brass">five percent</span> on top: Megapot pays a referral on
-            that purchase worth twice the bonus, so the better deal for you is the better deal
-            for us. Tickets cap at a hundred a payout and the rest comes back as USDC.
+            {usdc(row.pot)} pot. Take it as cash, or in Megapot tickets for{" "}
+            <span className="text-brass">five percent more</span>.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button
@@ -392,7 +379,6 @@ export function Settlement({
                     args: [caseId, true],
                     account: address!,
                     chain: wallet!.chain,
-                    gas: PAYOUT_GAS,
                   }),
                 )
               }
@@ -413,7 +399,6 @@ export function Settlement({
                     args: [caseId, false],
                     account: address!,
                     chain: wallet!.chain,
-                    gas: PAYOUT_GAS,
                   }),
                 )
               }
