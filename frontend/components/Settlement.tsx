@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { decodeEventLog } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
-import { MENTALIST_ABI, MENTALIST_ADDRESS, txUrl } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS, MEGAPOT, txUrl } from "@/lib/contracts";
 import { usdc } from "@/lib/market";
 import { countdown } from "@/lib/schedule";
 
@@ -27,6 +27,16 @@ import { countdown } from "@/lib/schedule";
  */
 
 type Busy = "paying" | "cashing" | null;
+
+const JACKPOT_ABI = [
+  {
+    type: "function",
+    name: "ticketPrice",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+] as const;
 
 interface Row {
   closesAt: number;
@@ -72,6 +82,7 @@ export function Settlement({
   const [error, setError] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<{ label: string; hash: string }[]>([]);
   const [ticketCountHere, setTicketCountHere] = useState<number | null>(null);
+  const [ticketPrice, setTicketPrice] = useState<bigint | null>(null);
   /** Which form the payout took. Both buttons set the same `paid` flag on chain. */
   const tookTickets = receipts.some((r) => r.label === "TICKETS BOUGHT");
   /**
@@ -99,6 +110,14 @@ export function Settlement({
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
   }, []);
+
+  useEffect(() => {
+    if (!pub) return;
+    void pub
+      .readContract({ address: MEGAPOT.jackpot, abi: JACKPOT_ABI, functionName: "ticketPrice" })
+      .then((price) => setTicketPrice(price as bigint))
+      .catch(() => setTicketPrice(null));
+  }, [pub]);
 
   useEffect(() => {
     if (!pub) return;
@@ -204,6 +223,7 @@ export function Settlement({
           const mentalistLogs = receipt.logs.filter(
             (log) => log.address.toLowerCase() === MENTALIST_ADDRESS.toLowerCase(),
           );
+          let orderedCount: number | null = null;
           for (const log of mentalistLogs) {
             try {
               const event = decodeEventLog({
@@ -212,14 +232,19 @@ export function Settlement({
                 topics: log.topics,
               });
               if (event.eventName === "PaidOut") {
-                setTicketCountHere(event.args.ticketIds.length);
+                // Batch payouts emit PaidOut with no IDs because Megapot mints later.
+                // Only a direct purchase has IDs to count here.
+                if (event.args.ticketIds.length > 0 && orderedCount === null) {
+                  orderedCount = event.args.ticketIds.length;
+                }
               } else if (event.eventName === "BatchOrdered") {
-                setTicketCountHere(Number(event.args.tickets));
+                orderedCount = Number(event.args.tickets);
               }
             } catch {
               /* Ignore unrelated Mentalist events in the receipt. */
             }
           }
+          if (orderedCount !== null) setTicketCountHere(orderedCount);
         }
         setReceipts((r) => [...r, { label, hash }]);
         if (kind === "paying" || kind === "cashing") setPaidHere(true);
@@ -266,6 +291,9 @@ export function Settlement({
   );
 
   const closed = row !== null && now >= row.closesAt;
+  const ticketBudget = row ? (row.share * 105n) / 100n : 0n;
+  const ticketEstimate = ticketPrice && ticketPrice > 0n ? ticketBudget / ticketPrice : null;
+  const ticketChange = ticketPrice && ticketPrice > 0n ? ticketBudget % ticketPrice : null;
   return (
     <div className="mt-5 border-t border-ink-3 pt-4">
       <h3 className="mb-3 font-mono text-[15px] tracking-file text-bone-dim sm:text-[17px]">
@@ -334,7 +362,10 @@ export function Settlement({
                 <span className="flex items-center gap-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src="/brand/megapot-light.svg" alt="" className="block h-[11px] w-auto" />
-                  <span>${usdc((row.share * 105n) / 100n)} IN TICKETS</span>
+                  <span>
+                    ${usdc(ticketBudget)} IN TICKETS · {ticketEstimate === null ? "…" : ticketEstimate.toString()} TICKETS
+                    {ticketChange !== null && ` · $${usdc(ticketChange)} USDC CHANGE`}
+                  </span>
                 </span>
               )}
             </Button>
