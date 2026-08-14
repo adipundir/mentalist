@@ -26,13 +26,17 @@ const queryClient = new QueryClient();
 const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || "";
 
 /**
- * A named wallet list instead of whatever the page announces about itself.
+ * A named list *and* whatever the browser announces about itself.
  *
- * EIP-6963 discovery is deduplicated by uuid rather than by wallet id, and Phantom announces
- * itself more than once with a fresh uuid each time. Two announcements become two connectors
- * carrying the same `app.phantom` id, React sees two children under one key in the wallet
- * modal, and warns. Naming the wallets ourselves gives exactly one entry per wallet, and
- * `injectedWallet` at the end still catches whatever else the browser has installed.
+ * Discovery was switched off here once, to stop Phantom announcing itself twice with a fresh
+ * uuid each time and putting two `app.phantom` entries under one React key. It fixed the
+ * warning and cost the wallet nobody can do without: MetaMask is not in the list below,
+ * because RainbowKit's entry for it wants a WalletConnect project id and there is not one,
+ * so a build with discovery off simply had no MetaMask in it at all. A duplicate key is a
+ * line in a console. A missing MetaMask is a player who cannot play.
+ *
+ * So discovery stays on and the named list is a floor, not a ceiling: these appear whether
+ * or not they announce themselves, and anything else installed appears because it does.
  */
 const { wallets: popular } = getDefaultWallets();
 
@@ -53,8 +57,6 @@ const config = projectId
       projectId,
       chains: [activeChain],
       wallets,
-      // Off, or the discovered duplicates come straight back in beside the named list.
-      multiInjectedProviderDiscovery: false,
       ssr: true,
     })
   : createConfig({
@@ -64,7 +66,6 @@ const config = projectId
       // list is the browser's own wallets. Named rather than discovered for the same reason
       // as above, and none of these needs a project id to connect.
       connectors: connectorsForWallets([INSTALLED], { appName: "MENTALIST", projectId: "" }),
-      multiInjectedProviderDiscovery: false,
       ssr: true,
     });
 
