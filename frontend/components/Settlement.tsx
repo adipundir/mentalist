@@ -258,11 +258,11 @@ export function Settlement({
       {row === null ? (
         <Waiting>READING THE FILE…</Waiting>
       ) : row.stake === 0n ? (
-        <p className="font-body text-[13px] leading-relaxed text-bone">
+        <p className="font-body text-[15px] leading-relaxed text-bone">
           You have no money on this case, so there is nothing to close out.
         </p>
       ) : !closed ? (
-        <p className="font-body text-[13px] leading-relaxed text-bone">
+        <p className="font-body text-[15px] leading-relaxed text-bone">
           Your pick is sealed until the case closes.{" "}
           <span className="text-brass">Result in {countdown(row.closesAt - now)}.</span>
         </p>
@@ -275,7 +275,7 @@ export function Settlement({
               then the filing reverted anyway. A late filer falls through to the branch below. */
       !row.resolved && !row.settled && now < row.closesAt + graceMs ? (
         <>
-          <p className="font-body text-[13px] leading-relaxed text-bone">
+          <p className="font-body text-[15px] leading-relaxed text-bone">
             Case closed. Working out the result on chain, which takes a moment.
           </p>
           {/* The keeper does this for the whole room on a schedule, so nobody has to press
@@ -287,7 +287,7 @@ export function Settlement({
         </>
       ) : !row.settled ? (
         <>
-          <p className="font-body text-[13px] leading-relaxed text-bone">
+          <p className="font-body text-[15px] leading-relaxed text-bone">
             {!row.resolved
               ? "No result was recorded for you on this case."
               : row.won
@@ -318,7 +318,7 @@ export function Settlement({
           </Button>
         </>
       ) : row.paid ? (
-        <p className="font-body text-[13px] leading-relaxed text-bone">
+        <p className="font-body text-[15px] leading-relaxed text-bone">
           {/* `refund` and `payout` both set the same paid flag, so this branch has to say
               which one happened or it tells a refunded player they are holding lottery
               tickets. `won` separates them exactly: only a winner can be paid out, and a
@@ -333,7 +333,7 @@ export function Settlement({
         </p>
       ) : row.winningStake === 0n ? (
         <>
-          <p className="font-body text-[13px] leading-relaxed text-bone">
+          <p className="font-body text-[15px] leading-relaxed text-bone">
             Nobody caught him, so every stake goes back.
           </p>
           <Button
@@ -357,7 +357,7 @@ export function Settlement({
         </>
       ) : row.won ? (
         <>
-          <p className="font-body text-[13px] leading-relaxed text-bone">
+          <p className="font-body text-[15px] leading-relaxed text-bone">
             <span className="text-brass">Congratulations, you caught the killer.</span> Choose
             your reward.
           </p>
@@ -417,7 +417,7 @@ export function Settlement({
           </div>
         </>
       ) : (
-        <p className="font-body text-[13px] leading-relaxed text-bone">
+        <p className="font-body text-[15px] leading-relaxed text-bone">
           The books are closed. Your stake belongs to whoever read the room correctly.
         </p>
       )}
