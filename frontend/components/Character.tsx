@@ -71,10 +71,10 @@ export interface CharacterSpec {
   /**
    * Whether this person reads as a woman.
    *
-   * Here for the narrator rather than the drawing: the speech engine has no idea who it is
-   * reading for, and a lineup where half the men answer in a woman's voice is a lineup
-   * nobody believes. Optional, and absent means "not specified", which the voice picker
-   * treats as the larger, mixed pool rather than as a man.
+   * Here for the voice recordings rather than the drawing: `scripts/voices.ts` picks each
+   * suspect's reader from a gendered pool, and a lineup where half the men answer in a
+   * woman's voice is a lineup nobody believes. Absent means "not specified", which is
+   * recorded from the masculine pool.
    */
   feminine?: boolean;
 }
@@ -385,7 +385,7 @@ function HangingArm({ spec, armIn }: { spec: CharacterSpec; armIn: number }) {
           its own outline runs straight across the end of the sleeve and the hand reads as a
           ball stuck onto the arm rather than as a hand coming out of it. */}
       <circle cx="25" cy="163.5" r="6.4" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
-      <path d="M31 86 Q18 126 19 158.5 L31 159.5 Q31 126 38 88 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+      <path d="M31 92 Q18 126 19 158.5 L31 159.5 Q31 126 38 93.5 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
     </g>
   );
 }
@@ -506,7 +506,7 @@ function Arms({
       {/* his left, screen right */}
       <g transform={`rotate(${-armIn} 69 99)`} style={{ transformOrigin: "69px 99px" }}>
         <circle cx="75" cy="163.5" r="6.4" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
-        <path d="M69 86 Q82 126 81 158.5 L69 159.5 Q69 126 62 88 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <path d="M69 92 Q82 126 81 158.5 L69 159.5 Q69 126 62 93.5 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
       </g>
     </g>
   );

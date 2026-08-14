@@ -3,7 +3,6 @@
 import { useCallback, useState, useRef } from "react";
 import type { Alibi } from "@/lib/casebook";
 import * as sfx from "@/lib/sound";
-import { narrate, stopNarration, toneForSeat, unlockNarrator } from "@/lib/narrator";
 import { playLine, stopVoice } from "@/lib/voice";
 
 /**
@@ -31,11 +30,10 @@ export function useCase({ alibis, caseId }: { alibis: Alibi[]; caseId: number })
    * comparing two stories should not have to hold one of them in their head.
    */
   const interrogate = useCallback(
-    (seat: number, feminine?: boolean) => {
+    (seat: number) => {
       const line = alibis[seat]?.text;
       if (line === undefined) return;
 
-      unlockNarrator();
       sfx.knock(0.9 + (seat % 3) * 0.08);
       sfx.whoosh(); // rides under the camera push-in
 
@@ -47,20 +45,15 @@ export function useCase({ alibis, caseId }: { alibis: Alibi[]; caseId: number })
       // Close his mouth when he stops talking.
       //
       // `saying` is what drives the talking expression, and nothing used to clear it, so a
-      // suspect went on flapping his jaw for the rest of the case. `narrate` resolves when
-      // the utterance ends, so that is the moment to put the face back. The token guards
-      // against a stale utterance landing after the player has moved on to somebody else.
+      // suspect went on flapping his jaw for the rest of the case. The recording resolves
+      // when it ends, which is the moment to put the face back. The token guards against a
+      // stale line landing after the player has moved on to somebody else.
       const token = ++speechToken.current;
-      // The recording first, and the browser's own voice only if there is no recording for
-      // this seat. Both resolve when the mouth stops moving, which is what closes it.
-      void playLine(caseId, seat)
-        .then((played) => {
-          if (played || speechToken.current !== token) return played;
-          return narrate(line, { ...toneForSeat(seat), seat, feminine }).then(() => true);
-        })
-        .then(() => {
-          if (speechToken.current === token) setSaying(null);
-        });
+      // The recording is the voice. It resolves when the mouth stops moving — or at once,
+      // for a seat with no file, in which case the bubble does the talking.
+      void playLine(caseId, seat).then(() => {
+        if (speechToken.current === token) setSaying(null);
+      });
     },
     [alibis, caseId],
   );
@@ -74,7 +67,6 @@ export function useCase({ alibis, caseId }: { alibis: Alibi[]; caseId: number })
    */
   const stepBack = useCallback(() => {
     speechToken.current++;
-    stopNarration();
     stopVoice();
     setWitness(null);
     setSaying(null);

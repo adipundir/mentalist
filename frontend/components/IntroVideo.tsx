@@ -2,15 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
-import { loadVoices, unlockNarrator } from "@/lib/narrator";
 
 /**
  * The loading screen, which is a film.
  *
- * It runs after BEGIN, so the click has already bought the two things a browser will not
- * give before a gesture: an unlocked audio context and the narrator's voice list. Both are
- * loaded underneath the video rather than on a screen of their own, along with the webfonts,
- * so the wait is spent watching something instead of watching a bar.
+ * It runs after START, so the click has already unlocked audio for everything that follows.
+ * The webfonts settle underneath the video rather than on a screen of their own, so the wait
+ * is spent watching something instead of watching a bar.
  *
  * It fades up from black, plays once, fades back to black, and only then hands over to the
  * board. If the file will not play at all, the handover still happens — a broken video must
@@ -41,8 +39,6 @@ export function IntroVideo({ onReady }: { onReady: () => void }) {
     if (started.current) return;
     started.current = true;
 
-    unlockNarrator();
-    void loadVoices();
     if (typeof document !== "undefined" && "fonts" in document) {
       void (document as unknown as { fonts: { ready: Promise<unknown> } }).fonts.ready;
     }

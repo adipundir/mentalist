@@ -155,8 +155,7 @@ export function Scene({
           // the wallet ever opened, so moving the pick then would only change what the screen
           // says, not what was bet. Hearing him out again stays free.
           onFocus={(seat) => {
-            // The speaker's own voice, not the one the alphabet happened to hand his seat.
-            g.interrogate(seat, suspects[seat]?.character.feminine);
+            g.interrogate(seat);
             // Anyone, at any point. Naming a man used to require hearing all of them first,
             // which is a rule the game never had a reason to enforce: the accounts are free
             // and public, and a player who already knows who they like should not have to

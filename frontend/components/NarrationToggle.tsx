@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { isNarratorMuted, setNarratorMuted, stopNarration } from "@/lib/narrator";
-import { stopVoice } from "@/lib/voice";
+import { isVoiceMuted, setVoiceMuted } from "@/lib/voice";
 
 /**
  * The voice, off everywhere.
@@ -26,14 +25,10 @@ export function NarrationToggle() {
     <button
       type="button"
       onClick={() => {
-        const next = !isNarratorMuted();
-        setNarratorMuted(next);
-        // Whoever is talking right now stops talking now, rather than finishing the
-        // paragraph the player just asked to be rid of.
-        if (next) {
-          stopNarration();
-          stopVoice();
-        }
+        // `setVoiceMuted` also stops whoever is mid-sentence, rather than letting them
+        // finish the paragraph the player just asked to be rid of.
+        const next = !isVoiceMuted();
+        setVoiceMuted(next);
         setOff(next);
       }}
       className="fixed bottom-3 right-3 z-[90] cursor-pointer border border-ink-3 bg-ink/80 px-2 py-1 font-mono text-[9px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
