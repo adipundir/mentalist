@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, createWalletClient, fallback, http, parseAbiItem } from "viem";
+import { createPublicClient, createWalletClient, fallback, http } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
-import { DEPLOY_BLOCK, MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { activeChain } from "@/lib/network";
 import { attestVerdict } from "@/lib/inco";
 import { CASEBOOK } from "@/lib/casebook";
@@ -27,10 +27,6 @@ export const dynamic = "force-dynamic";
 export const maxDuration = 60;
 
 
-const STAKED = parseAbiItem(
-  "event Staked(uint16 indexed caseId, address indexed player, uint256 amount, uint128 pot)",
-);
-
 function keeperAccount() {
   const key = process.env.KEEPER_PRIVATE_KEY;
   if (!key) return null;
@@ -52,6 +48,15 @@ let lastOpenRun = 0;
 const OPEN_COOLDOWN_MS = 60_000;
 
 export async function GET(request: Request) {
+  const requestedCase = new URL(request.url).searchParams.get("caseId");
+  let requestedCaseId: number | null = null;
+  if (requestedCase !== null) {
+    requestedCaseId = Number(requestedCase);
+    if (!Number.isInteger(requestedCaseId) || requestedCaseId < 0 || requestedCaseId >= CASEBOOK.length) {
+      return NextResponse.json({ error: "invalid case id" }, { status: 400 });
+    }
+  }
+
   const secret = process.env.KEEPER_SECRET;
   const auth = request.headers.get("authorization");
   // Vercel signs its own cron calls, and the GitHub schedule carries the secret. Both skip
@@ -94,7 +99,8 @@ export async function GET(request: Request) {
   })) as bigint;
   const report: Record<string, unknown>[] = [];
 
-  for (let caseId = 0; caseId < CASEBOOK.length; caseId++) {
+  const caseIds = requestedCaseId === null ? CASEBOOK.map((_, caseId) => caseId) : [requestedCaseId];
+  for (const caseId of caseIds) {
     const step: Record<string, unknown> = { caseId };
     try {
       const c = (await publicClient.readContract({
@@ -105,23 +111,31 @@ export async function GET(request: Request) {
       })) as readonly [bigint, number, bigint, bigint, number, number, boolean, boolean, number];
 
       const [closesAt, , , , entrants, , settled, exists] = c;
-      if (!exists || settled) continue;
+      if (!exists) {
+        step.state = "case does not exist";
+        report.push(step);
+        continue;
+      }
+      if (settled) {
+        step.state = "already settled";
+        step.settled = true;
+        report.push(step);
+        continue;
+      }
       if (now < closesAt) {
         step.state = "still taking money";
         report.push(step);
         continue;
       }
 
-      // Everyone who put money on this room. Reading it from the log rather than keeping a
-      // list means the keeper has no state of its own to fall out of step with the chain.
-      const staked = await publicClient.getLogs({
+      // The contract stores the player list at stake time. Settlement therefore does not
+      // depend on explorer indexing or a wide RPC log scan.
+      const room = (await publicClient.readContract({
         address: MENTALIST_ADDRESS,
-        event: STAKED,
-        args: { caseId },
-        fromBlock: DEPLOY_BLOCK,
-        toBlock: "latest",
-      });
-      const room = [...new Set(staked.map((l) => l.args.player as `0x${string}`))];
+        abi: MENTALIST_ABI,
+        functionName: "players",
+        args: [caseId],
+      })) as `0x${string}`[];
       step.entrants = Number(entrants);
 
       const unfiled: `0x${string}`[] = [];
@@ -218,8 +232,8 @@ export async function GET(request: Request) {
         step.settled = true;
         if (Number(after[4]) > Number(after[8])) {
           // Everyone here is now permanently unfiled: `resolve` is shut and this closes the
-          // books. They refund rather than win, so no money is lost, but a correct player just
-          // failed to get paid and that must not be logged as a normal settlement.
+          // books. A correct player just failed to get paid, so this must not be logged as a
+          // normal settlement.
           step.unfiledAtSettle = Number(after[4]) - Number(after[8]);
         }
       } else {

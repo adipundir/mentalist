@@ -22,6 +22,10 @@ export function StoryCard({
   continueLabel = "CONTINUE",
   extra,
   voice,
+  compact = false,
+  secondaryLabel,
+  onSecondary,
+  dismissOnBackdrop = false,
 }: {
   chapter?: string;
   title: string;
@@ -34,6 +38,11 @@ export function StoryCard({
   extra?: React.ReactNode;
   /** Name of a pre-recorded narration in /public/vo, without extension. */
   voice?: string;
+  /** Results cards should size to their content instead of reserving briefing space. */
+  compact?: boolean;
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+  dismissOnBackdrop?: boolean;
 }) {
   const [shown, setShown] = useState(0);
   const [muted, setMuted] = useState(isVoiceMuted());
@@ -65,7 +74,11 @@ export function StoryCard({
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       className="fixed inset-0 z-[80] flex items-center justify-center bg-ink/96 p-5 backdrop-blur-sm"
-      onClick={() => (!done ? setShown(body.length) : extra ? undefined : onContinue())}
+      onClick={(event) => {
+        if (event.target !== event.currentTarget) return;
+        if (!done) setShown(body.length);
+        else if (dismissOnBackdrop || !extra) onContinue();
+      }}
       role="button"
       tabIndex={0}
       onKeyDown={(e) => {
@@ -80,7 +93,7 @@ export function StoryCard({
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.03, duration: 0.18 }}
-        className="paper w-full max-w-[640px] border-2 border-ink-3 p-7 sm:p-9"
+        className={`paper w-full ${compact ? "max-w-[1100px]" : "max-w-[640px]"} max-h-[calc(100vh-2rem)] overflow-y-auto border-2 border-ink-3 p-7 sm:p-9`}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -92,19 +105,21 @@ export function StoryCard({
             </h2>
           </div>
 
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              const next = !muted;
-              setMuted(next);
-              setVoiceMuted(next);
-              if (!next && voice) void playCue(voice);
-            }}
-            className="shrink-0 cursor-pointer border border-ink-3 px-2 py-1 font-mono text-[9px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
-          >
-            {muted ? "NARRATION OFF" : "NARRATION ON"}
-          </button>
+          {voice && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                const next = !muted;
+                setMuted(next);
+                setVoiceMuted(next);
+                if (!next) void playCue(voice);
+              }}
+              className="shrink-0 cursor-pointer border border-ink-3 px-2 py-1 font-mono text-[9px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
+            >
+              {muted ? "NARRATION OFF" : "NARRATION ON"}
+            </button>
+          )}
         </div>
 
         <div className="mt-5 flex gap-5">
@@ -122,11 +137,13 @@ export function StoryCard({
             </div>
           )}
 
-          <p
-            className={`min-h-[7rem] flex-1 font-body text-[16px] leading-relaxed text-bone ${done ? "" : "caret"}`}
-          >
-            {body.slice(0, shown)}
-          </p>
+          {body && (
+            <p
+              className={`${compact ? "" : "min-h-[7rem]"} flex-1 font-body text-[16px] leading-relaxed text-bone ${done ? "" : "caret"}`}
+            >
+              {body.slice(0, shown)}
+            </p>
+          )}
         </div>
 
         {extra && <div onClick={(e) => e.stopPropagation()}>{extra}</div>}
@@ -135,16 +152,30 @@ export function StoryCard({
           <span className="font-mono text-[9px] tracking-file text-bone-dim/75">
             {!done ? "CLICK TO SKIP" : extra ? "" : "CLICK ANYWHERE TO CONTINUE"}
           </span>
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              onContinue();
-            }}
-            className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2 font-mono text-[10px] tracking-file text-blood-hot hover:bg-blood-hot/25"
-          >
-            {continueLabel}
-          </button>
+          <div className="flex flex-wrap justify-end gap-2">
+            {secondaryLabel && onSecondary && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSecondary();
+                }}
+                className="cursor-pointer border border-ink-3 px-5 py-2 font-mono text-[10px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
+              >
+                {secondaryLabel}
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onContinue();
+              }}
+              className="cursor-pointer border border-blood-hot bg-blood-hot/15 px-5 py-2 font-mono text-[10px] tracking-file text-blood-hot hover:bg-blood-hot/25"
+            >
+              {continueLabel}
+            </button>
+          </div>
         </div>
       </motion.div>
     </motion.div>

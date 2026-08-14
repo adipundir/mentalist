@@ -110,8 +110,6 @@ async function main() {
 
     // The narration around them, all in the narrator's voice.
     await cue(`c${caseId}-open`, chapter.opening, NARRATOR, `case ${caseId} opening`);
-    await cue(`c${caseId}-win`, chapter.successText, NARRATOR, `case ${caseId} solved`);
-    await cue(`c${caseId}-lose`, chapter.failureText, NARRATOR, `case ${caseId} missed`);
   }
 
   // Said once, in every case, while the bet is in the ground and the room is still closed.

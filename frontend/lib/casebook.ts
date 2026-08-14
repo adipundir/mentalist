@@ -5,27 +5,14 @@
  * and none of it behind a wallet: a player opens a case and hears the whole room without
  * ever touching the chain.
  *
- * Each case carries exactly one account that is logically impossible. Which one it is does
- * the list is who gives it: `alibis[i]` belongs to `roster[i]`. That mapping is fixed and
- * public, which is the whole reason the room needs no chain call to open.
- *
- * That same index is the person id encrypted and handed to `Casebook.openCase`. It is worth
- * being precise about what the ciphertext buys, because it is not secrecy from a careful
- * reader: anyone who opens this file has the answer. It buys two other things. Settlement is
- * trustless, since the answer is fixed before the first bet and the operator can neither
- * move it nor argue with it afterwards. And every bet is private, so nobody can watch the
- * informed money and simply follow it.
- *
- * Trustless there means immutable, not correct. No contract can check that the sealed index
- * not appear in this file: the answer key is server side, so nobody can read a case out of
- * the bundle before betting on it.
- * that was opened on a different one, so that much rests on whoever authored it.
+ * The answer key does not live here. The roster and alibis are public game content; the
+ * person id used to open the on-chain case is encrypted by the owner from local env and the
+ * post-settlement explanation is loaded by the API from server-only env.
  */
 
 export interface Alibi {
   /** What he says, in his own words. */
   text: string;
-  /** The one account in each case that cannot be true. Its index is the killer's person id. */
 }
 
 export interface CaseFile {
@@ -45,9 +32,6 @@ export interface CaseFile {
   roster: string[];
   /** One per suspect, in seat order: `alibis[i]` is what `roster[i]` says. */
   alibis: Alibi[];
-  /** Why that account cannot be true. Shown only once the case is closed. */
-  successText: string;
-  failureText: string;
 }
 
 export const CASEBOOK: CaseFile[] = [
@@ -80,8 +64,6 @@ export const CASEBOOK: CaseFile[] = [
         text: "I went to the cellar for another bottle, and that sticking door kept me down there a good while.",
       },
     ],
-    successText: "You got him. The man who swore he slept through the hour was upstairs the whole time.",
-    failureText: "Wrong man. The real one was still in the room when you pointed.",
   },
   {
     label: "Chapter II",
@@ -118,8 +100,6 @@ export const CASEBOOK: CaseFile[] = [
         text: "I was in the bathroom being sick from that takeout, head over the sink most of the hour. I would rather you left that out.",
       },
     ],
-    successText: "You got him. He cannot be behind his own bolted door and out on the floor at the same time.",
-    failureText: "Wrong man. The one who did it walked out past the uniforms.",
   },
   {
     label: "Chapter III",
@@ -171,8 +151,6 @@ export const CASEBOOK: CaseFile[] = [
         text: "A quarter rolled off my tray and under the tables. I was down on my hands and knees when it happened.",
       },
     ],
-    successText: "You got him. There was no queue, so there was nobody in front of him to wait for.",
-    failureText: "Wrong man. Your money is gone and the smile is still on the tile.",
   },
   {
     label: "Chapter IV",
@@ -220,8 +198,6 @@ export const CASEBOOK: CaseFile[] = [
         text: "I was marking up the racing page with a pencil stub. I have never bet a dollar, I just like the names.",
       },
     ],
-    successText: "You got him. Nobody makes that drive in four minutes.",
-    failureText: "Wrong man. He left while everyone was looking at somebody else.",
   },
   {
     label: "Chapter V",
@@ -258,8 +234,6 @@ export const CASEBOOK: CaseFile[] = [
         text: "I was in the washroom being sick, and I stayed in there a good while after, sweating it out.",
       },
     ],
-    successText: "You got him. He could not have seen what he described from where he says he stood.",
-    failureText: "Wrong man. By morning there was a fresh smile on a fresh wall.",
   },
   {
     label: "Chapter VI",
@@ -293,8 +267,6 @@ export const CASEBOOK: CaseFile[] = [
         text: "I went up to change my shirt, the collar had gone soft, and buttons are slow work when you have had a few.",
       },
     ],
-    successText: "You got him. He described a thing in a state it could not have been in.",
-    failureText: "Wrong man. The one who did it laughed and walked out into the rain.",
   },
   {
     label: "Chapter VII",
@@ -322,7 +294,5 @@ export const CASEBOOK: CaseFile[] = [
         text: "I bolted myself into the vestry when the rain started, nobody else in there the whole hour, and I lost at chess in under twenty moves.",
       },
     ],
-    successText: "You got him. Nobody plays a game alone and loses it.",
-    failureText: "Wrong man. He knew you would look everywhere except at the empty chair.",
   },
 ];

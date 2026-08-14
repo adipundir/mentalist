@@ -23,8 +23,9 @@ import { IBatchPurchaseFacilitator, IJackpot, IJackpotRandomTicketBuyer } from "
  *         themselves are public content and ship in the repository
  *         (`frontend/lib/casebook.ts`), so a careful reader can work the puzzle out. What the
  *         ciphertext buys is that settlement is trustless in one exact sense: the answer is
- *         fixed before the first bet and the operator can neither move it nor argue with it
- *         afterwards. It does not make the operator *correct*. Nothing on chain can check
+ *         fixed before the first bet and the operator cannot change it afterwards. The owner
+ *         may move the closing clock for testing and operations, but cannot rewrite the answer.
+ *         It does not make the operator *correct*. Nothing on chain can check
  *         that the sealed id belongs to the person whose alibi is impossible, so an author
  *         who sealed the wrong name and staked on it would be indistinguishable from someone
  *         who guessed well. `openCase` says what is and is not enforced there.
@@ -101,6 +102,9 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
     mapping(uint16 => Case) public cases;
     mapping(uint16 => mapping(address => Bet)) public bets;
+    /// @dev The wallets that staked in each case. The keeper reads this list directly from
+    /// contract storage; settlement does not depend on an explorer or event-log indexer.
+    mapping(uint16 => address[]) private _players;
 
     /// @dev The killer's person id, per case. Encrypted at rest and never revealed by this
     ///      contract, not even after settlement: the same case can run again.
@@ -134,8 +138,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
     address public resolver;
 
     /// @dev The house cut, taken off the pot at `settle` and only when somebody won. A case
-    ///      nobody solved refunds in full: charging for a game that did not happen is not a
-    ///      rake, and leaving the refund path unraked keeps it exact.
+    ///      nobody solved leaves its pot as house surplus instead of refunding failed guesses.
     uint16 public rakeBps = 500; // 5.00%
     uint16 public constant MAX_RAKE_BPS = 1000; // the ceiling the owner cannot raise past
 
@@ -179,9 +182,9 @@ contract Mentalist is Ownable, ReentrancyGuard {
     ///      GitHub for every five minutes and GitHub delivers roughly hourly, with gaps of an
     ///      hour and a half observed, because it throttles scheduled workflows hard. At ten
     ///      minutes the keeper never once arrived inside the window: it turned up late, found
-    ///      filing closed, and settled a case whose winner had never been filed. Nobody lost
-    ///      money, because a case with no filed winner refunds in full, but the player who
-    ///      read the room correctly did not get paid, which is the same thing as being wrong. `settle` is permissionless and
+    ///      filing closed, and settled a case whose winner had never been filed. A player who
+    ///      read the room correctly may not get paid if they never file, which is the same thing
+    ///      as being wrong. `settle` is permissionless and
     ///      every extra filing shrinks the shares of everyone who filed already, so whoever is
     ///      in first is paid to close the books at the first legal instant. Bounding both ends
     ///      with the same window is what stops that being a race: by the moment anybody may
@@ -201,7 +204,6 @@ contract Mentalist is Ownable, ReentrancyGuard {
     event CreditTaken(uint16 indexed caseId, address indexed player, uint256 amount);
     event ResolverSet(address indexed resolver);
     event PaidOut(uint16 indexed caseId, address indexed player, uint256 share, uint256[] ticketIds);
-    event Refunded(uint16 indexed caseId, address indexed player, uint256 amount);
 
     // ─────────────────────────────────────────── errors
 
@@ -223,7 +225,6 @@ contract Mentalist is Ownable, ReentrancyGuard {
     error InvalidAttestation();
     error BadConfig();
     error NotResolver();
-    error CaseHasMoneyIn();
     error LengthMismatch();
     error NoCredit();
 
@@ -336,6 +337,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
         verdictHandle[caseId][msg.sender] = ebool.unwrap(right);
 
         bets[caseId][msg.sender] = Bet({ stake: uint128(amount), resolved: false, won: false, paid: false });
+        _players[caseId].push(msg.sender);
 
         c.pot += uint128(amount);
         c.entrants += 1;
@@ -346,34 +348,6 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
     // ─────────────────────────────────────────── the result
 
-    /**
-     * @notice Open the answer, once the case is settled and paid.
-     *
-     * @dev Until this is called nobody holds a key to `_answer`: not the owner, not the
-     *      resolver, not a player. The only other grant in this contract is on a player's own
-     *      verdict bit. So the killer's id exists as ciphertext and nothing else, and the
-     *      reveal screen has to ask the chain for it rather than read it out of a file. That
-     *      is the difference between a game that says its answers are sealed and one where
-     *      they are.
-     *
-     *      Gated on `settled`, not on the close. A closed case can still be filed against, and
-     *      handing the answer out in that window would let somebody read it here and act on it
-     *      there. Once the books are shut there is nothing left to trade on.
-     *
-     *      Grants rather than reveals: the caller takes a key and decrypts off chain, so the
-     *      plaintext never touches storage or a log.
-     */
-    /// @notice The handle to decrypt once `revealAnswer` has given you a key to it.
-    function answerHandle(uint16 caseId) external view returns (bytes32) {
-        return euint256.unwrap(_answer[caseId]);
-    }
-
-    function revealAnswer(uint16 caseId) external {
-        Case storage c = cases[caseId];
-        if (!c.exists) revert NoSuchCase();
-        if (!c.settled) revert NotSettled();
-        e.allow(_answer[caseId], msg.sender);
-    }
     /**
      * @notice Take the key to your own verdict bit, once the case has stopped taking money.
      *
@@ -409,15 +383,15 @@ contract Mentalist is Ownable, ReentrancyGuard {
      *      Granting the resolver reveals nothing the market has not already ended: a bit
      *      saying whether a player named him, after the last moment anybody could act on it.
      */
-    function unsealFor(uint16 caseId, address[] calldata players) external {
+    function unsealFor(uint16 caseId, address[] calldata room) external {
         if (msg.sender != resolver) revert NotResolver();
         Case storage c = cases[caseId];
         if (!c.exists) revert NoSuchCase();
         if (block.timestamp < c.closesAt) revert CaseStillOpen();
 
-        for (uint256 i; i < players.length; ++i) {
-            if (bets[caseId][players[i]].stake == 0) continue;
-            e.allow(_correct[caseId][players[i]], msg.sender);
+        for (uint256 i; i < room.length; ++i) {
+            if (bets[caseId][room[i]].stake == 0) continue;
+            e.allow(_correct[caseId][room[i]], msg.sender);
         }
     }
 
@@ -463,19 +437,19 @@ contract Mentalist is Ownable, ReentrancyGuard {
     /// @notice File a whole room in one transaction. What the keeper actually calls.
     function resolveMany(
         uint16 caseId,
-        address[] calldata players,
+        address[] calldata room,
         DecryptionAttestation[] calldata attestations,
         bytes[][] calldata signatures
     ) external {
-        if (players.length != attestations.length || players.length != signatures.length) {
+        if (room.length != attestations.length || room.length != signatures.length) {
             revert LengthMismatch();
         }
-        for (uint256 i; i < players.length; ++i) {
+        for (uint256 i; i < room.length; ++i) {
             // One player already filed for themselves should not strand the rest of the room,
             // so a duplicate is skipped rather than reverted. Everything else still throws:
             // a bad signature or a mismatched handle is a broken batch, not a slow player.
-            if (bets[caseId][players[i]].resolved) continue;
-            _credit(caseId, players[i], attestations[i], signatures[i]);
+            if (bets[caseId][room[i]].resolved) continue;
+            _credit(caseId, room[i], attestations[i], signatures[i]);
         }
     }
 
@@ -520,7 +494,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
      * @dev It opens exactly where `FILING_WINDOW` ends, so a slow filer is never cut out of
      *      their own win by a fast one. Being first here used to be worth the whole pot: file,
      *      settle, and every other winner is locked out of `resolve`, out of `payout` because
-     *      they never filed, and out of `refund` because the case did have a winner.
+     *      they never filed, and out of any payout because the case did have a winner.
      */
     function settle(uint16 caseId) external {
         Case storage c = cases[caseId];
@@ -531,7 +505,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
         // The wait exists to stop a fast filer settling a slow one out of a win they had
         // earned: once the books shut, an unfiled player is locked out of `resolve`, out of
-        // `payout` because they never filed, and out of `refund` because the case did have a
+        // `payout` because they never filed, and out of any payout because the case did have a
         // winner. That risk is a function of who is still missing, not of the clock. With
         // every entrant already filed there is nobody left to cut out, so the window has
         // nothing to protect and waiting it out is dead time the winner pays for.
@@ -542,10 +516,9 @@ contract Mentalist is Ownable, ReentrancyGuard {
         c.settled = true;
 
         // The cut comes off here rather than at the door. Taken on the way in it would have
-        // to be given back on the refund path, and a case nobody solved is a game that did
-        // not happen: there is nothing to charge for. Gated on `winners` it never touches a
-        // refund, and the pot the shares divide is the pot after the cut, so `shareOf` needs
-        // no knowledge of any of this and the shares still telescope to exactly `pot`.
+        // to be given back on a refund path. A no-winner pot is released from `reserved` below,
+        // while a winning pot remains owed to the winners until payout. The pot the shares
+        // divide is after the cut, so `shareOf` needs no knowledge of any of this.
         if (c.winners != 0 && rakeBps != 0) {
             uint256 rake = (uint256(c.pot) * rakeBps) / 10_000;
             if (rake != 0) {
@@ -555,6 +528,13 @@ contract Mentalist is Ownable, ReentrancyGuard {
                 reserved -= rake;
                 emit RakeTaken(caseId, rake);
             }
+        }
+
+        // A failed guess is a loss even when nobody found the answer. Release the no-winner
+        // pot from reserved so it becomes owner-withdrawable surplus, rather than exposing a
+        // payout path that turns every all-loser case into a free game.
+        if (c.winners == 0) {
+            reserved -= c.pot;
         }
 
         emit Settled(caseId, c.pot, c.winningStake, c.winners);
@@ -762,27 +742,6 @@ contract Mentalist is Ownable, ReentrancyGuard {
     }
 
 
-    /**
-     * @notice If nobody named him, everyone gets their stake back.
-     * @dev A pot with no winners has nobody to divide it among, and keeping it would make
-     *      the house the beneficiary of everybody's failure.
-     */
-    function refund(uint16 caseId) external nonReentrant {
-        Case storage c = cases[caseId];
-        if (!c.settled) revert NotSettled();
-        if (c.winningStake != 0) revert DidNotWin();
-
-        Bet storage b = bets[caseId][msg.sender];
-        if (b.stake == 0) revert NothingStaked();
-        if (b.paid) revert AlreadyPaid();
-
-        b.paid = true;
-        reserved -= b.stake;
-        usdc.safeTransfer(msg.sender, b.stake);
-
-        emit Refunded(caseId, msg.sender, b.stake);
-    }
-
     // ─────────────────────────────────────────── views
 
     /// @notice What it costs to open a case or place a bet: one ciphertext ingest.
@@ -800,6 +759,11 @@ contract Mentalist is Ownable, ReentrancyGuard {
         return bets[caseId][player].stake != 0;
     }
 
+    /// @notice All wallets that staked in a case.
+    function players(uint16 caseId) external view returns (address[] memory) {
+        return _players[caseId];
+    }
+
     // ─────────────────────────────────────────── admin
 
     function sweepReferralFees() external {
@@ -807,22 +771,16 @@ contract Mentalist is Ownable, ReentrancyGuard {
     }
 
     /**
-     * @notice Re-time a case that nobody has bet on yet.
+     * @notice Re-time any case that has not settled yet.
      *
      * @dev `closesAt` is otherwise written once, in `openCase`, and a case cannot be opened
-     *      twice. Without this, wanting a case to close sooner meant deploying the whole
-     *      contract again and re-opening every room, which is a lot of moving parts to get
-     *      wrong for the sake of a clock.
-     *
-     *      Refused the moment there is a single entrant, and that is the whole safety of it.
-     *      A player bets against a closing time: shortening it strands somebody who was still
-     *      reading, and lengthening it holds their money longer than they agreed to. An empty
-     *      room has made no such promise to anybody.
+     *      twice. This is intentionally owner-only and exists to let the operator run and
+     *      repeat cases during testing, including rooms that already contain bets. The answer
+     *      and every bet remain unchanged; only the settlement clock moves.
      */
     function reschedule(uint16 caseId, uint64 openFor) external onlyOwner {
         Case storage c = cases[caseId];
         if (!c.exists) revert NoSuchCase();
-        if (c.entrants != 0) revert CaseHasMoneyIn();
         if (c.settled) revert AlreadySettled();
         if (openFor < 10 minutes) revert BadConfig();
 

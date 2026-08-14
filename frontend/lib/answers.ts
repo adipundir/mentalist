@@ -1,16 +1,11 @@
 /**
- * The reasoning behind each case. Prose only.
- *
- * The killer's id is deliberately not in here. Storing it would be storing the answer twice,
- * once encrypted on chain and once in plaintext beside it, and the plaintext copy is the one
- * that gets leaked. `revealAnswer` opens the ciphertext after a case settles and `/api/tell`
- * decrypts it from the chain, so this file cannot give a case away even if it escapes.
- *
- * Server side only, and not in the client bundle.
+ * Post-settlement answer data, loaded from the server-only MENTALIST_ANSWERS environment
+ * variable. This module must never be imported by a client component.
  */
 export interface Answer {
-  /** The explanation shown after a case settles. The killer's id is NOT here: it lives only
-   *  as ciphertext on chain and `/api/tell` decrypts it from there. */
+  /** The server-side answer used only after the contract reports settlement. */
+  name: string;
+  personId: number;
   tell: string;
 }
 

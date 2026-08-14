@@ -7,7 +7,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useAccount, usePublicClient } from "wagmi";
 import { CASEBOOK } from "@/lib/casebook";
 import { lineup, person } from "@/lib/canon";
-import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS, MENTALIST_CASES_ABI } from "@/lib/contracts";
 import { Character } from "@/components/Character";
 import { Scene } from "@/components/Scene";
 import { StoryCard } from "@/components/StoryCard";
@@ -22,6 +22,9 @@ interface CaseRow {
   closesAt: number;
   pot: bigint;
   entrants: number;
+  settled: boolean;
+  /** This wallet already has money on this case. */
+  played: boolean;
   /** Open on chain, not settled, and still inside its window. */
   open: boolean;
 }
@@ -56,12 +59,21 @@ function StoryInner() {
   const [locked, setLocked] = useState(false);
 
   const pub = usePublicClient();
-  const { address } = useAccount();
+  const { address, isConnecting } = useAccount();
+  const previousIndex = useRef(index);
+  const previousAddress = useRef(address);
 
   const chapter = CASEBOOK[index];
   const suspects = useMemo(() => lineup(chapter.roster), [chapter]);
 
   useEffect(() => {
+    const indexChanged = previousIndex.current !== index;
+    const accountChanged =
+      previousAddress.current !== undefined && address !== undefined && previousAddress.current !== address;
+    previousIndex.current = index;
+    previousAddress.current = address;
+    if (!indexChanged && !accountChanged) return;
+
     setPick(null);
     setVerdict(null);
     setRow(null);
@@ -77,21 +89,33 @@ function StoryInner() {
   // eventually promise a player a window the contract will not honour.
   useEffect(() => {
     if (!pub) return;
+    if (isConnecting) return;
     let live = true;
     const read = async () => {
       try {
         const c = await pub.readContract({
           address: MENTALIST_ADDRESS,
-          abi: MENTALIST_ABI,
+          abi: MENTALIST_CASES_ABI,
           functionName: "cases",
           args: [index],
         });
         if (!live) return;
         const closesAt = Number(c[0]) * 1000;
+        const staked = address
+          ? await pub.readContract({
+              address: MENTALIST_ADDRESS,
+              abi: MENTALIST_ABI,
+              functionName: "hasStaked",
+              args: [index, address],
+            })
+          : false;
+        if (!live) return;
         setRow({
           closesAt,
           pot: c[2],
           entrants: Number(c[4]),
+          settled: c[6],
+          played: staked,
           open: c[7] && !c[6] && Date.now() < closesAt,
         });
 
@@ -102,18 +126,9 @@ function StoryInner() {
         // a timer for the pot and the clock, and letting it keep writing the stage would
         // throw a player out of the room every fifteen seconds.
         if (!settled.current) {
-          const staked = address
-            ? await pub.readContract({
-                address: MENTALIST_ADDRESS,
-                abi: MENTALIST_ABI,
-                functionName: "hasStaked",
-                args: [index, address],
-              })
-            : false;
-          if (live) {
-            settled.current = true;
-            setStage(staked ? "closing" : "opening");
-          }
+          settled.current = true;
+          const caseClosed = c[7] && Date.now() >= closesAt;
+          setStage(c[6] || caseClosed || staked ? "closing" : "opening");
         }
       } catch (err) {
         // A failed read must not leave the page blank forever. Show the briefing: the room
@@ -130,7 +145,7 @@ function StoryInner() {
       live = false;
       clearInterval(id);
     };
-  }, [pub, index, address]);
+  }, [pub, index, address, isConnecting]);
 
   // `open` is a snapshot taken by a poll that runs every fifteen seconds, and the clock in the
   // HUD is live, so between the clock reaching zero and the next read the panel would still
@@ -152,6 +167,39 @@ function StoryInner() {
     // forward into. Whatever happened here, the next thing is the board.
     router.push("/cases");
   }
+
+  function leaveClosing() {
+    // A finished room remains an inspectable scene. Its stake panel already receives
+    // `open: false`, so returning here restores interrogation without reopening betting.
+    if (caseClosed || resultIsPublic) {
+      setStage("playing");
+    } else {
+      advance();
+    }
+  }
+
+  const resultIsPublic = row?.settled ?? false;
+  const caseClosed = row ? Date.now() >= row.closesAt : false;
+  const closingChapter =
+    verdict === null
+      ? resultIsPublic
+        ? "RESULTS OPEN"
+        : caseClosed
+          ? "WAITING SETTLEMENT"
+          : "THE MONEY IS DOWN"
+      : verdict
+        ? "CASE CLOSED"
+        : "HE WALKED";
+  const closingBody =
+    verdict === null
+      ? resultIsPublic
+        ? ""
+        : caseClosed
+          ? "The case has stopped taking money. The chain is finishing the verdicts, and the answer remains sealed until settlement."
+          : "Your money is on a name nobody else can read, and it stays that way until the case closes. Nobody can watch what you did and copy it, and nobody, including whoever wrote this case, can move the answer now that there is money against it."
+      : verdict
+        ? "Your verdict was recorded as correct. The answer stays sealed until settlement, then the case file opens."
+        : "Your verdict was recorded as wrong. The answer stays sealed until settlement.";
 
   return (
     <main className="fixed inset-0 overflow-hidden">
@@ -187,6 +235,10 @@ function StoryInner() {
         title={chapter.title}
         chapter={`CASE ${index + 1} OF ${CASEBOOK.length}`}
         closesAt={row?.closesAt}
+        closed={caseClosed}
+        settled={resultIsPublic}
+        onOpenResults={() => setStage("closing")}
+        onBackToCases={advance}
         variant={index}
         locked={locked}
         onPick={(seat, name) => setPick(seat === null || name === null ? null : { seat, name })}
@@ -243,25 +295,25 @@ function StoryInner() {
         {stage === "closing" && (
           <StoryCard
             key={`close-${index}`}
-            chapter={verdict === null ? "THE MONEY IS DOWN" : verdict ? "CASE CLOSED" : "HE WALKED"}
+            chapter={closingChapter}
             title={chapter.title}
-            body={
-              verdict === null
-                ? "Your money is on a name nobody else can read, and it stays that way until the case closes. Nobody can watch what you did and copy it, and nobody, including whoever wrote this case, can move the answer now that there is money against it."
-                : verdict
-                  ? chapter.successText
-                  : chapter.failureText
-            }
-            voice={verdict === null ? "sealed" : verdict ? `c${index}-win` : `c${index}-lose`}
-            onContinue={advance}
-            continueLabel="BACK TO THE CASES"
+            body={closingBody}
+            voice={undefined}
+            compact
+            dismissOnBackdrop
+            onContinue={leaveClosing}
+            continueLabel={caseClosed || resultIsPublic ? "VIEW THE CASE" : "BACK TO THE CASES"}
+            secondaryLabel={caseClosed || resultIsPublic ? "ALL CASES" : undefined}
+            onSecondary={caseClosed || resultIsPublic ? advance : undefined}
             extra={
               <>
                 {/* The verdict on its own is a scoreboard. Once the case is decided the room
                     is over, so the reasoning is no longer worth withholding: name the man,
                     put his own words back in front of the player, and show the contradiction
                     that was sitting in them the whole time. */}
-                {verdict !== null && <TheTell caseId={index} chapter={chapter} />}
+                {resultIsPublic && (
+                  <TheTell caseId={index} chapter={chapter} settled={resultIsPublic} />
+                )}
                 <Settlement caseId={index} onResolved={setVerdict} />
               </>
             }

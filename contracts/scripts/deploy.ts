@@ -6,16 +6,13 @@
  * themselves. Every case therefore has to be opened here, by the same key that deployed the
  * contract, or the board is seven permanently closed rows.
  *
- * The answers are read straight out of `frontend/lib/casebook.ts` rather than copied into a
- * table here. They are the same seven rows of data and a second copy of them is a second
- * thing to get wrong: a drifted answer would settle the market on the wrong man, silently,
- * because nothing on chain can be compared against the alibis afterwards.
+ * The answers are read from `MENTALIST_ANSWER_IDS` in `contracts/.env`, which is gitignored.
+ * The public casebook has the room, roster, and alibis; it does not carry the answer key.
  *
  * Each answer is encrypted on this machine before it goes anywhere, so the person id is
- * never in the calldata or in a log. It is in the repository, in the mentalist, in the open,
- * and that is deliberate: the ciphertext is not hiding the puzzle from a careful reader. It
- * fixes the answer before the first bet so settlement is trustless, and it keeps every
- * player's bet private so nobody can follow the informed money.
+ * never in the calldata or in a log. The ciphertext fixes the answer before the first bet so
+ * settlement is trustless, and it keeps every player's bet private so nobody can follow the
+ * informed money.
  *
  *   pnpm --filter contracts deploy:mentalist
  */
@@ -69,7 +66,6 @@ function artifact(name: string): { abi: Abi; bytecode: Hex } {
   return { abi: j.abi as Abi, bytecode: j.bytecode as Hex };
 }
 
-/** Red John's seat: the one account in the room that cannot be true. */
 /**
  * The answer key, and it lives only on this machine.
  *
@@ -179,7 +175,7 @@ async function main() {
     console.log(`case ${i} open: ${c.title} (${c.suspects} suspects), taking money for ${windowFor(i)}s`);
   }
 
-  console.log("\nNEXT_PUBLIC_MENTALIST_ADDRESS=" + addr);
+  console.log("\nMentalist contract address: " + addr);
 }
 
 main().catch((e) => {

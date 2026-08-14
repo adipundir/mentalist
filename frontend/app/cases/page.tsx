@@ -7,7 +7,7 @@ import { useAccount, usePublicClient } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { CASEBOOK } from "@/lib/casebook";
 import { lineup } from "@/lib/canon";
-import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
+import { MENTALIST_ABI, MENTALIST_ADDRESS, MENTALIST_CASES_ABI } from "@/lib/contracts";
 import { usdc } from "@/lib/market";
 import { SEASON_START, countdown, nextRelease, schedule } from "@/lib/schedule";
 import { Character } from "@/components/Character";
@@ -65,7 +65,7 @@ export default function Board() {
           try {
             const c = await pub.readContract({
               address: MENTALIST_ADDRESS,
-              abi: MENTALIST_ABI,
+              abi: MENTALIST_CASES_ABI,
               functionName: "cases",
               args: [i],
             });
@@ -254,29 +254,32 @@ function CaseCard({
           : "border-ink-3 bg-ink-2/40",
       ].join(" ")}
     >
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
         <p className="font-mono text-[9px] tracking-file text-blood-hot">{label}</p>
-        {row?.played ? (
-          <span className="border border-brass px-1.5 py-0.5 font-mono text-[8px] tracking-file text-brass">
-            YOU PLAYED
-          </span>
-        ) : !released ? (
-          <span className="font-mono text-[9px] tracking-file text-bone-dim">
-            OPENS IN {countdown(until)}
-          </span>
-        ) : !row || now === SEASON_START ? (
-          // Nothing at all until both halves are in: the case's window comes off the chain
-          // and the clock comes off the browser, and neither is known on the first paint.
-          // Rendering the branch anyway printed "CLOSING" on every card for the moment
-          // before the read landed, which is a lie about a case that has barely opened.
-          <span className="font-mono text-[9px] tracking-file text-bone-dim/40">·</span>
-        ) : open ? (
-          <span className="font-mono text-[9px] tracking-file text-bone-dim">
-            {left > 0 ? `CLOSES IN ${countdown(left)}` : "CLOSING"}
-          </span>
-        ) : (
-          <span className="font-mono text-[9px] tracking-file text-bone-dim">CLOSED</span>
-        )}
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          {row?.played && (
+            <span className="border border-brass px-1.5 py-0.5 font-mono text-[8px] tracking-file text-brass">
+              PLAYED
+            </span>
+          )}
+          {!released ? (
+            <span className="font-mono text-[9px] tracking-file text-bone-dim">
+              OPENS IN {countdown(until)}
+            </span>
+          ) : !row || now === SEASON_START ? (
+            <span className="font-mono text-[9px] tracking-file text-bone-dim">READING CHAIN</span>
+          ) : row.settled ? (
+            <span className="font-mono text-[9px] tracking-file text-brass">RESULTS OPEN</span>
+          ) : open ? (
+            <span className="font-mono text-[9px] tracking-file text-bone-dim">
+              {left > 0 ? `CLOSES IN ${countdown(left)}` : "CLOSING"}
+            </span>
+          ) : (
+            <span className="font-mono text-[9px] tracking-file text-bone-dim">
+              WAITING SETTLEMENT
+            </span>
+          )}
+        </div>
       </div>
 
       <h2
@@ -317,7 +320,7 @@ function CaseCard({
               printing it before the chain has answered tells that lie on every card for as
               long as the read takes, then corrects itself in front of the player. */}
           <p className="font-type text-[19px] leading-none text-brass">
-            {row ? `$${usdc(row.pot)}` : <span className="text-bone-dim/40">·</span>}
+            {row ? `$${usdc(row.pot)}` : <span className="font-mono text-[9px] text-bone-dim">READING</span>}
           </p>
         </div>
       </div>

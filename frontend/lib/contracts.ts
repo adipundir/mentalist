@@ -8,28 +8,23 @@
  */
 
 import { activeChain, NETWORK } from "@/lib/network";
+export { MENTALIST_ADDRESS } from "@/lib/addresses";
+import { MENTALIST_ADDRESS } from "@/lib/addresses";
 
 /**
- * `Casebook`, the whole game on chain.
+ * `Mentalist`, the whole game on chain.
  *
  * Holds Red John's person id per case as a ciphertext, takes encrypted bets against it,
  * and pays whoever named him in Megapot tickets bought with the losers' stakes.
  */
 /**
- * The live deployment on Base Sepolia. Hardcoded rather than read from the environment: it is
- * public information, it is the same for everybody, and a missing variable used to mean a
- * silently empty address and a site where no case could be opened. The env var still wins if
- * it is set, which is what a local fork or a redeploy needs.
+ * The live deployment on Base Sepolia is hardcoded in `lib/addresses.ts` and imported here.
  */
 /**
  * The block the live contract was deployed in. Log scans start here: `fromBlock: 0` asks for
  * a forty-five-million block range, which most public RPCs refuse outright.
  */
 export const DEPLOY_BLOCK = 45487371n;
-
-export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ||
-  "0xb39546b5ffedd9778a4de42e3d211fa041ff7cf5") as `0x${string}`;
-
 
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
 export const EXPLORER = activeChain.blockExplorers!.default.url;
@@ -63,6 +58,32 @@ export const MEGAPOT = {
       ? ("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`)
       : ("0x036CbD53842c5426634e7929541eC2318f3dCF7e" as `0x${string}`),
 } as const;
+
+/**
+ * Read-only case summary.
+ *
+ * The active deployment includes the appended `filed` field. Keep this fragment explicit so
+ * summary screens decode the same tuple shape as the deployed public getter.
+ */
+export const MENTALIST_CASES_ABI = [
+  {
+    type: "function",
+    name: "cases",
+    stateMutability: "view",
+    inputs: [{ name: "", type: "uint16" }],
+    outputs: [
+      { name: "closesAt", type: "uint64" },
+      { name: "suspects", type: "uint8" },
+      { name: "pot", type: "uint128" },
+      { name: "winningStake", type: "uint128" },
+      { name: "entrants", type: "uint32" },
+      { name: "winners", type: "uint32" },
+      { name: "settled", type: "bool" },
+      { name: "exists", type: "bool" },
+      { name: "filed", type: "uint32" },
+    ],
+  },
+] as const;
 
 export const MENTALIST_ABI = [
   {
@@ -199,6 +220,18 @@ export const MENTALIST_ABI = [
     outputs: [],
   },
   {
+    // Owner-only. Moves only the close clock: the sealed answer, bets, pot, and settlement
+    // state are unchanged.
+    type: "function",
+    name: "reschedule",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseId", type: "uint16" },
+      { name: "openFor", type: "uint64" },
+    ],
+    outputs: [],
+  },
+  {
     type: "function",
     name: "ticketBonusBps",
     stateMutability: "view",
@@ -216,29 +249,6 @@ export const MENTALIST_ABI = [
       { name: "share", type: "uint256", indexed: false },
       { name: "ticketIds", type: "uint256[]", indexed: false },
     ],
-  },
-  {
-    // Opens the answer once a case is settled. Before that the ciphertext has no key at all,
-    // not even for the owner.
-    type: "function",
-    name: "revealAnswer",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "caseId", type: "uint16" }],
-    outputs: [],
-  },
-  {
-    type: "function",
-    name: "answerHandle",
-    stateMutability: "view",
-    inputs: [{ name: "caseId", type: "uint16" }],
-    outputs: [{ name: "", type: "bytes32" }],
-  },
-  {
-    type: "function",
-    name: "refund",
-    stateMutability: "nonpayable",
-    inputs: [{ name: "caseId", type: "uint16" }],
-    outputs: [],
   },
   {
     type: "function",
@@ -328,6 +338,14 @@ export const MENTALIST_ABI = [
       { name: "player", type: "address" },
     ],
     outputs: [{ name: "", type: "bool" }],
+  },
+  {
+    // Enumerates players from contract storage so settlement does not depend on event logs.
+    type: "function",
+    name: "players",
+    stateMutability: "view",
+    inputs: [{ name: "caseId", type: "uint16" }],
+    outputs: [{ name: "", type: "address[]" }],
   },
 ] as const;
 

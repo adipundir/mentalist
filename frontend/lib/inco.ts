@@ -6,7 +6,7 @@
  * anything leaves it. The id never appears in the calldata, the logs, or on any explorer,
  * so nobody can watch the informed money and copy it.
  *
- * **Attesting a verdict.** `Casebook.stake` compares your sealed bet to the sealed answer
+ * **Attesting a verdict.** `Mentalist.stake` compares your sealed bet to the sealed answer
  * inside the enclave and grants the resulting bit to you alone. Reading it back is a
  * private decrypt: the covalidator signs over the value, and those signatures are what the
  * contract verifies. The contract rules on who won, not this browser.
@@ -66,7 +66,7 @@ async function withPatience<T>(attempt: () => Promise<T>): Promise<T> {
   throw lastError;
 }
 
-/** Seal a person id for `Casebook`. Only that contract, for that account, can use it. */
+/** Seal a person id for `Mentalist`. Only that contract, for that account, can use it. */
 export async function sealPersonId(
   personId: number,
   opts: { account: `0x${string}`; game: `0x${string}` },

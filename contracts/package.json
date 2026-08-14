@@ -7,7 +7,8 @@
     "test": "hardhat test",
     "node": "docker compose up",
     "test:forge": "forge test -vv",
-    "deploy": "npx tsx scripts/deploy.ts"
+    "deploy": "npx tsx scripts/deploy.ts",
+    "reschedule": "npx tsx scripts/reschedule.ts"
   },
   "devDependencies": {
     "@inco/lightning-js": "1.0.0",

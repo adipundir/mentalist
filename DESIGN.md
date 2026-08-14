@@ -7,7 +7,7 @@
 > bit, `e.xor(truth, liarBit)`, settled by `Mentalist.sol`. The shipped game is not that. It
 > is seven hand-written cases whose alibis are public in `frontend/lib/casebook.ts`, exactly
 > one of which is logically impossible, with the impossible speaker's id encrypted once into
-> `Casebook.sol` and compared against each player's encrypted bet by `e.eq`. Nothing in
+> `Mentalist.sol` and compared against each player's encrypted bet by `e.eq`. Nothing in
 > sections 0, 2.1, 2.2, 5 or 5.3 below is in the play path. **`README.md` is the current
 > description.** Section 3 (the seven cases) and section 4 (Megapot) still hold, except that
 > every shipped case has exactly one liar rather than the one to four in the section 3 table.
@@ -192,7 +192,7 @@ long shot, the one case nobody solves.
   itself and can never be insolvent, because it only ever pays out what it already holds.
 - **The losers fund the tickets.** Megapot's buyer takes a recipient and a referrer as
   separate arguments, so the market buys for the winner's wallet while naming itself
-  referrer. Nothing is minted from nowhere: `CaseMarket` is the payer
+  referrer. Nothing is minted from nowhere: `Mentalist` is the payer
   and the player is the recipient, so someone who has never held USDC still walks away
   holding a genuine lottery ticket NFT.
 - **The tickets pay for themselves.** `CaseRewards` passes itself as the `_referrers`

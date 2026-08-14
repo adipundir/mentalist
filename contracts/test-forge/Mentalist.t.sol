@@ -107,7 +107,7 @@ contract MockJackpot is IJackpot, IJackpotRandomTicketBuyer {
  *      IncoTest mocks the whole Inco stack in process, so `get(handle)` is a plaintext oracle
  *      no production caller has. That is what lets these tests know who was named.
  */
-contract CasebookTest is IncoTest {
+contract MentalistTest is IncoTest {
     Mentalist internal book;
     MockUSDC internal usdc;
     MockJackpot internal megapot;
@@ -334,8 +334,7 @@ contract CasebookTest is IncoTest {
      * @dev The house edge this closes: the author seals a person id outside 0..suspects-1 and
      *      stakes the same id themselves. Every honest bet then compares false, the author is
      *      the only winner, and `shareOf` hands them the entire pot. Both sides are
-     *      ciphertexts, so on chain it is indistinguishable from having simply guessed right,
-     *      and nobody else can be refunded either, because the case did have a winner.
+     *      ciphertexts, so on chain it is indistinguishable from having simply guessed right.
      */
     function test_AnAnswerNoSeatHasIsFoldedBackIntoTheRoom() public {
         _open(CASE_ID, 999);
@@ -812,10 +811,10 @@ contract CasebookTest is IncoTest {
      * @dev The rule that makes this matter: `settle` is permissionless, and every filing after
      *      yours shrinks your share. So the first winner in is *paid* to close the books on
      *      everybody else, and while the two bounds were an hour apart that was worth the whole
-     *      pot: the slow winner's `resolve` reverted `AlreadySettled`, `payout` reverted
-     *      `NotResolved`, and `refund` reverted `DidNotWin` because the case did have a winner.
-     *      A correct read lost its entire principal for being asleep. Now the window closes on
-     *      a clock and settling opens exactly where it ends, so being first buys nothing.
+     *      pot: the slow winner's `resolve` reverted `AlreadySettled` and `payout` reverted
+     *      `NotResolved`. A correct read lost its entire principal for being asleep. Now the
+     *      window closes on a clock and settling opens exactly where it ends, so being first
+     *      buys nothing.
      */
     function test_ASlowWinnerCannotBeSettledOutOfTheirWin() public {
         _open(CASE_ID, RED_JOHN);
@@ -1068,8 +1067,8 @@ contract CasebookTest is IncoTest {
 
     /// @dev Megapot's ticket sales are a toggle somebody else owns, and it goes down for
     ///      drawing windows and LP locks. A winner's money must not be hostage to it: there is
-    ///      no other way out of this contract for a winning bet, since `refund` is closed to a
-    ///      case that had a winner and `withdrawSurplus` cannot touch reserved money. So the
+    ///      no other way out of this contract for a winning bet, since `withdrawSurplus`
+    ///      cannot touch reserved money. So the
     ///      share leaves as USDC and the tickets are simply what it could not buy.
     function test_MegapotBeingShutPaysTheShareOutInUsdcInstead() public {
         _open(CASE_ID, RED_JOHN);
@@ -1110,9 +1109,8 @@ contract CasebookTest is IncoTest {
 
     // ── nobody got it ──────────────────────────────────────────
 
-    /// @dev A pot with no winners has nobody to divide it among, and keeping it would make the
-    ///      house the beneficiary of everybody's failure.
-    function test_NobodyNamedHimSoEverybodyIsRefunded() public {
+    /// @dev Wrong guesses are forfeited even when nobody finds the answer.
+    function test_NobodyNamedHimSoTheHouseKeepsThePot() public {
         _open(CASE_ID, RED_JOHN);
         _stake(jane, CASE_ID, SOMEONE_ELSE, 1_000_000);
         _stake(lisbon, CASE_ID, 0, 2_000_000);
@@ -1122,63 +1120,11 @@ contract CasebookTest is IncoTest {
         _resolve(lisbon, CASE_ID);
         _settle(CASE_ID);
 
-        uint256 herBefore = usdc.balanceOf(jane);
-        uint256 hisBefore = usdc.balanceOf(lisbon);
-
-        vm.prank(jane);
-        book.refund(CASE_ID);
-        vm.prank(lisbon);
-        book.refund(CASE_ID);
-
-        assertEq(usdc.balanceOf(jane) - herBefore, 1_000_000, "exactly what she put in");
-        assertEq(usdc.balanceOf(lisbon) - hisBefore, 2_000_000);
-        assertEq(book.reserved(), 0, "nothing left owed");
-        assertEq(usdc.balanceOf(address(book)), 0, "and the house kept none of it");
+        assertEq(usdc.balanceOf(jane), 999_000_000, "the losing stake stays forfeited");
+        assertEq(usdc.balanceOf(lisbon), 998_000_000, "the losing stake stays forfeited");
+        assertEq(book.reserved(), 0, "the no-winner pot is no longer owed");
+        assertEq(usdc.balanceOf(address(book)), 3_000_000, "the house keeps the pot");
         assertEq(megapot.ticketsOf(jane), 0, "no tickets were bought on a dead case");
-    }
-
-    function test_NobodyIsRefundedWhileSomebodyCanStillBePaid() public {
-        _open(CASE_ID, RED_JOHN);
-        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
-        _stake(lisbon, CASE_ID, SOMEONE_ELSE, 1_000_000);
-
-        _reachClose(CASE_ID);
-        _resolve(jane, CASE_ID);
-        _resolve(lisbon, CASE_ID);
-        _settle(CASE_ID);
-
-        // The loser cannot take his stake back out of the winner's pot.
-        vm.prank(lisbon);
-        vm.expectRevert(Mentalist.DidNotWin.selector);
-        book.refund(CASE_ID);
-
-        // Nor can the winner take the refund path instead of the payout one.
-        vm.prank(jane);
-        vm.expectRevert(Mentalist.DidNotWin.selector);
-        book.refund(CASE_ID);
-    }
-
-    function test_CannotRefundBeforeSettlement() public {
-        _open(CASE_ID, RED_JOHN);
-        _stake(jane, CASE_ID, SOMEONE_ELSE, 1_000_000);
-
-        vm.prank(jane);
-        vm.expectRevert(Mentalist.NotSettled.selector);
-        book.refund(CASE_ID);
-    }
-
-    function test_CannotRefundTwice() public {
-        _open(CASE_ID, RED_JOHN);
-        _stake(jane, CASE_ID, SOMEONE_ELSE, 1_000_000);
-        _reachClose(CASE_ID);
-        _resolve(jane, CASE_ID);
-        _settle(CASE_ID);
-
-        vm.startPrank(jane);
-        book.refund(CASE_ID);
-        vm.expectRevert(Mentalist.AlreadyPaid.selector);
-        book.refund(CASE_ID);
-        vm.stopPrank();
     }
 
     // ── solvency ───────────────────────────────────────────────
@@ -1440,8 +1386,8 @@ contract CasebookTest is IncoTest {
         assertEq(usdc.balanceOf(address(book)), 200_000, "and the cut is the only thing left");
     }
 
-    /// @notice A case nobody solved is a game that did not happen. It refunds in full.
-    function test_ARefundIsNeverRaked() public {
+    /// @notice A case nobody solved keeps the full pot; rake does not apply.
+    function test_NoWinnerPotIsKeptWithoutRake() public {
         book.setRake(500, 0);
         _open(CASE_ID, RED_JOHN);
         _stake(cho, CASE_ID, SOMEONE_ELSE, 1_000_000);
@@ -1449,12 +1395,8 @@ contract CasebookTest is IncoTest {
         _resolve(cho, CASE_ID);
         _settle(CASE_ID);
 
-        uint256 before = usdc.balanceOf(cho);
-        vm.prank(cho);
-        book.refund(CASE_ID);
-
-        assertEq(usdc.balanceOf(cho) - before, 1_000_000, "every unit of it comes back");
-        assertEq(usdc.balanceOf(address(book)), 0, "and the house kept none of it");
+        assertEq(usdc.balanceOf(cho), 999_000_000, "the losing stake is forfeited");
+        assertEq(usdc.balanceOf(address(book)), 1_000_000, "the house keeps the full pot");
     }
 
     /// @notice Taking tickets pays more than taking the cash, out of money the house has.
@@ -1525,18 +1467,19 @@ contract CasebookTest is IncoTest {
     }
 
 
-    /// @notice An empty room can be re-timed. A room with money in it cannot.
-    function test_ReschedulingIsRefusedOnceAnybodyHasBet() public {
+    /// @notice The owner can re-time a room even after players have entered it.
+    function test_ReschedulingStillWorksOnceAnybodyHasBet() public {
         _open(CASE_ID, RED_JOHN);
         uint64 was = _closesAt(CASE_ID);
 
         book.reschedule(CASE_ID, 10 minutes);
         assertLt(_closesAt(CASE_ID), was, "an empty room takes the new clock");
+        uint64 shortened = _closesAt(CASE_ID);
 
-        // The moment one person is in, the closing time is a promise made to them.
+        // Testing and operations may move the clock without changing the answer or bets.
         _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
-        vm.expectRevert(Mentalist.CaseHasMoneyIn.selector);
         book.reschedule(CASE_ID, 1 hours);
+        assertGt(_closesAt(CASE_ID), shortened, "a funded room takes the new clock");
 
         // And it is the owner's to move, nobody else's.
         vm.prank(cho);
@@ -1577,7 +1520,7 @@ contract CasebookTest is IncoTest {
         _reachClose(CASE_ID);
 
         // Jane files and immediately tries to shut the books on Cho, who would then be locked
-        // out of `resolve`, out of `payout`, and out of `refund` all at once.
+        // out of `resolve` and out of `payout` all at once.
         _resolve(jane, CASE_ID);
         vm.prank(jane);
         vm.expectRevert(Mentalist.CaseStillOpen.selector);
@@ -1588,7 +1531,7 @@ contract CasebookTest is IncoTest {
         vm.expectRevert(Mentalist.CaseStillOpen.selector);
         book.settle(CASE_ID);
 
-        // Cho files inside his window and keeps his refund.
+        // Cho files inside his window and keeps his claim alive.
         _resolve(cho, CASE_ID);
         book.settle(CASE_ID);
     }
@@ -1600,32 +1543,6 @@ contract CasebookTest is IncoTest {
 
         vm.expectRevert(Mentalist.CaseStillOpen.selector);
         book.settle(CASE_ID);
-    }
-
-
-    /// @notice The answer is sealed to everyone until the case is settled, then open to all.
-    function test_TheAnswerOpensOnlyOnceTheCaseIsSettled() public {
-        _open(CASE_ID, RED_JOHN);
-        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
-
-        // Nobody may have it while there is still money to be made from knowing it, and that
-        // includes the owner of the contract.
-        vm.expectRevert(Mentalist.NotSettled.selector);
-        book.revealAnswer(CASE_ID);
-
-        _reachClose(CASE_ID);
-        vm.expectRevert(Mentalist.NotSettled.selector);
-        book.revealAnswer(CASE_ID);
-
-        _resolve(jane, CASE_ID);
-        _settle(CASE_ID);
-
-        // Now it is nobody's advantage, so anybody may read it: the room deserves to be told.
-        vm.prank(cho);
-        book.revealAnswer(CASE_ID);
-        processAllOperations();
-        (DecryptionAttestation memory att, ) = _attest(cho, book.answerHandle(CASE_ID));
-        assertEq(uint256(att.value), RED_JOHN, "and what it says is the man who did it");
     }
 
 }

@@ -6,7 +6,7 @@
  * minute the contract will not honour.
  */
 
-/** Stake bounds, in USDC's six decimals. Mirrors `Casebook.minStake` / `maxStake`. */
+/** Stake bounds, in USDC's six decimals. Mirrors `Mentalist.minStake` / `maxStake`. */
 export const MIN_STAKE = 100_000n;
 export const MAX_STAKE = 5_000_000n;
 

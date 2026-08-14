@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { MENTALIST_ABI, MENTALIST_ADDRESS, ERC20_ABI, MEGAPOT } from "@/lib/contracts";
@@ -75,6 +75,7 @@ export function Stake({
   const [custom, setCustom] = useState("");
   const [step, setStep] = useState<Step>("idle");
   const [error, setError] = useState<string | null>(null);
+  const notifiedStaked = useRef(false);
   const [balance, setBalance] = useState<bigint | null>(null);
 
   // This panel only exists once the whole room has been heard, which makes it the earliest
@@ -93,6 +94,7 @@ export function Stake({
 
   useEffect(() => {
     if (!pub || !address) return;
+    notifiedStaked.current = false;
     let live = true;
     const read = async () => {
       try {
@@ -116,7 +118,10 @@ export function Stake({
         // should be showing them the settlement rather than a stake button.
         if (staked) {
           setStep("done");
-          onStaked(0n);
+          if (!notifiedStaked.current) {
+            notifiedStaked.current = true;
+            onStaked(0n);
+          }
         }
       } catch {
         /* a cold RPC read is not worth a message to the player */
@@ -194,6 +199,7 @@ export function Stake({
         });
 
       setStep("done");
+      notifiedStaked.current = true;
       sfx.stamp();
       onStaked(amount);
     } catch (e) {
@@ -203,6 +209,9 @@ export function Stake({
   }, [wallet, pub, address, amount, caseId, seat, onStaked]);
 
   if (step === "done") return null;
+  // Do not flash a wallet/staking bar while the chain read is pending, and never expose
+  // betting controls after the case has closed.
+  if (open !== true) return null;
 
   const busy = step !== "idle";
   const short = balance !== null && balance < amount;

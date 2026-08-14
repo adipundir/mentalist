@@ -58,6 +58,10 @@ export function Scene({
   chapter,
   title,
   closesAt,
+  closed = false,
+  settled = false,
+  onOpenResults,
+  onBackToCases,
   variant = 0,
   stakePanel,
   locked,
@@ -70,6 +74,12 @@ export function Scene({
   title: string;
   /** Unix ms this case stops accepting money. Drives the clock in the middle of the HUD. */
   closesAt?: number;
+  /** A closed room remains inspectable, but no longer needs the interrogation prompt. */
+  closed?: boolean;
+  /** Whether the settled result modal can be reopened from the scene. */
+  settled?: boolean;
+  onOpenResults?: () => void;
+  onBackToCases?: () => void;
   /** Which crime scene this case is set in. */
   variant?: number;
   /** Shown once the whole room has spoken, so the stake is placed on an informed read. */
@@ -190,7 +200,7 @@ export function Scene({
                 once, under the account bar that covers it, which is the same as not being
                 there. It sits under the title until the room has been heard out, then goes:
                 an instruction that outlives its job is just clutter over a crime scene. */}
-            {!g.allSpoken && (
+            {!g.allSpoken && !closed && (
               <p className="mt-1.5 font-body text-[13px] leading-snug text-bone-dim">
                 Click each person to hear where they were.{" "}
                 <span className="text-brass">
@@ -199,6 +209,28 @@ export function Scene({
               </p>
             )}
           </div>
+          {(settled || closed) && (
+            <div className="pointer-events-auto mt-1 flex flex-wrap justify-end gap-2">
+              {settled && onOpenResults && (
+                <button
+                  type="button"
+                  onClick={onOpenResults}
+                  className="border border-blood-hot bg-ink/70 px-4 py-2 font-mono text-[10px] tracking-file text-blood-hot hover:bg-blood-hot/15"
+                >
+                  SEE THE KILLER
+                </button>
+              )}
+              {onBackToCases && (
+                <button
+                  type="button"
+                  onClick={onBackToCases}
+                  className="border border-ink-3 bg-ink/70 px-4 py-2 font-mono text-[10px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
+                >
+                  ALL CASES
+                </button>
+              )}
+            </div>
+          )}
 
         </div>
 

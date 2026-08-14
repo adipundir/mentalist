@@ -1,23 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { MENTALIST_ABI, MENTALIST_ADDRESS, txUrl } from "@/lib/contracts";
-import { attestVerdict } from "@/lib/inco";
 import { usdc } from "@/lib/market";
 import { countdown } from "@/lib/schedule";
-import * as sfx from "@/lib/sound";
 
 /**
  * The end of a case, and the only place the two stacks meet.
  *
  * **Inco** decides the outcome. Your verdict bit was computed inside the enclave the moment
- * you staked, but it is not readable until the case has closed: `unseal` is what grants it to
- * you, and that is deliberately a separate transaction. The covalidator answers to the
- * on-chain ACL and knows nothing about closing times, so the grant is the only thing that can
- * carry the timing. Filing then means asking the covalidator to attest the bit and handing
- * those signatures to the contract. The *contract* rules on whether you were right, not this
- * browser. A market that settled on a number the client reported would be a scoreboard.
+ * you staked, but it is not readable until the case has closed. The keeper grants access,
+ * obtains the covalidator attestation, and files the verdict for the room. The *contract*
+ * rules on whether you were right, not this browser. A market that settled on a number the
+ * client reported would be a scoreboard.
  *
  * **Megapot** pays it out. Your share of the pot buys real lottery tickets with the money of
  * everyone who named the wrong man, up to the hundred-ticket ceiling in `payout`; the rest of
@@ -29,7 +25,7 @@ import * as sfx from "@/lib/sound";
  * everybody.
  */
 
-type Busy = "resolving" | "settling" | "paying" | "cashing" | "refunding" | null;
+type Busy = "paying" | "cashing" | null;
 
 interface Row {
   closesAt: number;
@@ -60,7 +56,7 @@ export function Settlement({
   onResolved,
 }: {
   caseId: number;
-  /** Fires with the verdict the contract accepted, so the page can tell the story. */
+  /** Fires with the verdict the keeper filed, so the page can tell the story. */
   onResolved?: (won: boolean | null) => void;
 }) {
   const { address } = useAccount();
@@ -85,6 +81,13 @@ export function Settlement({
   const [paidHere, setPaidHere] = useState(false);
   const [now, setNow] = useState(0);
   const [graceMs, setGraceMs] = useState(DEFAULT_GRACE_MS);
+  const settlementRequestSent = useRef(false);
+  const settlementRequestInFlight = useRef(false);
+
+  useEffect(() => {
+    settlementRequestSent.current = false;
+    settlementRequestInFlight.current = false;
+  }, [caseId]);
 
   useEffect(() => {
     setNow(Date.now());
@@ -113,13 +116,20 @@ export function Settlement({
   }, [pub]);
 
   const refresh = useCallback(async () => {
-    if (!pub || !address) return;
+    if (!pub) return;
     try {
-      const [c, b, share] = await Promise.all([
-        pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "cases", args: [caseId] }),
-        pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "bets", args: [caseId, address] }),
-        pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "shareOf", args: [caseId, address] }),
-      ]);
+      const c = await pub.readContract({
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
+        functionName: "cases",
+        args: [caseId],
+      });
+      const [b, share] = address
+        ? await Promise.all([
+            pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "bets", args: [caseId, address] }),
+            pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "shareOf", args: [caseId, address] }),
+          ])
+        : [[0n, false, false, false] as const, 0n];
       setRow({
         closesAt: Number(c[0]) * 1000,
         pot: c[2],
@@ -148,20 +158,28 @@ export function Settlement({
     return () => clearInterval(id);
   }, [refresh]);
 
-  // Nudge the keeper when somebody opens a case that has closed and not been filed. The
-  // schedule that normally does this runs on GitHub, which is late under load, and a player
-  // sitting on a finished case is the moment being late actually shows. It asks at most once
-  // a minute per browser, and the endpoint is idempotent, so a crowd all asking at once
-  // costs one round of work rather than one each.
+  // Ask the keeper once after close. The request does the whole room, so a response means the
+  // page must stop calling it; the normal cron remains the retry path for a failed request.
   useEffect(() => {
-    if (!row || row.settled || row.resolved) return;
-    if (Date.now() < row.closesAt) return;
-    const last = Number(sessionStorage.getItem("keeper-nudge") ?? 0);
-    if (Date.now() - last < 60_000) return;
-    sessionStorage.setItem("keeper-nudge", String(Date.now()));
-    // Nothing here waits on the answer: the poll above picks the result up either way.
-    void fetch("/api/keeper").catch(() => {});
-  }, [row]);
+    if (!row || row.settled || row.resolved || Date.now() < row.closesAt) return;
+    if (settlementRequestSent.current || settlementRequestInFlight.current) return;
+
+    const key = `keeper-nudge:${caseId}`;
+    if (sessionStorage.getItem(key)) {
+      settlementRequestSent.current = true;
+      return;
+    }
+
+    settlementRequestInFlight.current = true;
+    sessionStorage.setItem(key, String(Date.now()));
+    void fetch(`/api/keeper?caseId=${caseId}`, { cache: "no-store" })
+      .catch(() => {})
+      .finally(() => {
+        settlementRequestInFlight.current = false;
+        settlementRequestSent.current = true;
+        void refresh();
+      });
+  }, [caseId, row, refresh]);
 
   /** One transaction per action, and each one waits for its receipt before the UI moves. */
   const send = useCallback(
@@ -177,7 +195,7 @@ export function Settlement({
         if (receipt.status !== "success")
           throw Object.assign(new Error("reverted"), { shortMessage: "THE CHAIN REJECTED IT" });
         setReceipts((r) => [...r, { label, hash }]);
-        if (kind === "paying" || kind === "cashing" || kind === "refunding") setPaidHere(true);
+        if (kind === "paying" || kind === "cashing") setPaidHere(true);
         await refresh();
       } catch (e) {
         setError(readable(e));
@@ -188,191 +206,56 @@ export function Settlement({
     [wallet, pub, refresh],
   );
 
-  /**
-   * File the one bit that decides your case.
-   *
-   * Two transactions, and the first is the interesting one. `unseal` grants you your own
-   * verdict bit, which the contract holds back until the case has closed: the covalidator
-   * decrypts for whoever the on-chain ACL allows and has no notion of a closing time, so a
-   * grant made at stake time would have been an answer key on sale for the minimum bet.
-   *
-   * The handle is the contract's own record of your verdict, so there is nothing to invent
-   * and nothing to argue about: the covalidator signs the value, the contract checks the
-   * handle it stored and the signatures, and rules.
-   */
-  async function fileVerdict() {
-    if (!wallet || !pub || !address) return;
-    setBusy("resolving");
-    setError(null);
-    try {
-      try {
-        const unsealed = await wallet.writeContract({
-          address: MENTALIST_ADDRESS,
-          abi: MENTALIST_ABI,
-          functionName: "unseal",
-          args: [caseId],
-          account: address,
-          chain: wallet.chain,
-        });
-        await pub.waitForTransactionReceipt({ hash: unsealed });
-        setReceipts((r) => [...r, { label: "VERDICT UNSEALED", hash: unsealed }]);
-      } catch {
-        // An instance deployed before `unseal` existed granted the bit at stake time and has
-        // no such function to call. The decrypt below then succeeds on that older grant, so
-        // this is not fatal on its own: let the covalidator be the one to refuse.
-      }
-
-      const handle = await pub.readContract({
-        address: MENTALIST_ADDRESS,
-        abi: MENTALIST_ABI,
-        functionName: "verdictHandle",
-        args: [caseId, address],
-      });
-      const { won, attestation, signatures } = await attestVerdict(wallet, handle);
-      const hash = await wallet.writeContract({
-        address: MENTALIST_ADDRESS,
-        abi: MENTALIST_ABI,
-        functionName: "resolve",
-        args: [caseId, attestation, signatures],
-        account: address,
-        chain: wallet.chain,
-      });
-      const receipt = await pub.waitForTransactionReceipt({ hash });
-      if (receipt.status !== "success")
-        throw Object.assign(new Error("reverted"), { shortMessage: "THE CHAIN REFUSED THE FILING" });
-      setReceipts((r) => [...r, { label: "VERDICT FILED", hash }]);
-      sfx.stamp();
-      if (won) sfx.stingSolved();
-      else sfx.stingMissed();
-      await refresh();
-    } catch (e) {
-      setError(readable(e));
-    } finally {
-      setBusy(null);
-    }
-  }
-
   const closed = row !== null && now >= row.closesAt;
-  // The window only protects players who have not filed yet. Once the room is complete there
-  // is nobody left to protect, so the money releases immediately instead of making the winner
-  // sit out a wait that is doing nothing.
-  const roomComplete = row !== null && row.entrants > 0 && row.filed >= row.entrants;
-  const canSettle =
-    row !== null && now >= row.closesAt && (roomComplete || now >= row.closesAt + graceMs);
-
   return (
     <div className="mt-5 border-t border-ink-3 pt-4">
-      <h3 className="mb-2 font-mono text-[12px] tracking-file text-bone-dim">
+      <h3 className="mb-3 font-mono text-[15px] tracking-file text-bone-dim sm:text-[17px]">
         THE RESULT
       </h3>
 
       {row === null ? (
         <Waiting>READING THE FILE…</Waiting>
       ) : row.stake === 0n ? (
-        <p className="font-body text-[15px] leading-relaxed text-bone">
+        <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
           You have no money on this case, so there is nothing to close out.
         </p>
       ) : !closed ? (
-        <p className="font-body text-[15px] leading-relaxed text-bone">
+        <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
           Your pick is sealed until the case closes.{" "}
           <span className="text-brass">Result in {countdown(row.closesAt - now)}.</span>
         </p>
-      ) : /* Filing is only possible until the filing window runs out, and the books can only
-              be closed after it has. The clock is the guard, NOT the `settled` flag: `_credit`
-              reverts on `closesAt + FILING_WINDOW` and settling is a separate permissionless
-              call, so between those two moments `settled` is still false and this used to
-              offer a button that could only revert. It was not a free misclick either, since
-              `unseal` has no upper time bound: it mined, it cost gas, it posted a receipt, and
-              then the filing reverted anyway. A late filer falls through to the branch below. */
+      ) : /* Filing is only possible until the filing window runs out. The keeper handles the
+              filing and settlement, while this page only refreshes the resulting state. */
       !row.resolved && !row.settled && now < row.closesAt + graceMs ? (
         <>
-          <p className="font-body text-[15px] leading-relaxed text-bone">
-            Case closed. Working out the result on chain, which takes a moment.
+          <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
+            Case closed. The keeper is recording the room&rsquo;s results automatically.
           </p>
-          {/* The keeper does this for the whole room on a schedule, so nobody has to press
-              anything. The button stays for the case where it is running late, and for anyone
-              who would rather not wait on a machine they do not control. */}
-          <Button tone="blood" onClick={fileVerdict} disabled={busy !== null}>
-            {busy === "resolving" ? "GETTING YOUR RESULT…" : "GET IT NOW"}
-          </Button>
         </>
       ) : !row.settled ? (
         <>
           <p className="font-body text-[15px] leading-relaxed text-bone">
             {!row.resolved
-              ? "No result was recorded for you on this case."
+              ? "The keeper is still finalizing this case. Check back shortly."
               : row.won
                 ? "You caught the killer. Your reward unlocks once the rest of the room has been counted."
                 : "Wrong man. Your stake goes to whoever got it right."}
           </p>
-          <Button
-            tone={row.won ? "blood" : "dim"}
-            onClick={() =>
-              send("settling", "MONEY RELEASED", () =>
-                wallet!.writeContract({
-                  address: MENTALIST_ADDRESS,
-                  abi: MENTALIST_ABI,
-                  functionName: "settle",
-                  args: [caseId],
-                  account: address!,
-                  chain: wallet!.chain,
-                }),
-              )
-            }
-            disabled={busy !== null || !canSettle}
-          >
-            {busy === "settling"
-              ? "RELEASING…"
-              : canSettle
-                ? "RELEASE THE MONEY"
-                : `WAITING ON ${row.entrants - row.filed} MORE IN THE ROOM`}
-          </Button>
         </>
       ) : row.paid || paidHere ? (
-        <p className="font-body text-[15px] leading-relaxed text-bone">
-          {/* `refund` and `payout` both set the same paid flag, so this branch has to say
-              which one happened or it tells a refunded player they are holding lottery
-              tickets. `won` separates them exactly: only a winner can be paid out, and a
-              refund only exists in a case nobody won. The tickets are capped at a hundred a
-              payout, so on a share of any size the USDC leg is the larger half and calling it
-              the change from a whole ticket would be a straight overstatement. */}
-          {!row.won
-            ? "Done. Your stake is back in your wallet."
-            : tookTickets
+        <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
+          {tookTickets
               ? "Done. Your share bought Megapot tickets for the next drawing, and any change came back as USDC. The counter at the top of the screen is how many tickets you hold. Testnet drawings run every 30 minutes."
               : "Done. Your share is in your wallet as USDC."}
         </p>
       ) : row.winningStake === 0n ? (
-        <>
-          <p className="font-body text-[15px] leading-relaxed text-bone">
-            {/* Written to the player, not to the room. "Nobody caught him" reads as a
-                bulletin about other people and lets this player off the hook; the case is
-                the same either way, and the account that matters is theirs. */}
-            <span className="text-blood-hot">Oops — you didn&rsquo;t find the killer.</span>{" "}
-            He walks. Your stake comes back.
-          </p>
-          <Button
-            tone="brass"
-            onClick={() =>
-              send("refunding", "STAKE RETURNED", () =>
-                wallet!.writeContract({
-                  address: MENTALIST_ADDRESS,
-                  abi: MENTALIST_ABI,
-                  functionName: "refund",
-                  args: [caseId],
-                  account: address!,
-                  chain: wallet!.chain,
-                }),
-              )
-            }
-            disabled={busy !== null}
-          >
-            {busy === "refunding" ? "RETURNING YOUR STAKE…" : `TAKE BACK $${usdc(row.stake)}`}
-          </Button>
-        </>
+        <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
+          <span className="text-blood-hot">Oops — you didn&rsquo;t find the killer.</span>{" "}
+          He walks.
+        </p>
       ) : row.won ? (
         <>
-          <p className="font-body text-[15px] leading-relaxed text-bone">
+          <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
             <span className="text-brass">Congratulations, you caught the killer.</span> Choose
             your reward.
           </p>
@@ -432,8 +315,8 @@ export function Settlement({
           </div>
         </>
       ) : (
-        <p className="font-body text-[15px] leading-relaxed text-bone">
-          The books are closed. Your stake belongs to whoever read the room correctly.
+        <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
+          The case is closed. No winning claim was recorded.
         </p>
       )}
 
