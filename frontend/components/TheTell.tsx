@@ -68,8 +68,8 @@ export function TheTell({ caseId, chapter, settled }: { caseId: number; chapter:
 
   if (!tell) {
     return settled ? (
-      <div className="mt-6 flex items-end gap-5 border-l-2 border-blood/40 pl-4">
-        <div className="h-48 w-28 animate-pulse bg-ink-3/60 sm:h-56 sm:w-36" />
+      <div className="mt-4 flex items-end gap-4 border-l-2 border-blood/40 pl-4">
+        <div className="h-40 w-24 animate-pulse bg-ink-3/60 sm:h-48 sm:w-32" />
         <div className="flex-1 space-y-4 pb-2">
           <p className="font-mono text-[17px] tracking-file text-blood-hot sm:text-[20px]">OPENING CASE FILE…</p>
           <div className="h-4 w-2/3 animate-pulse bg-ink-3/60" />
@@ -81,23 +81,23 @@ export function TheTell({ caseId, chapter, settled }: { caseId: number; chapter:
   }
 
   return (
-    <div className="mt-6 grid gap-6 border-l-2 border-blood/60 pl-4 sm:grid-cols-[minmax(220px,300px)_minmax(0,1fr)] sm:items-center sm:gap-8">
-      <div className="mx-auto w-full max-w-[300px] border-2 border-ink-3 bg-[#211c1a]">
+    <div className="mt-4 grid gap-4 border-l-2 border-blood/60 pl-4 sm:grid-cols-[minmax(180px,240px)_minmax(0,1fr)] sm:items-center sm:gap-6">
+      <div className="mx-auto w-full max-w-[240px] border-2 border-ink-3 bg-[#211c1a]">
         <Character
           spec={{ ...person(chapter.roster[tell.personId]).character, id: chapter.roster[tell.personId] }}
           expression="shocked"
           fullBody
-          className="h-72 w-full sm:h-[390px]"
+          className="h-52 w-full sm:h-[280px] lg:h-[300px]"
         />
       </div>
       <div className="min-w-0 pb-1">
-      <p className="max-w-[34ch] font-mono text-[15px] tracking-file text-blood-hot sm:text-[18px]">
+      <p className="max-w-[34ch] font-mono text-[14px] tracking-file text-blood-hot sm:text-[16px]">
         RED JOHN WAS {tell.name}
       </p>
-      <p className="mt-4 font-body text-[17px] italic leading-relaxed text-bone-dim sm:text-[20px]">
+      <p className="mt-2 font-body text-[16px] italic leading-relaxed text-bone-dim sm:text-[18px]">
         &ldquo;{tell.alibi}&rdquo;
       </p>
-      <p className="mt-4 font-body text-[16px] leading-relaxed text-bone sm:text-[18px]">{tell.tell}</p>
+      <p className="mt-2 font-body text-[15px] leading-relaxed text-bone sm:text-[16px]">{tell.tell}</p>
       </div>
     </div>
   );

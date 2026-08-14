@@ -93,7 +93,7 @@ export function StoryCard({
         initial={{ y: 18, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.03, duration: 0.18 }}
-        className={`paper w-full ${compact ? "max-w-[1100px]" : "max-w-[640px]"} max-h-[calc(100vh-2rem)] overflow-y-auto border-2 border-ink-3 p-7 sm:p-9`}
+        className={`paper w-full ${compact ? "max-w-[1100px] max-h-[calc(100vh-1rem)] overflow-hidden p-5 sm:p-6" : "max-w-[640px] max-h-[calc(100vh-2rem)] overflow-y-auto p-7 sm:p-9"} border-2 border-ink-3`}
       >
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
@@ -122,7 +122,7 @@ export function StoryCard({
           )}
         </div>
 
-        <div className="mt-5 flex gap-5">
+        <div className={`${compact ? "mt-4 gap-4" : "mt-5 gap-5"} flex`}>
           {speaker && (
             <div className="shrink-0">
               <div className="w-24 border-2 border-ink-3 bg-[#211c1a]">
@@ -148,7 +148,7 @@ export function StoryCard({
 
         {extra && <div onClick={(e) => e.stopPropagation()}>{extra}</div>}
 
-        <div className="mt-6 flex items-center justify-between gap-3 border-t border-ink-3 pt-4">
+        <div className={`${compact ? "mt-4 pt-3" : "mt-6 pt-4"} flex items-center justify-between gap-3 border-t border-ink-3`}>
           <span className="font-mono text-[9px] tracking-file text-bone-dim/75">
             {!done ? "CLICK TO SKIP" : extra ? "" : "CLICK ANYWHERE TO CONTINUE"}
           </span>

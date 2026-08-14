@@ -14,6 +14,7 @@ import { StoryCard } from "@/components/StoryCard";
 import { Settlement } from "@/components/Settlement";
 import { TheTell } from "@/components/TheTell";
 import { Stake } from "@/components/Stake";
+import { TicketBalance } from "@/components/TicketBalance";
 
 type Stage = "opening" | "playing" | "closing";
 
@@ -228,6 +229,9 @@ function StoryInner() {
             />
           ))}
         </ol>
+        <div className="pointer-events-auto ml-auto">
+          <TicketBalance />
+        </div>
 
       </div>
 
