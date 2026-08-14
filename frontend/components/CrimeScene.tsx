@@ -6,8 +6,8 @@ import { useMemo } from "react";
  * THE CRIME SCENE.
  *
  * The room the suspects are standing in is the room it happened in, so it should look like
- * it. A body on the floor, blood that pooled and then got walked through, a trail of prints
- * leading out, and his signature drying on the wall above it.
+ * it. A body on the floor, the blood it is lying in, and his signature drying on the wall
+ * above it.
  *
  * Every case gets its own: the layout is generated from the case index rather than
  * hand-placed, so Chapter I and Chapter VI are recognisably different rooms without seven
@@ -230,60 +230,10 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
       return { d: blob(r, x, y, 0.7 + r() * 1.9, 8), o: 0.3 + r() * 0.36 };
     });
 
-    // Prints walking out of the pool and past you, growing as they come forward and fading
-    // as the blood wears off the shoe.
-    //
-    // They used to run at the far wall — `exitX` put them out at the edge of the room, so
-    // the trail crossed the frame sideways and the last print ended up off the screen
-    // entirely, at three times the length of a foot, because the growth curve had nothing
-    // stopping it. He walks out past the camera instead: a short lateral drift and a lot of
-    // downward travel, which is what "toward you" looks like in a faked perspective.
-    const out = left ? -1 : 1;
-    const px = (t: number) => bodyX + out * (5 + t * 17);
-    const py = (t: number) => bodyY + 5 + t * 21;
-
-    const steps = 8;
-    const prints = Array.from({ length: steps }, (_, i) => {
-      const t = i / (steps - 1);
-      const ease = t * t; // the floor recedes, so steps bunch up toward the back wall
-
-      // Point each foot along the direction of travel.
-      //
-      // These used to carry a fixed rotation near zero, which left every toe pointing
-      // straight up the screen while the trail itself ran sideways: a line of feet walking
-      // away from the direction they were facing. The sole is drawn toe-up, so rotating by
-      // atan2(dx, -dy) turns that default heading onto the tangent of the path.
-      const dx = px(Math.min(1, t + 0.02)) - px(Math.max(0, t - 0.02));
-      const dy = py(Math.min(1, t + 0.02)) - py(Math.max(0, t - 0.02));
-      const heading = (Math.atan2(dx, -dy) * 180) / Math.PI;
-
-      // Rounded, because these numbers end up inside a `transform` string.
-      //
-      // `Math.atan2` is allowed to differ in its last bit between one engine and another,
-      // and the server and the browser are two engines: the markup came back with
-      // rotate(-146.54274705003652) against the server's ...655, which React reports as a
-      // hydration mismatch on every reload of a case. Two decimal places is finer than a
-      // pixel here and identical on both sides.
-      const round = (v: number) => Math.round(v * 100) / 100;
-
-      return {
-        x: round(px(t)),
-        y: round(py(t)),
-        side: i % 2 === 0 ? -1 : 1,
-        // A few degrees of toe-out per foot, because nobody walks with their feet parallel.
-        rot: round(heading + (r() - 0.5) * 7),
-        o: round(Math.max(0.12, 0.72 - t * 0.5)),
-        // A shoe is about a fifth the length of the person lying next to it, so this is
-        // capped rather than left to run: it used to reach 1.8 and print a boot the size of
-        // her torso in the foreground.
-        s: round(0.55 + ease * 0.55),
-      };
-    });
-
     // His signature on the wall, directly above the body. That is where he leaves it.
     const markX = Math.max(24, Math.min(102, bodyX + (left ? 16 : -16) + (r() - 0.5) * 8));
 
-    return { bodyX, bodyY, pool, spatter, prints, markX, left };
+    return { bodyX, bodyY, pool, spatter, markX, left };
   }, [variant, suspects]);
 
   return (
@@ -314,31 +264,11 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
         <path key={i} d={sp.d} fill={BLOOD} opacity={sp.o} />
       ))}
 
-      {/* ── the trail. Drawn before the body and the blood it lies in, because it is on the
-          floor and they are on top of it. Painted last, the prints walked over the victim. */}
-      {/* ── prints walking out ──
-          A shoe, not a pill. The old pair of stacked ovals read as a red capsule lying on
-          the floor: no toe, no arch, no heel, and nothing to say which way it was going.
-          A sole narrows at the waist and the heel sits apart from it, which is most of what
-          makes a print legible at this size. Left and right alternate about the line of
-          travel and the whole foot points along it. */}
-      {scene.prints.map((p, i) => (
-        <g
-          key={i}
-          transform={`translate(${p.x} ${p.y}) rotate(${p.rot + p.side * 5}) translate(${p.side * 1.7} 0) scale(${p.s * 0.62})`}
-          opacity={p.o}
-        >
-          <g transform={`scale(${p.side} 1)`}>
-            {/* sole: broad across the ball of the foot, pinched at the waist */}
-            <path
-              d="M-0.95 -2.9 C-1.35 -1.9 -1.25 -0.7 -0.75 0.05 C-0.35 0.65 0.35 0.65 0.7 0.05 C1.15 -0.7 1.2 -1.95 0.85 -2.9 C0.5 -3.75 -0.6 -3.8 -0.95 -2.9 Z"
-              fill={BLOOD_WET}
-            />
-            {/* heel, set back and slightly narrower */}
-            <ellipse cx="-0.05" cy="1.75" rx="0.72" ry="0.95" fill={BLOOD_WET} />
-          </g>
-        </g>
-      ))}
+      {/* No footprints.
+          There was a trail walking out of the pool, and at this scale it never read as
+          feet: a shoe that has to be legible next to a body a third of the frame wide is
+          either too big to be a shoe or too small to be anything. The blood is enough to
+          say what happened here, and a wrong detail costs more than a missing one. */}
 
       {/* ── the pool ── */}
       <path d={scene.pool} fill={BLOOD} opacity={0.88} />

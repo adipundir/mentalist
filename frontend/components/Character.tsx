@@ -354,8 +354,11 @@ function Body({
 
 /** Arms tuck in when anxious and hang loose when cocky. Shared so the raised arm agrees. */
 function armInFor(expression: Expression): number {
-  if (expression === "nervous" || expression === "caught" || expression === "shocked") return 5;
-  if (expression === "smug" || expression === "sinister") return -7;
+  // Kept small. These swing the whole arm about the shoulder, and past a few degrees the
+  // sleeve walks out from under the jacket and the man stands there with his arms floating
+  // beside him — which is exactly what -7 was doing to every smug figure in the lineup.
+  if (expression === "nervous" || expression === "caught" || expression === "shocked") return 3;
+  if (expression === "smug" || expression === "sinister") return -4;
   return 0;
 }
 
@@ -382,7 +385,7 @@ function HangingArm({ spec, armIn }: { spec: CharacterSpec; armIn: number }) {
           its own outline runs straight across the end of the sleeve and the hand reads as a
           ball stuck onto the arm rather than as a hand coming out of it. */}
       <circle cx="25" cy="163.5" r="6.4" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
-      <path d="M31 94 Q18 126 19 158.5 L31 159.5 Q31 126 38 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+      <path d="M31 86 Q18 126 19 158.5 L31 159.5 Q31 126 38 88 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
     </g>
   );
 }
@@ -503,7 +506,7 @@ function Arms({
       {/* his left, screen right */}
       <g transform={`rotate(${-armIn} 69 99)`} style={{ transformOrigin: "69px 99px" }}>
         <circle cx="75" cy="163.5" r="6.4" fill={spec.skin} stroke={INK} strokeWidth="2.4" />
-        <path d="M69 94 Q82 126 81 158.5 L69 159.5 Q69 126 62 96 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
+        <path d="M69 86 Q82 126 81 158.5 L69 159.5 Q69 126 62 88 Z" fill={spec.suit} stroke={INK} strokeWidth="2.6" />
       </g>
     </g>
   );
