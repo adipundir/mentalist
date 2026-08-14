@@ -2,7 +2,7 @@
 
 **Seven rooms. A body in each one. Everybody gives an account of themselves, and exactly one of those accounts cannot be true.**
 
-Live: **https://red-john-cases.vercel.app**
+Live: **https://mentalist-cases.vercel.app**
 Source: **https://github.com/adipundir/mentalist**
 
 A confidential prediction market on Base Sepolia, built for the Inco x Megapot Summer Game Jam 2026, adapted from the Red John arc of *The Mentalist*.

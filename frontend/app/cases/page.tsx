@@ -313,8 +313,11 @@ function CaseCard({
 
         <div className="text-right">
           <p className="mb-1.5 font-mono text-[9px] tracking-file text-bone-dim">IN THE POT</p>
+          {/* No placeholder zero. "$0.00" is a fact about a case nobody has bet on, and
+              printing it before the chain has answered tells that lie on every card for as
+              long as the read takes, then corrects itself in front of the player. */}
           <p className="font-type text-[19px] leading-none text-brass">
-            ${row ? usdc(row.pot) : "0.00"}
+            {row ? `$${usdc(row.pot)}` : <span className="text-bone-dim/40">·</span>}
           </p>
         </div>
       </div>

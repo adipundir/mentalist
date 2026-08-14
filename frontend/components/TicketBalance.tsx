@@ -30,10 +30,15 @@ export function TicketBalance() {
   const { address } = useAccount();
   const pub = usePublicClient();
   const [tickets, setTickets] = useState(0);
+  // Whether the jackpot has actually answered. Without it the chip renders "0 TICKETS" the
+  // moment a wallet connects and corrects itself a second later, which reads as a player
+  // being told they hold nothing and then contradicted.
+  const [read, setRead] = useState(false);
 
   useEffect(() => {
     if (!pub || !address) {
       setTickets(0);
+      setRead(false);
       return;
     }
     let live = true;
@@ -53,7 +58,9 @@ export function TicketBalance() {
             },
           ],
         } as never)) as unknown[];
-        if (live) setTickets(Array.isArray(logs) ? logs.length : 0);
+        if (!live) return;
+        setTickets(Array.isArray(logs) ? logs.length : 0);
+        setRead(true);
       } catch {
         /* a cold read leaves the count where it was rather than blanking it */
       }
@@ -66,7 +73,7 @@ export function TicketBalance() {
     };
   }, [pub, address]);
 
-  if (!address) return null;
+  if (!address || !read) return null;
 
   return (
     <a

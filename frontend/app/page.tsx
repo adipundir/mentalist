@@ -88,7 +88,7 @@ export default function Home() {
         }}
         className="mt-9 cursor-pointer border-2 border-blood-hot bg-blood-hot/10 px-10 py-3 font-type text-[20px] tracking-wide text-blood-hot transition-colors hover:bg-blood-hot/25"
       >
-        BEGIN
+        START
       </motion.button>
 
       <motion.nav
