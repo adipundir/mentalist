@@ -34,6 +34,7 @@ import * as dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CASEBOOK } from "../../frontend/lib/casebook";
+import { ANSWERS } from "../../frontend/lib/answers";
 
 dotenv.config();
 
@@ -69,10 +70,13 @@ function artifact(name: string): { abi: Abi; bytecode: Hex } {
 }
 
 /** Red John's seat: the one account in the room that cannot be true. */
-function answerOf(index: number): number {
-  const seat = CASEBOOK[index]!.alibis.findIndex((a) => a.impossible);
-  if (seat < 0) throw new Error(`case ${index} has no impossible alibi`);
-  return seat;
+function answerOf(i: number): number {
+  // Read from the gitignored answer key rather than from the casebook, which ships to
+  // every browser. The plaintext never leaves this machine: it is encrypted below and
+  // only the ciphertext reaches the chain.
+  const a = ANSWERS[i];
+  if (!a) throw new Error(`no answer for case ${i}`);
+  return a.id;
 }
 
 async function main() {

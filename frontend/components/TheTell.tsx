@@ -1,30 +1,42 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import type { CaseFile } from "@/lib/casebook";
-import { person } from "@/lib/canon";
 
 /**
- * The reasoning, shown once a case is decided.
+ * The reasoning, fetched once a case is decided.
  *
- * Every room is one contradiction wearing a lot of furniture, and a player who staked and
- * lost deserves to see the thing they walked past rather than just the word WRONG. This
- * names the killer, quotes him back word for word, and says what could not be true about it.
- *
- * It renders only after the verdict is in. Before that it would be the answer key.
+ * Nothing here is in the bundle. The killer and the explanation live server side and
+ * `/api/tell` will not release them until the chain says the case is settled, so a player
+ * cannot read the answer out of the page before betting on it.
  */
-export function TheTell({ chapter }: { chapter: CaseFile }) {
-  const seat = chapter.alibis.findIndex((a) => a.impossible);
-  if (seat < 0) return null;
-  // `roster` holds lookup keys, not display names. The lineup shows the real one.
-  const name = person(chapter.roster[seat]).name;
+export function TheTell({ caseId, chapter }: { caseId: number; chapter: CaseFile }) {
+  const [tell, setTell] = useState<{ name: string; alibi: string; tell: string } | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    void fetch(`/api/tell?case=${caseId}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => {
+        if (live && d?.name) setTell(d);
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [caseId]);
+
+  if (!tell) return null;
 
   return (
     <div className="mt-6 border-l-2 border-blood/60 pl-4">
-      <p className="font-mono text-[10px] tracking-file text-blood-hot">RED JOHN WAS {name}</p>
-
-      <p className="mt-3 font-body text-[15px] italic leading-relaxed text-bone-dim">
-        &ldquo;{chapter.alibis[seat].text}&rdquo;
+      <p className="font-mono text-[10px] tracking-file text-blood-hot">
+        RED JOHN WAS {tell.name}
       </p>
-
-      <p className="mt-3 font-body text-[15px] leading-relaxed text-bone">{chapter.tell}</p>
+      <p className="mt-3 font-body text-[15px] italic leading-relaxed text-bone-dim">
+        &ldquo;{tell.alibi}&rdquo;
+      </p>
+      <p className="mt-3 font-body text-[15px] leading-relaxed text-bone">{tell.tell}</p>
     </div>
   );
 }

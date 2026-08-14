@@ -85,7 +85,14 @@ function Victim({ x, y, left }: { x: number; y: number; left: boolean }) {
    * the chin toward the shoulder. Everything below is one of those.
    */
   return (
-    <g transform={`translate(${x} ${y}) scale(${0.34 * flip} 0.34) rotate(-6)`}>
+    // The inner translate is what actually centres her.
+    //
+    // She is drawn outward from her hips, but her mass is not symmetrical about them: head
+    // and shoulders run one way, legs the other. Anchoring the hips to the middle of the
+    // room therefore left the *figure* sitting off to one side of it. Shifting the drawing
+    // back by half its own width puts what you can see in the centre, and because the shift
+    // happens inside the flip it works whichever way she is lying.
+    <g transform={`translate(${x} ${y}) scale(${0.34 * flip} 0.34) rotate(-6) translate(-5.2 0)`}>
       {/* Far leg, underneath and mostly hidden by the near one: straight out, foot turned
           over the way a leg lands when nothing is holding it. */}
       {limb(
@@ -212,7 +219,6 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
     // Lifted with the lineup. Everything downstream — the pool, the spatter and the prints
     // walking out — is measured from here, so the whole scene travels together.
     const bodyY = 62 + r() * 2;
-    const exitX = left ? 6 + r() * 14 : 154 - r() * 14;
 
     const pool = blob(r, bodyX + (r() < 0.5 ? 1.5 : -1.5), bodyY + 1.5, 7 + r() * 2);
 
@@ -224,13 +230,19 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
       return { d: blob(r, x, y, 0.7 + r() * 1.9, 8), o: 0.3 + r() * 0.36 };
     });
 
-    // Prints walking out of the pool and straight past you, growing as they come forward and
-    // fading as the blood wears off the shoe.
-    // Where the walk goes: sideways out of the pool and a little toward the camera.
-    const px = (t: number) => bodyX + (exitX - bodyX) * t;
-    const py = (t: number) => bodyY + 2 + t * t * 12;
+    // Prints walking out of the pool and past you, growing as they come forward and fading
+    // as the blood wears off the shoe.
+    //
+    // They used to run at the far wall — `exitX` put them out at the edge of the room, so
+    // the trail crossed the frame sideways and the last print ended up off the screen
+    // entirely, at three times the length of a foot, because the growth curve had nothing
+    // stopping it. He walks out past the camera instead: a short lateral drift and a lot of
+    // downward travel, which is what "toward you" looks like in a faked perspective.
+    const out = left ? -1 : 1;
+    const px = (t: number) => bodyX + out * (5 + t * 17);
+    const py = (t: number) => bodyY + 5 + t * 27;
 
-    const steps = 9;
+    const steps = 8;
     const prints = Array.from({ length: steps }, (_, i) => {
       const t = i / (steps - 1);
       const ease = t * t; // the floor recedes, so steps bunch up toward the back wall
@@ -251,8 +263,11 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
         side: i % 2 === 0 ? -1 : 1,
         // A few degrees of toe-out per foot, because nobody walks with their feet parallel.
         rot: heading + (r() - 0.5) * 7,
-        o: Math.max(0.1, 0.8 - t * 0.55),
-        s: 0.5 + ease * 1.5,
+        o: Math.max(0.12, 0.72 - t * 0.5),
+        // A shoe is about a fifth the length of the person lying next to it, so this is
+        // capped rather than left to run: it used to reach 1.8 and print a boot the size of
+        // her torso in the foreground.
+        s: 0.55 + ease * 0.55,
       };
     });
 
@@ -301,7 +316,7 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
       {scene.prints.map((p, i) => (
         <g
           key={i}
-          transform={`translate(${p.x} ${p.y}) rotate(${p.rot + p.side * 5}) translate(${p.side * 1.7} 0) scale(${p.s * 0.9})`}
+          transform={`translate(${p.x} ${p.y}) rotate(${p.rot + p.side * 5}) translate(${p.side * 1.7} 0) scale(${p.s * 0.62})`}
           opacity={p.o}
         >
           <g transform={`scale(${p.side} 1)`}>

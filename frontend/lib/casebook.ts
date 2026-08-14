@@ -5,7 +5,7 @@
  * and none of it behind a wallet: a player opens a case and hears the whole room without
  * ever touching the chain.
  *
- * Each case carries exactly one account that is logically impossible, and where it sits in
+ * Each case carries exactly one account that is logically impossible. Which one it is does
  * the list is who gives it: `alibis[i]` belongs to `roster[i]`. That mapping is fixed and
  * public, which is the whole reason the room needs no chain call to open.
  *
@@ -17,7 +17,8 @@
  * informed money and simply follow it.
  *
  * Trustless there means immutable, not correct. No contract can check that the sealed index
- * is the one marked `impossible` below, and there is no reveal afterwards to catch a case
+ * not appear in this file: the answer key is server side, so nobody can read a case out of
+ * the bundle before betting on it.
  * that was opened on a different one, so that much rests on whoever authored it.
  */
 
@@ -25,7 +26,6 @@ export interface Alibi {
   /** What he says, in his own words. */
   text: string;
   /** The one account in each case that cannot be true. Its index is the killer's person id. */
-  impossible?: true;
 }
 
 export interface CaseFile {
@@ -46,7 +46,6 @@ export interface CaseFile {
   /** One per suspect, in seat order: `alibis[i]` is what `roster[i]` says. */
   alibis: Alibi[];
   /** Why that account cannot be true. Shown only once the case is closed. */
-  tell: string;
   successText: string;
   failureText: string;
 }
@@ -76,17 +75,13 @@ export const CASEBOOK: CaseFile[] = [
       },
       {
         text: "I was out cold in the front room chair the whole hour, and my eyes never left those stairs. Nobody went up.",
-        impossible: true,
       },
       {
         text: "I went to the cellar for another bottle, and that sticking door kept me down there a good while.",
       },
     ],
-    tell: "You cannot be out cold for an hour and keep watch on the stairs in the same breath. This one slept through the only thing worth seeing, then swore to it anyway.",
-    successText:
-      "You put the money on the sleeper, and the parlour went very quiet. Whoever swore to an hour of nothing had spent that hour upstairs with three fingers and a steady wrist, and there will be no sleeping tonight.",
-    failureText:
-      "You named the wrong one, and the wrong one wept, and your money was gone before the weeping stopped. Somewhere behind you a hand that had been gloved all afternoon was already reaching for its coat.",
+    successText: "You got him. The man who swore he slept through the hour was upstairs the whole time.",
+    failureText: "Wrong man. The real one was still in the room when you pointed.",
   },
   {
     label: "Chapter II",
@@ -118,17 +113,13 @@ export const CASEBOOK: CaseFile[] = [
       },
       {
         text: "I had the bolt across the back room door the whole hour, nobody in and nobody out. And halfway through that, I stood right over him out there on the linoleum and saw him face down, before any shouting started.",
-        impossible: true,
       },
       {
         text: "I was in the bathroom being sick from that takeout, head over the sink most of the hour. I would rather you left that out.",
       },
     ],
-    tell: "The story bolts the speaker into the back room for the whole hour and then, in the middle of that same hour, stands him over the body out on the linoleum. One man cannot be behind his own bolt and out on that floor at the same moment.",
-    successText:
-      "Bolted in the whole hour, and still standing over him on the linoleum: the story cannot carry both, and it comes apart in your hands. The smile on the wall stops being funny the moment the cuffs close. You collect your money while the rain thins out, and the man they fold into the back of the car is the one who painted it.",
-    failureText:
-      "The wrong wrists get the bracelets, and the face on the plaster goes right on grinning at everybody. Your stake walks out into the dark with the real one, who nods at the uniforms on the way past like a neighbour heading home.",
+    successText: "You got him. He cannot be behind his own bolted door and out on the floor at the same time.",
+    failureText: "Wrong man. The one who did it walked out past the uniforms.",
   },
   {
     label: "Chapter III",
@@ -166,7 +157,6 @@ export const CASEBOOK: CaseFile[] = [
       },
       {
         text: "I was standing third in the burger line, two people ahead of me. There was not one other person in that whole food court.",
-        impossible: true,
       },
       {
         text: "I was at the corner table with the newspaper up in front of my face. Put it down when the screaming started.",
@@ -181,11 +171,8 @@ export const CASEBOOK: CaseFile[] = [
         text: "A quarter rolled off my tray and under the tables. I was down on my hands and knees when it happened.",
       },
     ],
-    tell: "You cannot be standing third in a line with nobody in front of you, and that alibi puts the whole food court empty at the very same moment.",
-    successText:
-      "There was no line, and there was no waiting your turn, and now there is no story left. They walk him out past the fryers still talking, and the smile up on the tile keeps grinning like it knew all along.",
-    failureText:
-      "You point, the wrong wrists come up, and the room lets out a breath that costs you everything in your pocket. Somewhere behind you a fire door sighs shut, and the smile on the tile is still the only one in the building.",
+    successText: "You got him. There was no queue, so there was nobody in front of him to wait for.",
+    failureText: "Wrong man. Your money is gone and the smile is still on the tile.",
   },
   {
     label: "Chapter IV",
@@ -225,7 +212,6 @@ export const CASEBOOK: CaseFile[] = [
       },
       {
         text: "I needed air, so I walked the reservoir loop in the rain, three miles if it is a step. Gone four minutes, five at the outside.",
-        impossible: true,
       },
       {
         text: "I was in the washroom with the cold tap running over my wrists till my head cleared. Five minutes, then straight in here.",
@@ -234,11 +220,8 @@ export const CASEBOOK: CaseFile[] = [
         text: "I was marking up the racing page with a pencil stub. I have never bet a dollar, I just like the names.",
       },
     ],
-    tell: "Nobody covers three miles on foot in four or five minutes, since even the fastest runners alive need better than twelve minutes for that distance and this was a walk in the rain, so the trip cannot fit inside the time claimed for it.",
-    successText:
-      "You put the money on the mouth that folded an hour into four minutes, and the smile drains out of the room like a light going off. Red John goes out through the rain in cuffs, and tonight the painted grin on the wall belongs to you.",
-    failureText:
-      "You name the wrong mouth and the row breathes out at once, every one of them except the one you pointed at. Somewhere inside that relief Red John is already turning toward the door, still wearing the four minutes that never happened.",
+    successText: "You got him. Nobody makes that drive in four minutes.",
+    failureText: "Wrong man. He left while everyone was looking at somebody else.",
   },
   {
     label: "Chapter V",
@@ -261,7 +244,6 @@ export const CASEBOOK: CaseFile[] = [
       },
       {
         text: "I never once went down, and that trapdoor, the only way into the cellar, stayed shut the whole hour. Still I watched somebody kneel and put that red on her cheek.",
-        impossible: true,
       },
       {
         text: "I had the flat off the truck and the spare halfway onto the bolts. Look at my hands, the grease is still in the creases.",
@@ -276,11 +258,8 @@ export const CASEBOOK: CaseFile[] = [
         text: "I was in the washroom being sick, and I stayed in there a good while after, sweating it out.",
       },
     ],
-    tell: "By his own telling the hatch was shut the whole hour and it is the only way to look into that cellar, so there was nothing for him to look through. A man cannot watch the mark being drawn in a room he has just finished sealing himself out of.",
-    successText:
-      "You put the name to the face and the bracelets go on while the carmine is still tacky. The smile on her cheek stops being a signature and starts being evidence.",
-    failureText:
-      "Wrong mouth, and the room knows it before you do. The one you wanted is already up the stairs and into the rain, and by morning there is a fresh smile drying on a fresh cheek.",
+    successText: "You got him. He could not have seen what he described from where he says he stood.",
+    failureText: "Wrong man. By morning there was a fresh smile on a fresh wall.",
   },
   {
     label: "Chapter VI",
@@ -309,17 +288,13 @@ export const CASEBOOK: CaseFile[] = [
       },
       {
         text: "I rang my wife on the hall phone about half nine to say I would be late home. Ask her.",
-        impossible: true,
       },
       {
         text: "I went up to change my shirt, the collar had gone soft, and buttons are slow work when you have had a few.",
       },
     ],
-    tell: "The wires came down on Tuesday and the hall phone has not carried a sound since, so the call he swears he made on it tonight never went anywhere at all.",
-    successText:
-      "The room goes quiet the way rooms do when the one man who should be talking finds he has nothing left to say. Red John looks at you like you have paid him a compliment, and the money comes home.",
-    failureText:
-      "You point, and a man goes white who has done nothing worse than be in this house tonight. Somewhere behind him another one laughs, small and pleased, and walks out into the rain with your stake.",
+    successText: "You got him. He described a thing in a state it could not have been in.",
+    failureText: "Wrong man. The one who did it laughed and walked out into the rain.",
   },
   {
     label: "Chapter VII",
@@ -345,13 +320,9 @@ export const CASEBOOK: CaseFile[] = [
       },
       {
         text: "I bolted myself into the vestry when the rain started, nobody else in there the whole hour, and I lost at chess in under twenty moves.",
-        impossible: true,
       },
     ],
-    tell: "He bolted himself into the vestry with nobody else in it, then says he lost a game of chess. Chess takes two, and by his own account there was no one on the other side of the board.",
-    successText:
-      "You lay the money on the one who lost a game to nobody, and the whole church stops breathing at once. The rain quits, the smile finally comes off, and after all these years Red John has a face to go with it.",
-    failureText:
-      "You point, the money goes down, and the wrong mouth falls open in horror. The right one does not move at all, because he knew you would look everywhere in this room except at the empty chair across the board.",
+    successText: "You got him. Nobody plays a game alone and loses it.",
+    failureText: "Wrong man. He knew you would look everywhere except at the empty chair.",
   },
 ];

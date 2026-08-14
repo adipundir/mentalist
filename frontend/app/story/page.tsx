@@ -259,7 +259,7 @@ function StoryInner() {
                     is over, so the reasoning is no longer worth withholding: name the man,
                     put his own words back in front of the player, and show the contradiction
                     that was sitting in them the whole time. */}
-                {verdict !== null && <TheTell chapter={chapter} />}
+                {verdict !== null && <TheTell caseId={index} chapter={chapter} />}
                 <Settlement caseId={index} onResolved={setVerdict} />
               </>
             }
