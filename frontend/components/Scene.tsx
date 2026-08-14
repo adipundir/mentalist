@@ -203,7 +203,12 @@ export function Scene({
 
         </div>
 
-        {closesAt !== undefined && <Countdown closesAt={closesAt} />}
+        {/* Stood down while an account is being given. The camera wrapper inside the room
+            is transformed, which makes it a stacking context: no z-index inside it can ever
+            outrank the HUD, so a bubble from a back-row figure ran under this clock however
+            high it was pushed. The clock steps aside instead — nothing may sit over what a
+            suspect is saying. */}
+        {closesAt !== undefined && <Countdown closesAt={closesAt} hidden={!!g.saying} />}
 
         {/* The bar and the stake panel both live on the bottom edge, and the bar is opaque
             and sits above it. Once the panel is up it is what the player came for, so the bar
@@ -251,7 +256,7 @@ export function Scene({
  * of state that is always worth a glance. It sits in the middle of the screen because it
  * belongs to the room rather than to any one suspect.
  */
-function Countdown({ closesAt }: { closesAt: number }) {
+function Countdown({ closesAt, hidden }: { closesAt: number; hidden?: boolean }) {
   // Anchored to closesAt rather than to a clock read during render, which would differ
   // between the server pass and the browser's first pass and fail hydration.
   const [now, setNow] = useState(closesAt);
@@ -270,7 +275,9 @@ function Countdown({ closesAt }: { closesAt: number }) {
   const urgent = left < 5 * 60_000;
 
   return (
-    <div className="pointer-events-none absolute left-1/2 top-14 -translate-x-1/2 text-center sm:top-16">
+    <div
+      className={`pointer-events-none absolute left-1/2 top-14 -translate-x-1/2 text-center transition-opacity duration-300 sm:top-16 ${hidden ? "opacity-0" : "opacity-100"}`}
+    >
       <p className="font-mono text-[10px] tracking-file text-bone-dim">
         {left === 0 ? "CASE CLOSED" : "CASE CLOSES IN"}
       </p>

@@ -14,22 +14,29 @@ import { isNarratorMuted } from "./narrator";
  * the synthesised path cancels its own utterance, or two accounts play over each other and
  * neither is worth listening to.
  */
-let current: HTMLAudioElement | null = null;
+let current: { el: HTMLAudioElement; abort: () => void } | null = null;
 
 export function stopVoice() {
   if (!current) return;
-  current.pause();
-  current.src = "";
+  const c = current;
   current = null;
+  c.abort();
 }
 
 /**
  * Play a seat's account.
  *
  * Resolves `true` once it has finished playing, `false` the moment it is clear there is
- * nothing to play — no file, a codec the browser will not take, or autoplay refused. The
- * caller uses that answer to fall back, so a missing recording costs a beat rather than an
+ * nothing to play — no file, a codec the browser will not take. The caller uses that answer
+ * to fall back to the synthesised voice, so a missing recording costs a beat rather than an
  * account nobody hears.
+ *
+ * Autoplay refusal is not "nothing to play". A card that mounts straight after a navigation
+ * has had no gesture yet, so the browser rejects `play()` — and `speechSynthesis` is not
+ * gated the same way, which meant the fallback spoke where the recording could not, and the
+ * one voice that ever played before a click was the browser's. Refusal now waits for the
+ * first gesture and plays the recording then: the promise stays open, so the fallback never
+ * fires early, and the worst case is a silent beat before the player's first click.
  */
 export function playLine(caseId: number, seat: number): Promise<boolean> {
   return playCue(`c${caseId}-s${seat}`);
@@ -42,23 +49,52 @@ export function playCue(name: string): Promise<boolean> {
 
   return new Promise<boolean>((resolve) => {
     const el = new Audio(`/vo/${name}.m4a`);
-    current = el;
     let settled = false;
+    let unhook: (() => void) | null = null;
+    let stall: ReturnType<typeof setTimeout> | null = null;
+
     const done = (played: boolean) => {
       if (settled) return;
       settled = true;
-      if (current === el) current = null;
+      unhook?.();
+      if (stall) clearTimeout(stall);
+      el.pause();
+      el.src = "";
+      if (current?.el === el) current = null;
       resolve(played);
     };
+    current = { el, abort: () => done(false) };
 
     el.addEventListener("ended", () => done(true), { once: true });
     el.addEventListener("error", () => done(false), { once: true });
-    // A file that is missing 404s into `error`, but a file that is present and simply never
-    // decodes would otherwise hang the caller forever. Nothing in the casebook runs past a
-    // minute, so this can only fire on a stall.
-    const guard = setTimeout(() => done(false), 60_000);
-    el.addEventListener("ended", () => clearTimeout(guard), { once: true });
+    // Nothing in the casebook runs long: once sound has started, a couple of minutes of
+    // not-finishing is a stall, not a monologue.
+    el.addEventListener(
+      "playing",
+      () => {
+        stall = setTimeout(() => done(false), 180_000);
+      },
+      { once: true },
+    );
 
-    el.play().catch(() => done(false));
+    const tryPlay = () =>
+      el.play().catch((e) => {
+        if (!settled && (e as DOMException)?.name === "NotAllowedError") {
+          const retry = () => {
+            unhook?.();
+            unhook = null;
+            tryPlay();
+          };
+          unhook = () => {
+            window.removeEventListener("pointerdown", retry, true);
+            window.removeEventListener("keydown", retry, true);
+          };
+          window.addEventListener("pointerdown", retry, { once: true, capture: true });
+          window.addEventListener("keydown", retry, { once: true, capture: true });
+        } else {
+          done(false);
+        }
+      });
+    tryPlay();
   });
 }
