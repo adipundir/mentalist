@@ -263,9 +263,8 @@ export function Settlement({
         </p>
       ) : !closed ? (
         <p className="font-body text-[13px] leading-relaxed text-bone">
-          Your money is on a name nobody else can read, and nobody can find out whether it was
-          right until the case stops taking bets. That includes us.{" "}
-          <span className="text-brass">The result is in {countdown(row.closesAt - now)}.</span>
+          Your pick is sealed until the case closes.{" "}
+          <span className="text-brass">Result in {countdown(row.closesAt - now)}.</span>
         </p>
       ) : /* Filing is only possible until the filing window runs out, and the books can only
               be closed after it has. The clock is the guard, NOT the `settled` flag: `_credit`
@@ -277,10 +276,7 @@ export function Settlement({
       !row.resolved && !row.settled && now < row.closesAt + graceMs ? (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
-            The case has closed and the result is being worked out. The{" "}
-            <span className="text-blood-hot">contract</span> decides who was right, not this
-            page, so it happens on chain and takes a few minutes. Leave this open and it will
-            tell you the moment it knows.
+            Case closed. Working out the result on chain, which takes a moment.
           </p>
           {/* The keeper does this for the whole room on a schedule, so nobody has to press
               anything. The button stays for the case where it is running late, and for anyone
@@ -293,10 +289,10 @@ export function Settlement({
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
             {!row.resolved
-              ? "This case closed without a result being recorded for you, so it pays you nothing. The books still need closing before anyone can collect."
+              ? "No result was recorded for you on this case."
               : row.won
-                ? "You named him. The contract agrees, and your share is waiting: it is released once everyone else in the room has had their result recorded too."
-                : "Wrong man. Your stake stays in the pot for whoever got it right."}
+                ? "You caught the killer. Your reward unlocks once the rest of the room has been counted."
+                : "Wrong man. Your stake goes to whoever got it right."}
           </p>
           <Button
             tone={row.won ? "blood" : "dim"}
@@ -338,8 +334,7 @@ export function Settlement({
       ) : row.winningStake === 0n ? (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
-            Nobody in this room named him. There is no winning side to divide the pot among,
-            so every stake goes back where it came from.
+            Nobody caught him, so every stake goes back.
           </p>
           <Button
             tone="brass"
@@ -363,9 +358,8 @@ export function Settlement({
       ) : row.won ? (
         <>
           <p className="font-body text-[13px] leading-relaxed text-bone">
-            You&rsquo;re in for <span className="text-brass">${usdc(row.share)}</span> of a $
-            {usdc(row.pot)} pot. Take it as cash, or in Megapot tickets for{" "}
-            <span className="text-brass">five percent more</span>.
+            <span className="text-brass">Congratulations, you caught the killer.</span> Choose
+            your reward.
           </p>
           <div className="flex flex-wrap gap-3">
             <Button
@@ -384,9 +378,15 @@ export function Settlement({
               }
               disabled={busy !== null}
             >
-              {busy === "paying"
-                ? "BUYING YOUR TICKETS…"
-                : `TAKE $${usdc((row.share * 105n) / 100n)} IN TICKETS`}
+              {busy === "paying" ? (
+                "BUYING YOUR TICKETS…"
+              ) : (
+                <span className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/megapot-light.svg" alt="" className="block h-[11px] w-auto" />
+                  <span>${usdc((row.share * 105n) / 100n)} IN TICKETS</span>
+                </span>
+              )}
             </Button>
             <Button
               tone="dim"
@@ -404,7 +404,15 @@ export function Settlement({
               }
               disabled={busy !== null}
             >
-              {busy === "cashing" ? "PAYING OUT…" : `TAKE $${usdc(row.share)} IN USDC`}
+              {busy === "cashing" ? (
+                "PAYING OUT…"
+              ) : (
+                <span className="flex items-center gap-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/brand/usdc.svg" alt="" className="block h-[13px] w-auto" />
+                  <span>${usdc(row.share)} IN USDC</span>
+                </span>
+              )}
             </Button>
           </div>
         </>
