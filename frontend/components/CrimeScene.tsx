@@ -218,7 +218,7 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
     const left = variant % 2 === 0;
     // Lifted with the lineup. Everything downstream — the pool, the spatter and the prints
     // walking out — is measured from here, so the whole scene travels together.
-    const bodyY = 62 + r() * 2;
+    const bodyY = Math.round((62 + r() * 2) * 100) / 100;
 
     const pool = blob(r, bodyX + (r() < 0.5 ? 1.5 : -1.5), bodyY + 1.5, 7 + r() * 2);
 
@@ -257,17 +257,26 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
       const dy = py(Math.min(1, t + 0.02)) - py(Math.max(0, t - 0.02));
       const heading = (Math.atan2(dx, -dy) * 180) / Math.PI;
 
+      // Rounded, because these numbers end up inside a `transform` string.
+      //
+      // `Math.atan2` is allowed to differ in its last bit between one engine and another,
+      // and the server and the browser are two engines: the markup came back with
+      // rotate(-146.54274705003652) against the server's ...655, which React reports as a
+      // hydration mismatch on every reload of a case. Two decimal places is finer than a
+      // pixel here and identical on both sides.
+      const round = (v: number) => Math.round(v * 100) / 100;
+
       return {
-        x: px(t),
-        y: py(t),
+        x: round(px(t)),
+        y: round(py(t)),
         side: i % 2 === 0 ? -1 : 1,
         // A few degrees of toe-out per foot, because nobody walks with their feet parallel.
-        rot: heading + (r() - 0.5) * 7,
-        o: Math.max(0.12, 0.72 - t * 0.5),
+        rot: round(heading + (r() - 0.5) * 7),
+        o: round(Math.max(0.12, 0.72 - t * 0.5)),
         // A shoe is about a fifth the length of the person lying next to it, so this is
         // capped rather than left to run: it used to reach 1.8 and print a boot the size of
         // her torso in the foreground.
-        s: 0.55 + ease * 0.55,
+        s: round(0.55 + ease * 0.55),
       };
     });
 

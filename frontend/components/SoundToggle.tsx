@@ -30,7 +30,7 @@ export function SoundToggle() {
       }}
       className="fixed bottom-3 right-3 z-[90] cursor-pointer border border-ink-3 bg-ink/80 px-2 py-1 font-mono text-[9px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
     >
-      {off ? "SOUND OFF" : "SOUND ON"}
+      {off ? "SOUND: OFF" : "SOUND: ON"}
     </button>
   );
 }

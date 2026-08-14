@@ -153,17 +153,19 @@ export function startRoomTone() {
   const src = noise(ac);
   src.loop = true;
 
+  // Same correction as the beds: 320Hz of filtered rumble is air nobody can hear on a
+  // built-in speaker. Opened up enough to read as a room without becoming hiss.
   const lp = ac.createBiquadFilter();
   lp.type = "lowpass";
-  lp.frequency.value = 320;
+  lp.frequency.value = 900;
 
   const hp = ac.createBiquadFilter();
   hp.type = "highpass";
-  hp.frequency.value = 40;
+  hp.frequency.value = 90;
 
   const g = ac.createGain();
   g.gain.setValueAtTime(0.0001, ac.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.035, ac.currentTime + 2.5);
+  g.gain.exponentialRampToValueAtTime(0.05, ac.currentTime + 2.5);
 
   src.connect(hp).connect(lp).connect(g).connect(bus()!);
   src.start();
@@ -576,12 +578,12 @@ export function startTitleBed() {
 
   const out = ac.createGain();
   out.gain.setValueAtTime(0.0001, ac.currentTime);
-  out.gain.exponentialRampToValueAtTime(0.05, ac.currentTime + 4);
+  out.gain.exponentialRampToValueAtTime(0.09, ac.currentTime + 4);
 
   // A slow sweep across the top so the chord opens and closes rather than droning flat.
   const lp = ac.createBiquadFilter();
   lp.type = "lowpass";
-  lp.frequency.value = 420;
+  lp.frequency.value = 1250;
   lp.Q.value = 0.6;
 
   const sweep = ac.createOscillator();
@@ -594,10 +596,10 @@ export function startTitleBed() {
   // D minor, rooted low. The fifth is left out: a bare root, third and octave is emptier,
   // and empty is the point.
   const voices = [
-    { hz: 36.7, type: "sine" as const, gain: 0.55 },
-    { hz: 73.4, type: "triangle" as const, gain: 0.3, detune: -7 },
-    { hz: 87.3, type: "triangle" as const, gain: 0.22, detune: 6 },
-    { hz: 146.8, type: "sine" as const, gain: 0.12, detune: -4 },
+    { hz: 73.4, type: "sine" as const, gain: 0.4 },
+    { hz: 146.8, type: "sine" as const, gain: 0.34, detune: -7 },
+    { hz: 174.6, type: "triangle" as const, gain: 0.17, detune: 6 },
+    { hz: 293.7, type: "triangle" as const, gain: 0.09, detune: -4 },
   ];
 
   const oscs = voices.map((v) => {
@@ -645,11 +647,17 @@ export function startRoomBed() {
 
   const out = ac.createGain();
   out.gain.setValueAtTime(0.0001, ac.currentTime);
-  out.gain.exponentialRampToValueAtTime(0.032, ac.currentTime + 6);
+  out.gain.exponentialRampToValueAtTime(0.075, ac.currentTime + 6);
 
+  // Written for a register a laptop can actually reproduce.
+  //
+  // This bed used to sit on a 36Hz root under a 300Hz lowpass at a gain of 0.032, which is
+  // a correct piece of sound design that nobody could hear: built-in speakers roll off
+  // below about 150Hz, so on the machine most players use there was silence, and the sound
+  // toggle read as a switch with nothing behind it.
   const lp = ac.createBiquadFilter();
   lp.type = "lowpass";
-  lp.frequency.value = 300;
+  lp.frequency.value = 1100;
   lp.Q.value = 0.5;
 
   // Slower than the title's breath, and shallower. A room does not swell.
@@ -662,9 +670,10 @@ export function startRoomBed() {
 
   // Root, minor third, and the octave. No fifth, so it never resolves into comfort.
   const voices = [
-    { hz: 36.7, type: "sine" as const, gain: 0.5 },
-    { hz: 73.4, type: "triangle" as const, gain: 0.2, detune: -9 },
-    { hz: 87.3, type: "triangle" as const, gain: 0.13, detune: 7 },
+    { hz: 73.4, type: "sine" as const, gain: 0.34 },          // the weight, for headphones
+    { hz: 146.8, type: "sine" as const, gain: 0.3 },          // root
+    { hz: 174.6, type: "triangle" as const, gain: 0.15, detune: -9 }, // minor third
+    { hz: 293.7, type: "triangle" as const, gain: 0.075, detune: 7 }, // the octave above
   ];
   const oscs = voices.map((v) => {
     const o = ac.createOscillator();
@@ -681,7 +690,7 @@ export function startRoomBed() {
   // A pulse just under the chord, near a resting heart rate. It is felt more than heard.
   const pulse = ac.createOscillator();
   pulse.type = "sine";
-  pulse.frequency.value = 27.5;
+  pulse.frequency.value = 55;
   const pulseGain = ac.createGain();
   pulseGain.gain.value = 0.0001;
   const beat = ac.createOscillator();
@@ -699,7 +708,7 @@ export function startRoomBed() {
   roomBed = {
     duck: (on: boolean) => {
       if (!ctx) return;
-      out.gain.setTargetAtTime(on ? 0.011 : 0.032, ctx.currentTime, 0.25);
+      out.gain.setTargetAtTime(on ? 0.026 : 0.075, ctx.currentTime, 0.25);
     },
     stop: () => {
       if (!ctx) return;

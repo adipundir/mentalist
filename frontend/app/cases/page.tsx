@@ -12,6 +12,7 @@ import { usdc } from "@/lib/market";
 import { SEASON_START, countdown, nextRelease, schedule } from "@/lib/schedule";
 import { Character } from "@/components/Character";
 import { PoweredBy } from "@/components/PoweredBy";
+import * as sfx from "@/lib/sound";
 import { TicketBalance } from "@/components/TicketBalance";
 
 /**
@@ -53,6 +54,14 @@ export default function Board() {
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
+  }, []);
+
+  // The board used to be the one silent screen in the game: the film brings its own sound
+  // and the room has its own bed, so arriving here dropped the player into nothing. Audio
+  // is already unlocked by the click on BEGIN that got them here.
+  useEffect(() => {
+    sfx.startTitleBed();
+    return () => sfx.stopTitleBed();
   }, []);
 
   useEffect(() => {

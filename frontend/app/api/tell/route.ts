@@ -52,18 +52,6 @@ export async function GET(request: Request) {
 
     if (!c[6]) return NextResponse.json({ error: "case is not settled" }, { status: 403 });
 
-    // Take a key to the answer. The contract is the thing enforcing that this is allowed, and
-    // it refuses outright until the books are shut, so there is no window to race.
-    const hash = await wallet.writeContract({
-      address: MENTALIST_ADDRESS,
-      abi: MENTALIST_ABI,
-      functionName: "revealAnswer",
-      args: [caseId],
-      chain: activeChain,
-      account,
-    });
-    await pub.waitForTransactionReceipt({ hash });
-
     const handle = (await pub.readContract({
       address: MENTALIST_ADDRESS,
       abi: MENTALIST_ABI,
@@ -72,8 +60,46 @@ export async function GET(request: Request) {
     })) as `0x${string}`;
 
     const zap = await getZap();
-    const [result] = await zap.attestedDecrypt(wallet as never, [handle] as never);
-    const id = Number((result as { plaintext: { value: bigint } }).plaintext.value);
+    const read = async () => {
+      const [r] = await zap.attestedDecrypt(wallet as never, [handle] as never);
+      return Number((r as { plaintext: { value: bigint } }).plaintext.value);
+    };
+
+    // Try to read it before paying to unlock it. The grant is permanent once made, so after
+    // the first reveal of a case every later request is a pure read: sending `revealAnswer`
+    // unconditionally would mean a transaction, and a fee, every time anybody opened a
+    // settled case.
+    let id: number;
+    try {
+      id = await read();
+    } catch {
+      const hash = await wallet.writeContract({
+        address: MENTALIST_ADDRESS,
+        abi: MENTALIST_ABI,
+        functionName: "revealAnswer",
+        args: [caseId],
+        chain: activeChain,
+        account,
+      });
+      await pub.waitForTransactionReceipt({ hash });
+
+      // The covalidator answers to the on-chain ACL and does not see the grant the instant it
+      // mines, so the first read after a reveal can fail on timing alone. That is what a
+      // freshly settled case looked like: an error, on a case the contract had already agreed
+      // to open.
+      let last: unknown;
+      id = -1;
+      for (let i = 0; i < 5; i++) {
+        try {
+          id = await read();
+          break;
+        } catch (err) {
+          last = err;
+          await new Promise((r) => setTimeout(r, 1500 * (i + 1)));
+        }
+      }
+      if (id < 0) throw last;
+    }
 
     const who = chapter.roster[id];
     if (who === undefined) {
