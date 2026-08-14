@@ -176,11 +176,11 @@ function Victim({ x, y, left }: { x: number; y: number; left: boolean }) {
           strokeWidth="1.9"
           strokeLinejoin="round"
         />
-        {/* Eyes closed, mouth slightly open. Crossed-out eyes are a cartoon gag, and this is
-            the reason every person in the room is being questioned. */}
-        <g stroke={INK} strokeWidth="1.8" strokeLinecap="round" fill="none">
-          <path d="M-6.4 -1 Q-4.2 1.2 -2 -1" />
-          <path d="M2 -1 Q4.2 1.2 6.4 -1" />
+        {/* Eyes crossed out. Closed lids read as asleep at this size — the shape is the same
+            arc a sleeping cartoon uses — and she is not asleep. */}
+        <g stroke={INK} strokeWidth="1.9" strokeLinecap="round" fill="none">
+          <path d="M-6.6 -3 l3.8 3.8 M-2.8 -3 l-3.8 3.8" />
+          <path d="M2.8 -3 l3.8 3.8 M6.6 -3 l-3.8 3.8" />
         </g>
         <ellipse cx="0.4" cy="5.4" rx="1.9" ry="1.5" fill="#5b2b2b" stroke={INK} strokeWidth="1.4" />
       </g>

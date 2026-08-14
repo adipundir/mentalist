@@ -196,7 +196,10 @@ export async function voiceForSeat(
   // woman's voice. Unclassified voices stay in the pool: they are usually fine, and a seat
   // with no voice at all is worse than a seat with an ambiguous one. If the match empties
   // the pool completely, the mixed pool is used rather than nothing.
-  if (feminine !== undefined) {
+  // Undefined means masculine, because the cast marks only the women. Skipping the filter
+  // whenever the flag was absent meant it never ran for a man at all, and he answered in
+  // whichever voice the alphabet handed his seat, which on a Mac is usually a woman's.
+  {
     const want = feminine ? "f" : "m";
     const fitted = pool.filter((v) => {
       const sounds = voiceSounds(v);
