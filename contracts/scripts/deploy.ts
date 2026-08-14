@@ -124,8 +124,21 @@ async function main() {
   // Name the keeper, so the winners of these cases never have to come back and file to be
   // counted. It is not the owner and it holds no money: the most it can do is carry
   // covalidator-signed verdicts on-chain, and refuse to.
+  // Required, not optional.
+  //
+  // This used to warn and carry on, and a deployment that took the warning went out with no
+  // resolver at all: `unsealFor` reverts with `NotResolver()`, so nobody could file for
+  // anybody, and every winner in a room with one slow player sat behind the two-hour filing
+  // window before they could be paid. A game whose settlement depends on this address is a
+  // game that should not deploy without it.
   const keeper = process.env.KEEPER_ADDRESS;
-  if (keeper) {
+  if (!keeper) {
+    throw new Error(
+      "KEEPER_ADDRESS is not set: deploying without a resolver leaves every room waiting on " +
+        "its slowest player. Set it to the keeper wallet and run this again.",
+    );
+  }
+  {
     const tx = await wallet.writeContract({
       address: addr,
       abi: book.abi,
@@ -134,8 +147,6 @@ async function main() {
     });
     await pub.waitForTransactionReceipt({ hash: tx });
     console.log(`resolver set: ${keeper}`);
-  } else {
-    console.log("no KEEPER_ADDRESS, so players will file their own verdicts");
   }
 
   for (const [i, c] of CASEBOOK.entries()) {
