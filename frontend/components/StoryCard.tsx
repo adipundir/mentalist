@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Character, type CharacterSpec } from "./Character";
 import { isVoiceMuted, playCue, setVoiceMuted, stopVoice } from "@/lib/voice";
@@ -38,7 +38,6 @@ export function StoryCard({
   const [shown, setShown] = useState(0);
   const [muted, setMuted] = useState(isVoiceMuted());
   const done = shown >= body.length;
-  const started = useRef(false);
 
   // Type it out. ~28ms/char lands close to spoken pace for this register.
   useEffect(() => {
@@ -50,9 +49,12 @@ export function StoryCard({
   }, [shown, done, body.length]);
 
   // The narrator reads the card, if this card has a recording. One without simply types.
+  //
+  // No mount guard. In dev React runs the effect twice — mount, cleanup, mount — and a
+  // guard that survives the first cleanup leaves the second, real mount silent: the first
+  // run claims the flag and plays, the cleanup stops the audio, and the rerun bails on the
+  // flag. Playing on every (re)mount is correct; the cleanup already stops the old one.
   useEffect(() => {
-    if (started.current) return;
-    started.current = true;
     if (voice) void playCue(voice);
     return () => stopVoice();
   }, [voice]);
