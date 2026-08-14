@@ -347,6 +347,34 @@ contract Mentalist is Ownable, ReentrancyGuard {
     // ─────────────────────────────────────────── the result
 
     /**
+     * @notice Open the answer, once the case is settled and paid.
+     *
+     * @dev Until this is called nobody holds a key to `_answer`: not the owner, not the
+     *      resolver, not a player. The only other grant in this contract is on a player's own
+     *      verdict bit. So the killer's id exists as ciphertext and nothing else, and the
+     *      reveal screen has to ask the chain for it rather than read it out of a file. That
+     *      is the difference between a game that says its answers are sealed and one where
+     *      they are.
+     *
+     *      Gated on `settled`, not on the close. A closed case can still be filed against, and
+     *      handing the answer out in that window would let somebody read it here and act on it
+     *      there. Once the books are shut there is nothing left to trade on.
+     *
+     *      Grants rather than reveals: the caller takes a key and decrypts off chain, so the
+     *      plaintext never touches storage or a log.
+     */
+    /// @notice The handle to decrypt once `revealAnswer` has given you a key to it.
+    function answerHandle(uint16 caseId) external view returns (bytes32) {
+        return euint256.unwrap(_answer[caseId]);
+    }
+
+    function revealAnswer(uint16 caseId) external {
+        Case storage c = cases[caseId];
+        if (!c.exists) revert NoSuchCase();
+        if (!c.settled) revert NotSettled();
+        e.allow(_answer[caseId], msg.sender);
+    }
+    /**
      * @notice Take the key to your own verdict bit, once the case has stopped taking money.
      *
      * @dev This grant, and not the clock in `resolve`, is what keeps the answer from leaking

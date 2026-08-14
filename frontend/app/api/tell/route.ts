@@ -1,36 +1,46 @@
 import { NextResponse } from "next/server";
-import { createPublicClient, fallback, http } from "viem";
+import { createPublicClient, createWalletClient, fallback, http } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
 import { MENTALIST_ABI, MENTALIST_ADDRESS } from "@/lib/contracts";
 import { activeChain } from "@/lib/network";
 import { CASEBOOK } from "@/lib/casebook";
 import { ANSWERS } from "@/lib/answers";
 import { person } from "@/lib/canon";
+import { getZap } from "@/lib/inco";
 
 /**
- * The reveal, released by the chain rather than by the page.
+ * The reveal, taken from the chain rather than from a stored answer.
  *
- * The answers used to sit in `casebook.ts`, which is tracked and ships to every browser, so
- * anybody could read the killer out of the bundle before placing a bet. They live server side
- * now, and this is the only way out of the building: it reads the case straight off the
- * contract and refuses unless that case is settled. Before settlement there is nothing here
- * to take, and after it the answer is public anyway, because the room has been paid out.
+ * Nothing here knows who the killer is. The id exists in one place only, as ciphertext in the
+ * contract, and this asks the contract to open it: `revealAnswer` refuses until the case is
+ * settled, so before then there is nothing to hand out and no way to hand it out early. After
+ * settlement the room has been paid and the answer is worth nothing to trade on.
+ *
+ * Keeping a plaintext copy beside the ciphertext would have defeated the point of encrypting
+ * it at all. Only the prose explanation is stored, and prose cannot be compared against a bet.
  */
 export const dynamic = "force-dynamic";
+export const maxDuration = 60;
+
+const transport = fallback([
+  http("https://base-sepolia-rpc.publicnode.com"),
+  http("https://base-sepolia.gateway.tenderly.co"),
+  http("https://sepolia.base.org"),
+]);
 
 export async function GET(request: Request) {
   const caseId = Number(new URL(request.url).searchParams.get("case"));
-  if (!Number.isInteger(caseId) || caseId < 0 || caseId >= CASEBOOK.length) {
+  const chapter = CASEBOOK[caseId];
+  if (!Number.isInteger(caseId) || !chapter) {
     return NextResponse.json({ error: "no such case" }, { status: 404 });
   }
 
-  const pub = createPublicClient({
-    chain: activeChain,
-    transport: fallback([
-      http("https://base-sepolia-rpc.publicnode.com"),
-      http("https://base-sepolia.gateway.tenderly.co"),
-      http("https://sepolia.base.org"),
-    ]),
-  });
+  const key = process.env.KEEPER_PRIVATE_KEY;
+  if (!key) return NextResponse.json({ error: "no key configured" }, { status: 503 });
+  const account = privateKeyToAccount((key.startsWith("0x") ? key : `0x${key}`) as `0x${string}`);
+
+  const pub = createPublicClient({ chain: activeChain, transport });
+  const wallet = createWalletClient({ account, chain: activeChain, transport });
 
   try {
     const c = (await pub.readContract({
@@ -40,25 +50,45 @@ export async function GET(request: Request) {
       args: [caseId],
     })) as readonly [bigint, number, bigint, bigint, number, number, boolean, boolean, number];
 
-    // `settled` is the gate, not `closesAt`. A case that has closed but not been settled can
-    // still be filed against, and handing out the answer in that window would let somebody
-    // read it here and act on it there.
-    if (!c[6]) {
-      return NextResponse.json({ error: "case is not settled" }, { status: 403 });
+    if (!c[6]) return NextResponse.json({ error: "case is not settled" }, { status: 403 });
+
+    // Take a key to the answer. The contract is the thing enforcing that this is allowed, and
+    // it refuses outright until the books are shut, so there is no window to race.
+    const hash = await wallet.writeContract({
+      address: MENTALIST_ADDRESS,
+      abi: MENTALIST_ABI,
+      functionName: "revealAnswer",
+      args: [caseId],
+      chain: activeChain,
+      account,
+    });
+    await pub.waitForTransactionReceipt({ hash });
+
+    const handle = (await pub.readContract({
+      address: MENTALIST_ADDRESS,
+      abi: MENTALIST_ABI,
+      functionName: "answerHandle",
+      args: [caseId],
+    })) as `0x${string}`;
+
+    const zap = await getZap();
+    const [result] = await zap.attestedDecrypt(wallet as never, [handle] as never);
+    const id = Number((result as { plaintext: { value: bigint } }).plaintext.value);
+
+    const who = chapter.roster[id];
+    if (who === undefined) {
+      return NextResponse.json({ error: "the answer did not name anyone" }, { status: 500 });
     }
-  } catch {
-    return NextResponse.json({ error: "could not read the case" }, { status: 503 });
-  }
 
-  const answer = ANSWERS[caseId];
-  const chapter = CASEBOOK[caseId];
-  if (!answer || !chapter) {
-    return NextResponse.json({ error: "no such case" }, { status: 404 });
+    return NextResponse.json({
+      name: person(who).name,
+      alibi: chapter.alibis[id]?.text ?? "",
+      tell: ANSWERS[caseId]?.tell ?? "",
+    });
+  } catch (e) {
+    return NextResponse.json(
+      { error: e instanceof Error ? e.message.slice(0, 200) : "could not read the answer" },
+      { status: 503 },
+    );
   }
-
-  return NextResponse.json({
-    name: person(chapter.roster[answer.id]!).name,
-    alibi: chapter.alibis[answer.id]?.text ?? "",
-    tell: answer.tell,
-  });
 }

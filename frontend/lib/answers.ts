@@ -1,17 +1,16 @@
 /**
- * The answers, and the reasoning that gives them away.
+ * The reasoning behind each case. Prose only.
  *
- * Carried in an environment variable, not in this repository and not in the client bundle.
- * They used to sit in `casebook.ts`, which is tracked and ships to every browser, so the
- * killer of every case was one devtools tab away. The ciphertext on chain was still doing its
- * job, fixing the answer before the first bet so the author cannot move it, but a game that
- * sells confidentiality cannot hand the answer to anyone who opens the sources.
+ * The killer's id is deliberately not in here. Storing it would be storing the answer twice,
+ * once encrypted on chain and once in plaintext beside it, and the plaintext copy is the one
+ * that gets leaked. `revealAnswer` opens the ciphertext after a case settles and `/api/tell`
+ * decrypts it from the chain, so this file cannot give a case away even if it escapes.
  *
- * Read only on the server: `deploy.ts` encrypts each answer on the authoring machine, and
- * `/api/tell` releases one only once the chain says that case is settled.
+ * Server side only, and not in the client bundle.
  */
 export interface Answer {
-  id: number;
+  /** The explanation shown after a case settles. The killer's id is NOT here: it lives only
+   *  as ciphertext on chain and `/api/tell` decrypts it from there. */
   tell: string;
 }
 

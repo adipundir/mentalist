@@ -1602,4 +1602,30 @@ contract CasebookTest is IncoTest {
         book.settle(CASE_ID);
     }
 
+
+    /// @notice The answer is sealed to everyone until the case is settled, then open to all.
+    function test_TheAnswerOpensOnlyOnceTheCaseIsSettled() public {
+        _open(CASE_ID, RED_JOHN);
+        _stake(jane, CASE_ID, RED_JOHN, 1_000_000);
+
+        // Nobody may have it while there is still money to be made from knowing it, and that
+        // includes the owner of the contract.
+        vm.expectRevert(Mentalist.NotSettled.selector);
+        book.revealAnswer(CASE_ID);
+
+        _reachClose(CASE_ID);
+        vm.expectRevert(Mentalist.NotSettled.selector);
+        book.revealAnswer(CASE_ID);
+
+        _resolve(jane, CASE_ID);
+        _settle(CASE_ID);
+
+        // Now it is nobody's advantage, so anybody may read it: the room deserves to be told.
+        vm.prank(cho);
+        book.revealAnswer(CASE_ID);
+        processAllOperations();
+        (DecryptionAttestation memory att, ) = _attest(cho, book.answerHandle(CASE_ID));
+        assertEq(uint256(att.value), RED_JOHN, "and what it says is the man who did it");
+    }
+
 }

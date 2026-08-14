@@ -240,7 +240,7 @@ export function CrimeScene({ variant, suspects }: { variant: number; suspects: n
     // downward travel, which is what "toward you" looks like in a faked perspective.
     const out = left ? -1 : 1;
     const px = (t: number) => bodyX + out * (5 + t * 17);
-    const py = (t: number) => bodyY + 5 + t * 27;
+    const py = (t: number) => bodyY + 5 + t * 21;
 
     const steps = 8;
     const prints = Array.from({ length: steps }, (_, i) => {

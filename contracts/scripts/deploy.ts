@@ -34,7 +34,7 @@ import * as dotenv from "dotenv";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { CASEBOOK } from "../../frontend/lib/casebook";
-import { ANSWERS } from "../../frontend/lib/answers";
+
 
 dotenv.config();
 
@@ -70,13 +70,21 @@ function artifact(name: string): { abi: Abi; bytecode: Hex } {
 }
 
 /** Red John's seat: the one account in the room that cannot be true. */
+/**
+ * The answer key, and it lives only on this machine.
+ *
+ * `MENTALIST_ANSWER_IDS` is in `contracts/.env`, which is gitignored, and it is read here and
+ * nowhere else: not by the site, not by the API, not by anything deployed. The ids exist in
+ * production as ciphertext in the contract and in no other form, which is the whole point of
+ * committing them with Inco rather than trusting a server to keep them.
+ */
 function answerOf(i: number): number {
-  // Read from the gitignored answer key rather than from the casebook, which ships to
-  // every browser. The plaintext never leaves this machine: it is encrypted below and
-  // only the ciphertext reaches the chain.
-  const a = ANSWERS[i];
-  if (!a) throw new Error(`no answer for case ${i}`);
-  return a.id;
+  const raw = process.env.MENTALIST_ANSWER_IDS;
+  if (!raw) throw new Error("MENTALIST_ANSWER_IDS is not set: cannot open a case without it");
+  const ids = JSON.parse(raw) as number[];
+  const id = ids[i];
+  if (id === undefined) throw new Error(`no answer for case ${i}`);
+  return id;
 }
 
 async function main() {

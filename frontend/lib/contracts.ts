@@ -25,10 +25,10 @@ import { activeChain, NETWORK } from "@/lib/network";
  * The block the live contract was deployed in. Log scans start here: `fromBlock: 0` asks for
  * a forty-five-million block range, which most public RPCs refuse outright.
  */
-export const DEPLOY_BLOCK = 45483605n;
+export const DEPLOY_BLOCK = 45485235n;
 
 export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ||
-  "0xc499a06023c81917dcf6188928c34a1e8b54ab7e") as `0x${string}`;
+  "0x42e3b311fe18e99c78887070f159c10cdfc718f1") as `0x${string}`;
 
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
 export const EXPLORER = activeChain.blockExplorers!.default.url;
@@ -206,6 +206,22 @@ export const MENTALIST_ABI = [
       { name: "share", type: "uint256", indexed: false },
       { name: "ticketIds", type: "uint256[]", indexed: false },
     ],
+  },
+  {
+    // Opens the answer once a case is settled. Before that the ciphertext has no key at all,
+    // not even for the owner.
+    type: "function",
+    name: "revealAnswer",
+    stateMutability: "nonpayable",
+    inputs: [{ name: "caseId", type: "uint16" }],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "answerHandle",
+    stateMutability: "view",
+    inputs: [{ name: "caseId", type: "uint16" }],
+    outputs: [{ name: "", type: "bytes32" }],
   },
   {
     type: "function",
