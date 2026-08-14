@@ -154,7 +154,7 @@ export function Scene({
   return (
     <div className="fixed inset-0 overflow-hidden">
       {/* ── the room is the page: one background, edge to edge ── */}
-      <div className="absolute inset-0">
+      <div className="absolute inset-0 z-20">
         <Room
           subjects={subjects}
           focused={g.witness ?? chosen}
@@ -184,7 +184,7 @@ export function Scene({
 
         {/* HUD: which case this is, and how long it stands. */}
         <div
-          className="pointer-events-none absolute inset-x-0 top-0 flex items-start justify-between gap-4 px-4 pb-12 pt-14 sm:px-7 sm:pt-16"
+          className="pointer-events-none absolute inset-x-0 top-0 z-10 flex items-start justify-between gap-4 px-4 pb-12 pt-14 sm:px-7 sm:pt-16"
           style={{ background: "linear-gradient(rgb(6 5 7 / 0.72), rgb(6 5 7 / 0.3) 60%, transparent)" }}
         >
           <div>
