@@ -1,43 +1,30 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { numberToHex } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
-import { parseAbiItem } from "viem";
-import { DEPLOY_BLOCK, MENTALIST_ADDRESS } from "@/lib/contracts";
+import { MEGAPOT, MEGAPOT_SCAN_FROM } from "@/lib/contracts";
 
 /**
- * How many Megapot tickets this wallet has won here.
+ * How many Megapot tickets this wallet holds.
  *
- * Counted from this contract's own `PaidOut` logs rather than asked of Megapot, because the
- * jackpot contract has no balance view for a ticket holder: tickets are minted to an address
- * and the only per-holder record anywhere is the ids in the purchase receipt. Ours carries
- * them, so the sum of `ticketIds` across a player's payouts is exactly what they hold from
- * this game.
+ * Read from Megapot, not from us. The count used to be a sum of this game's own payout
+ * receipts, which was wrong twice over: the receipts live on whichever Mentalist contract
+ * bought them, so every redeploy reset a player to zero, and a batch order does not report
+ * its ticket ids at call time, so the one field it summed came back empty anyway. Neither
+ * had anything to do with what the player owns. The tickets are minted to their address and
+ * they stay there, whatever happens to this game afterwards.
  *
- * Shown from the moment a wallet is connected, zero included. Hiding it until the count was
- * positive meant a player who had not collected yet could not tell the counter existed, which
- * reads as a missing feature rather than an empty one.
+ * The jackpot has no balance view — `balanceOf`, `ticketsOf`, `userTicketCount` are all
+ * absent, which is why the receipt-counting existed at all — but it emits one log per ticket
+ * with the holder indexed, so counting those logs is counting tickets. Verified against a
+ * wallet holding 209: 209 logs, all under this topic; against a wallet holding none: zero.
  *
- * Counts only what was won on the live contract, since the scan starts at its deployment
- * block. A redeploy therefore starts everyone at zero, which is correct: the old contract's
- * tickets are still in the old contract's payouts.
+ * A consequence worth knowing: this counts every Megapot ticket the wallet holds from this
+ * jackpot, including any bought outside this game. That is the honest reading of the label.
  */
-const PAID_OUT = parseAbiItem(
-  "event PaidOut(uint16 indexed caseId, address indexed player, uint256 share, uint256[] ticketIds)",
-);
-
-/**
- * The event that actually records a ticket.
- *
- * `PaidOut` carries `ticketIds`, and counting those was wrong for the flow the game
- * actually uses: Megapot's batch purchase does not hand back ids at call time, so a payout
- * that ordered 199 tickets emitted `BatchOrdered(…, 199, …)` and then a `PaidOut` whose
- * `ticketIds` array was empty. The counter read the empty array and told a player who had
- * just bought two hundred tickets that they held none.
- */
-const BATCH_ORDERED = parseAbiItem(
-  "event BatchOrdered(uint16 indexed caseId, address indexed player, uint256 tickets, uint256 creditLeft)",
-);
+const TICKET_MINTED =
+  "0x1171a0297accb0ea82123a0d9bcf24aac48153f56e53e55b55bac3409d37b372" as const;
 
 export function TicketBalance() {
   const { address } = useAccount();
@@ -52,29 +39,21 @@ export function TicketBalance() {
     let live = true;
     const read = async () => {
       try {
-        const [paid, ordered] = await Promise.all([
-          pub.getLogs({
-            address: MENTALIST_ADDRESS,
-            event: PAID_OUT,
-            args: { player: address },
-            fromBlock: DEPLOY_BLOCK,
-            toBlock: "latest",
-          }),
-          pub.getLogs({
-            address: MENTALIST_ADDRESS,
-            event: BATCH_ORDERED,
-            args: { player: address },
-            fromBlock: DEPLOY_BLOCK,
-            toBlock: "latest",
-          }),
-        ]);
-        // Both paths, and they do not overlap: a payout that ordered a batch reports its
-        // tickets in `BatchOrdered` and leaves `PaidOut.ticketIds` empty, and a purchase
-        // that did return ids never ordered a batch.
-        const n =
-          paid.reduce((sum, l) => sum + ((l.args.ticketIds as bigint[] | undefined)?.length ?? 0), 0) +
-          ordered.reduce((sum, l) => sum + Number((l.args.tickets as bigint | undefined) ?? 0n), 0);
-        if (live) setTickets(n);
+        // `eth_getLogs` straight, rather than viem's `getLogs`: that one wants an ABI it can
+        // decode with, and Megapot's event is not in any ABI we hold. The topic hash and the
+        // holder are all this needs, and the node does the filtering.
+        const logs = (await pub.request({
+          method: "eth_getLogs",
+          params: [
+            {
+              address: MEGAPOT.jackpot,
+              topics: [TICKET_MINTED, `0x${address.slice(2).toLowerCase().padStart(64, "0")}`],
+              fromBlock: numberToHex(MEGAPOT_SCAN_FROM),
+              toBlock: "latest",
+            },
+          ],
+        } as never)) as unknown[];
+        if (live) setTickets(Array.isArray(logs) ? logs.length : 0);
       } catch {
         /* a cold read leaves the count where it was rather than blanking it */
       }

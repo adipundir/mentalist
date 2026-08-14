@@ -30,6 +30,29 @@ export const DEPLOY_BLOCK = 45487371n;
 export const MENTALIST_ADDRESS = (process.env.NEXT_PUBLIC_MENTALIST_ADDRESS ||
   "0xb39546b5ffedd9778a4de42e3d211fa041ff7cf5") as `0x${string}`;
 
+/**
+ * Every contract this game has played on, oldest first, with the block each went live in.
+ *
+ * Tickets belong to the wallet, not to the deployment that bought them: Megapot mints them
+ * to the player and they stay there whatever happens to us afterwards. But the only
+ * per-holder record anywhere is the purchase receipt, and each deployment keeps its own, so
+ * a counter that reads one contract tells a player who has been playing all week that they
+ * hold nothing the moment we redeploy. It reads all of them instead.
+ *
+ * Append, never edit: dropping a line here does not move any tickets, it only hides them.
+ */
+export const PAST_DEPLOYMENTS: { address: `0x${string}`; block: bigint }[] = [
+  { address: "0x42e3b311fe18e99c78887070f159c10cdfc718f1", block: 45485235n },
+  { address: "0xb434119eb6a185d19f591e0fe41552814ab850af", block: 45486182n },
+  { address: "0xa2f3a8c88bf1486f9f7db72654d93b984d1bb858", block: 45487000n },
+];
+
+/** Everywhere a ticket could have been bought for this player, current deployment included. */
+export const TICKET_SOURCES: { address: `0x${string}`; block: bigint }[] = [
+  ...PAST_DEPLOYMENTS.filter((d) => d.address.toLowerCase() !== MENTALIST_ADDRESS.toLowerCase()),
+  { address: MENTALIST_ADDRESS, block: DEPLOY_BLOCK },
+];
+
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
 export const EXPLORER = activeChain.blockExplorers!.default.url;
 
@@ -45,6 +68,15 @@ export const txUrl = (hash: string) => `${EXPLORER}/tx/${hash}`;
  * a codeless address there: the balance read would fail silently and the approve would
  * succeed as a no-op, leaving the stake to revert on the transfer.
  */
+/**
+ * Where a ticket scan starts.
+ *
+ * The jackpot is older than this game and scanning it from block zero is a range no public
+ * RPC will serve, so this is the block the first Mentalist deployment went live in: no
+ * ticket this game ever bought predates it.
+ */
+export const MEGAPOT_SCAN_FROM = 45485235n;
+
 export const MEGAPOT = {
   jackpot: "0x465dA3c859f193A3807386387bEE941B2A4c3279",
   ticketBuyer: "0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746",
