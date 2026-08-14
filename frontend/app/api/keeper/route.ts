@@ -9,15 +9,13 @@ import { CASEBOOK } from "@/lib/casebook";
 /**
  * The keeper: files everybody's verdict once a case has closed, then shuts the books.
  *
- * Left to themselves, a winner had to come back and send three transactions to collect money
- * they had already won, and a winner who never came back was simply not counted. This walks
- * every closed case and does that work for the whole room.
+ * This walks every closed case and files the room's verdicts so the backend payout route can
+ * submit rewards for winners without requiring them to send a transaction.
  *
  * It holds no power worth stealing. `resolveFor` verifies a covalidator signature over a
  * handle the contract itself stored, so this key cannot invent a winner, move a verdict
- * between players, or change a number. The worst a lost key does is stop the filing, and
- * players keep `unseal`/`resolve` to do it themselves. Nothing here is custodial and no
- * money moves through it: payouts are pulled by the winner, never pushed by this.
+ * between players, or change a number. The worst a lost key does is stop filing or submit an
+ * otherwise-valid payout to that winner's own address. No reward is sent to the keeper.
  *
  * Runs on a schedule from vercel.json, and is safe to call again at any point. Every step
  * is idempotent: an already-filed player is skipped by the batch, and a settled case is

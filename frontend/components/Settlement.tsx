@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { decodeEventLog } from "viem";
 import { useAccount, usePublicClient, useWalletClient } from "wagmi";
 import { MENTALIST_ABI, MENTALIST_ADDRESS, txUrl } from "@/lib/contracts";
 import { usdc } from "@/lib/market";
@@ -70,6 +71,7 @@ export function Settlement({
   const [busy, setBusy] = useState<Busy>(null);
   const [error, setError] = useState<string | null>(null);
   const [receipts, setReceipts] = useState<{ label: string; hash: string }[]>([]);
+  const [ticketCountHere, setTicketCountHere] = useState<number | null>(null);
   /** Which form the payout took. Both buttons set the same `paid` flag on chain. */
   const tookTickets = receipts.some((r) => r.label === "TICKETS BOUGHT");
   /**
@@ -188,7 +190,7 @@ export function Settlement({
   /** One transaction per action, and each one waits for its receipt before the UI moves. */
   const send = useCallback(
     async (kind: Exclude<Busy, null>, label: string, run: () => Promise<`0x${string}`>) => {
-      if (!wallet || !pub) return;
+      if (!address || !pub || !wallet) return;
       setBusy(kind);
       setError(null);
       try {
@@ -198,6 +200,27 @@ export function Settlement({
         const receipt = await pub.waitForTransactionReceipt({ hash });
         if (receipt.status !== "success")
           throw Object.assign(new Error("reverted"), { shortMessage: "THE CHAIN REJECTED IT" });
+        if (kind === "paying") {
+          const mentalistLogs = receipt.logs.filter(
+            (log) => log.address.toLowerCase() === MENTALIST_ADDRESS.toLowerCase(),
+          );
+          for (const log of mentalistLogs) {
+            try {
+              const event = decodeEventLog({
+                abi: MENTALIST_ABI,
+                data: log.data,
+                topics: log.topics,
+              });
+              if (event.eventName === "PaidOut") {
+                setTicketCountHere(event.args.ticketIds.length);
+              } else if (event.eventName === "BatchOrdered") {
+                setTicketCountHere(Number(event.args.tickets));
+              }
+            } catch {
+              /* Ignore unrelated Mentalist events in the receipt. */
+            }
+          }
+        }
         setReceipts((r) => [...r, { label, hash }]);
         if (kind === "paying" || kind === "cashing") setPaidHere(true);
         await refresh();
@@ -207,7 +230,39 @@ export function Settlement({
         setBusy(null);
       }
     },
-    [wallet, pub, refresh],
+    [address, pub, refresh, wallet],
+  );
+
+  const requestPayout = useCallback(
+    async (wantTickets: boolean): Promise<`0x${string}`> => {
+      if (!address || !wallet) throw new Error("Connect your wallet first");
+      const signature = await wallet.signTypedData({
+        domain: {
+          name: "Mentalist",
+          version: "1",
+          chainId: wallet.chain.id,
+          verifyingContract: MENTALIST_ADDRESS,
+        },
+        types: {
+          Payout: [
+            { name: "caseId", type: "uint16" },
+            { name: "player", type: "address" },
+            { name: "wantTickets", type: "bool" },
+          ],
+        },
+        primaryType: "Payout",
+        message: { caseId, player: address, wantTickets },
+      });
+      const response = await fetch("/api/payout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ caseId, player: address, wantTickets, signature }),
+      });
+      const body = (await response.json()) as { hash?: `0x${string}`; error?: string };
+      if (!response.ok || !body.hash) throw new Error(body.error ?? "Payout submission failed");
+      return body.hash;
+    },
+    [address, caseId, wallet],
   );
 
   const closed = row !== null && now >= row.closesAt;
@@ -249,7 +304,7 @@ export function Settlement({
       ) : row.paid || paidHere ? (
         <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
           {tookTickets
-              ? "Done. Your share bought Megapot tickets for the next drawing, and any change came back as USDC. The counter at the top of the screen is how many tickets you hold. Testnet drawings run every 30 minutes."
+              ? `Done. ${ticketCountHere ?? "Your Megapot"} ${ticketCountHere === 1 ? "ticket was" : "tickets were"} ordered for your wallet. They will be minted shortly, and any change came back as USDC. The counter at the top of the screen is how many tickets you hold. Testnet drawings run every 30 minutes.`
               : "Done. Your share is in your wallet as USDC."}
         </p>
       ) : row.winningStake === 0n ? (
@@ -268,14 +323,7 @@ export function Settlement({
               tone="blood"
               onClick={() =>
                 send("paying", "TICKETS BOUGHT", () =>
-                  wallet!.writeContract({
-                    address: MENTALIST_ADDRESS,
-                    abi: MENTALIST_ABI,
-                    functionName: "payout",
-                    args: [caseId, true],
-                    account: address!,
-                    chain: wallet!.chain,
-                  }),
+                  requestPayout(true),
                 )
               }
               disabled={busy !== null}
@@ -294,14 +342,7 @@ export function Settlement({
               tone="dim"
               onClick={() =>
                 send("cashing", "PAID OUT", () =>
-                  wallet!.writeContract({
-                    address: MENTALIST_ADDRESS,
-                    abi: MENTALIST_ABI,
-                    functionName: "payout",
-                    args: [caseId, false],
-                    account: address!,
-                    chain: wallet!.chain,
-                  }),
+                  requestPayout(false),
                 )
               }
               disabled={busy !== null}

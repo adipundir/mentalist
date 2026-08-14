@@ -582,16 +582,33 @@ contract Mentalist is Ownable, ReentrancyGuard {
         nonReentrant
         returns (uint256[] memory ticketIds)
     {
+        return _payout(caseId, msg.sender, wantTickets);
+    }
+
+    /// @notice Let the resolver submit a winner's payout without requiring the winner to pay gas.
+    function payoutFor(uint16 caseId, address player, bool wantTickets)
+        external
+        nonReentrant
+        returns (uint256[] memory ticketIds)
+    {
+        if (msg.sender != resolver) revert NotResolver();
+        return _payout(caseId, player, wantTickets);
+    }
+
+    function _payout(uint16 caseId, address player, bool wantTickets)
+        internal
+        returns (uint256[] memory ticketIds)
+    {
         Case storage c = cases[caseId];
         if (!c.settled) revert NotSettled();
 
-        Bet storage b = bets[caseId][msg.sender];
+        Bet storage b = bets[caseId][player];
         if (b.stake == 0) revert NothingStaked();
         if (!b.resolved) revert NotResolved();
         if (b.paid) revert AlreadyPaid();
         if (!b.won) revert DidNotWin();
 
-        uint256 share = shareOf(caseId, msg.sender);
+        uint256 share = shareOf(caseId, player);
         b.paid = true;
 
         // Taking tickets pays better than taking the cash, because Megapot pays this contract
@@ -612,7 +629,7 @@ contract Mentalist is Ownable, ReentrancyGuard {
         // reserving only what they put in would lock their winnings in here forever.
         reserved -= share;
         uint256 budget = share + bonus;
-        return _buyAndBank(caseId, budget, wantTickets);
+        return _buyAndBank(caseId, player, budget, wantTickets);
     }
 
     /**
@@ -626,7 +643,18 @@ contract Mentalist is Ownable, ReentrancyGuard {
      */
     function buyMoreTickets(uint16 caseId) external nonReentrant returns (uint256[] memory) {
         if (ticketCredit[caseId][msg.sender] == 0) revert NoCredit();
-        return _spendCredit(caseId);
+        return _spendCredit(caseId, msg.sender);
+    }
+
+    /// @notice Convert a winner's remaining ticket credit without requiring their wallet to pay gas.
+    function buyMoreTicketsFor(uint16 caseId, address player)
+        external
+        nonReentrant
+        returns (uint256[] memory)
+    {
+        if (msg.sender != resolver) revert NotResolver();
+        if (ticketCredit[caseId][player] == 0) revert NoCredit();
+        return _spendCredit(caseId, player);
     }
 
     /**
@@ -649,40 +677,41 @@ contract Mentalist is Ownable, ReentrancyGuard {
     /// @dev The first conversion, straight off a payout.
     function _buyAndBank(
         uint16 caseId,
+        address player,
         uint256 budget,
         bool wantTickets
     ) internal returns (uint256[] memory ids) {
         if (!wantTickets) {
-            usdc.safeTransfer(msg.sender, budget);
-            emit PaidOut(caseId, msg.sender, budget, new uint256[](0));
+            usdc.safeTransfer(player, budget);
+            emit PaidOut(caseId, player, budget, new uint256[](0));
             return new uint256[](0);
         }
         // Banked first, spent second, so both paths run the same code and there is exactly
         // one place that knows how to turn credit into tickets.
-        ticketCredit[caseId][msg.sender] = budget;
+        ticketCredit[caseId][player] = budget;
         reserved += budget;
-        ids = _spendCredit(caseId);
+        ids = _spendCredit(caseId, player);
 
         // Anything that cannot become a ticket goes home as cash in this same transaction.
         // Holding it back would strand a winner's money behind a second call for no gain, and
         // it covers the case where Megapot is shut outright: the share still leaves, in full,
         // exactly as it did before any of this existed.
-        uint256 left = ticketCredit[caseId][msg.sender];
+        uint256 left = ticketCredit[caseId][player];
         if (left != 0) {
             uint256 price = jackpot.ticketPrice();
             if (price == 0 || left < price || !jackpot.allowTicketPurchases()) {
-                ticketCredit[caseId][msg.sender] = 0;
+                ticketCredit[caseId][player] = 0;
                 reserved -= left;
-                usdc.safeTransfer(msg.sender, left);
+                usdc.safeTransfer(player, left);
             }
         }
 
-        emit PaidOut(caseId, msg.sender, budget, ids);
+        emit PaidOut(caseId, player, budget, ids);
     }
 
     /// @dev Spends up to `TICKETS_PER_BATCH` of a player's credit on real Megapot entries.
-    function _spendCredit(uint16 caseId) internal returns (uint256[] memory ticketIds) {
-        uint256 credit = ticketCredit[caseId][msg.sender];
+    function _spendCredit(uint16 caseId, address player) internal returns (uint256[] memory ticketIds) {
+        uint256 credit = ticketCredit[caseId][player];
         uint256 price = jackpot.ticketPrice();
 
         uint256 count;
@@ -706,14 +735,14 @@ contract Mentalist is Ownable, ReentrancyGuard {
         // or when this player already has one in flight, since it keys orders by recipient.
         if (address(batchFacilitator) != address(0) && count > TICKETS_PER_BATCH) {
             uint256 minimum = batchFacilitator.minimumTicketCount();
-            if (count >= minimum && !batchFacilitator.hasActiveBatchOrder(msg.sender)) {
+            if (count >= minimum && !batchFacilitator.hasActiveBatchOrder(player)) {
                 uint256 bulkCost = price * count;
-                ticketCredit[caseId][msg.sender] = credit - bulkCost;
+                ticketCredit[caseId][player] = credit - bulkCost;
                 reserved -= bulkCost;
 
                 usdc.forceApprove(address(batchFacilitator), bulkCost);
                 batchFacilitator.createBatchOrder(
-                    msg.sender,
+                    player,
                     uint64(count),
                     new IJackpot.Ticket[](0),
                     referrers,
@@ -724,21 +753,21 @@ contract Mentalist is Ownable, ReentrancyGuard {
 
                 // The keeper mints these later, so there are no ids to hand back yet. The
                 // count is what the event carries and what a client counts.
-                emit BatchOrdered(caseId, msg.sender, count, ticketCredit[caseId][msg.sender]);
+                emit BatchOrdered(caseId, player, count, ticketCredit[caseId][player]);
                 return new uint256[](0);
             }
         }
 
         if (count > TICKETS_PER_BATCH) count = TICKETS_PER_BATCH;
         uint256 cost = price * count;
-        ticketCredit[caseId][msg.sender] = credit - cost;
+        ticketCredit[caseId][player] = credit - cost;
         reserved -= cost;
 
         usdc.forceApprove(address(ticketBuyer), cost);
-        ticketIds = ticketBuyer.buyTickets(count, msg.sender, referrers, split, SOURCE);
+        ticketIds = ticketBuyer.buyTickets(count, player, referrers, split, SOURCE);
         usdc.forceApprove(address(ticketBuyer), 0);
 
-        emit TicketsBought(caseId, msg.sender, ticketIds, ticketCredit[caseId][msg.sender]);
+        emit TicketsBought(caseId, player, ticketIds, ticketCredit[caseId][player]);
     }
 
 

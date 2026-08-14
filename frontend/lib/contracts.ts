@@ -24,7 +24,7 @@ import { MENTALIST_ADDRESS } from "@/lib/addresses";
  * The block the live contract was deployed in. Log scans start here: `fromBlock: 0` asks for
  * a forty-five-million block range, which most public RPCs refuse outright.
  */
-export const DEPLOY_BLOCK = 45487371n;
+export const DEPLOY_BLOCK = 45622068n;
 
 /** Follows NEXT_PUBLIC_NETWORK, or every receipt link on mainnet would point at a testnet. */
 export const EXPLORER = activeChain.blockExplorers!.default.url;
@@ -153,6 +153,27 @@ export const MENTALIST_ABI = [
     outputs: [{ name: "ticketIds", type: "uint256[]" }],
   },
   {
+    type: "function",
+    name: "payoutFor",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseId", type: "uint16" },
+      { name: "player", type: "address" },
+      { name: "wantTickets", type: "bool" },
+    ],
+    outputs: [{ name: "ticketIds", type: "uint256[]" }],
+  },
+  {
+    type: "function",
+    name: "buyMoreTicketsFor",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "caseId", type: "uint16" },
+      { name: "player", type: "address" },
+    ],
+    outputs: [{ name: "ticketIds", type: "uint256[]" }],
+  },
+  {
     // What the keeper calls so a winner never has to come back and file to be counted.
     // Permissionless: it verifies a covalidator signature over a handle this contract
     // stored, so a caller can carry a verdict but cannot invent one.
@@ -229,6 +250,16 @@ export const MENTALIST_ABI = [
     stateMutability: "view",
     inputs: [],
     outputs: [{ name: "", type: "uint16" }],
+  },
+  {
+    type: "event",
+    name: "BatchOrdered",
+    inputs: [
+      { name: "caseId", type: "uint16", indexed: true },
+      { name: "player", type: "address", indexed: true },
+      { name: "tickets", type: "uint256", indexed: false },
+      { name: "creditLeft", type: "uint256", indexed: false },
+    ],
   },
   {
     // Carries the ticket ids a payout bought, which is the only per-player record of Megapot

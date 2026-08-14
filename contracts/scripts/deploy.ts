@@ -37,6 +37,7 @@ dotenv.config();
 
 /** Megapot V2's `JackpotRandomTicketBuyer` on Base Sepolia. The payout rail. */
 const MEGAPOT_BUYER = "0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746" as const;
+const MEGAPOT_BATCH_FACILITATOR = "0x62A5D60F486D01a28071652a7951Aff1EA4c5b7c" as const;
 
 /**
  * How long each case takes money. A week, so a season of one case a day is entirely open by
@@ -127,7 +128,9 @@ async function main() {
   // anybody, and every winner in a room with one slow player sat behind the two-hour filing
   // window before they could be paid. A game whose settlement depends on this address is a
   // game that should not deploy without it.
-  const keeper = process.env.KEEPER_ADDRESS;
+  const keeperKey = process.env.KEEPER_PRIVATE_KEY;
+  const keeper = process.env.KEEPER_ADDRESS ??
+    (keeperKey ? privateKeyToAccount((keeperKey.startsWith("0x") ? keeperKey : `0x${keeperKey}`) as Hex).address : undefined);
   if (!keeper) {
     throw new Error(
       "KEEPER_ADDRESS is not set: deploying without a resolver leaves every room waiting on " +
@@ -144,6 +147,15 @@ async function main() {
     await pub.waitForTransactionReceipt({ hash: tx });
     console.log(`resolver set: ${keeper}`);
   }
+
+  const facilitatorTx = await wallet.writeContract({
+    address: addr,
+    abi: book.abi,
+    functionName: "setBatchFacilitator",
+    args: [MEGAPOT_BATCH_FACILITATOR],
+  });
+  await pub.waitForTransactionReceipt({ hash: facilitatorTx });
+  console.log(`batch facilitator set: ${MEGAPOT_BATCH_FACILITATOR}`);
 
   for (const [i, c] of CASEBOOK.entries()) {
     // The ciphertext is bound to this account and this contract, and `openCase` ingests it
