@@ -63,9 +63,16 @@ export function nextRelease(now: number = Date.now()): Release | null {
 }
 
 export function countdown(ms: number): string {
-  const h = Math.floor(ms / 3_600_000);
-  const m = Math.floor((ms % 3_600_000) / 60_000);
-  const s = Math.floor((ms % 60_000) / 1000);
+  const total = Math.max(0, ms);
+  const d = Math.floor(total / 86_400_000);
+  const h = Math.floor(total / 3_600_000);
+  const m = Math.floor((total % 3_600_000) / 60_000);
+  const s = Math.floor((total % 60_000) / 1000);
   const pad = (x: number) => String(x).padStart(2, "0");
+
+  // Past a day, hours stop meaning anything: "335:51:59" is a fortnight written in a unit
+  // nobody counts in, and it reads as a broken clock rather than a long one. Days and hours
+  // there, and the second-by-second clock only once it is close enough to matter.
+  if (d > 0) return `${d}D ${h % 24}H`;
   return h > 0 ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
