@@ -1,7 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Special_Elite, Crimson_Pro } from "next/font/google";
-import { SoundToggle } from "@/components/SoundToggle";
+import { NarrationToggle } from "@/components/NarrationToggle";
 
 /** Data, addresses, the terminal panel. */
 const mono = IBM_Plex_Mono({
@@ -39,7 +39,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       >
         {children}
         {/* The sounds play on every screen, so the switch for them belongs on every screen. */}
-        <SoundToggle />
+        <NarrationToggle />
       </body>
     </html>
   );

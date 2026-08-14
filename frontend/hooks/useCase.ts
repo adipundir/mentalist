@@ -35,7 +35,6 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
       if (line === undefined) return;
 
       unlockNarrator();
-      sfx.startRoomTone();
       sfx.knock(0.9 + (seat % 3) * 0.08);
       sfx.whoosh(); // rides under the camera push-in
 

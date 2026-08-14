@@ -19,14 +19,6 @@ export default function Home() {
   const router = useRouter();
   const [booting, setBooting] = useState(false);
 
-  // If the player has already interacted with the app, the title screen keeps the room tone
-  // going instead of dropping to silence. On a first, cold visit the browser refuses and
-  // this does nothing, which is the correct and unavoidable behaviour.
-  useEffect(() => {
-    if (sfx.audioReady()) sfx.startTitleBed();
-    return () => sfx.stopTitleBed();
-  }, []);
-
   return (
     <main className="relative flex min-h-[100dvh] flex-col items-center justify-center px-6 pb-20 text-center">
       {/* The mark, watching.
@@ -92,8 +84,6 @@ export default function Home() {
           // rather than letting the loading screen run in silence.
           sfx.thud();
           sfx.knock();
-          // No bed under this one: the intro film brings its own sound.
-          sfx.stopTitleBed();
           setBooting(true);
         }}
         className="mt-9 cursor-pointer border-2 border-blood-hot bg-blood-hot/10 px-10 py-3 font-type text-[20px] tracking-wide text-blood-hot transition-colors hover:bg-blood-hot/25"

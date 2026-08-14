@@ -24,7 +24,6 @@ let master: GainNode | null = null;
 let reverb: ConvolverNode | null = null;
 let reverbSend: GainNode | null = null;
 let muted = false;
-let tone: { stop: () => void } | null = null;
 
 /**
  * A concrete room, as an impulse response.
@@ -100,7 +99,6 @@ const bus = () => master ?? undefined;
 export function setMuted(value: boolean) {
   muted = value;
   if (value) {
-    stopRoomTone();
     if (master && ctx) master.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
   } else if (master && ctx) {
     master.gain.setTargetAtTime(0.9, ctx.currentTime, 0.05);
@@ -146,43 +144,15 @@ function env(ac: AudioContext, peak: number, attack: number, decay: number): Gai
  * A barely-there bed of air. Starts on the first interaction and runs until the scene
  * unmounts. You should not be able to name it while it's playing.
  */
-export function startRoomTone() {
-  const ac = audio();
-  if (!ac || tone) return;
-
-  const src = noise(ac);
-  src.loop = true;
-
-  // Same correction as the beds: 320Hz of filtered rumble is air nobody can hear on a
-  // built-in speaker. Opened up enough to read as a room without becoming hiss.
-  const lp = ac.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 900;
-
-  const hp = ac.createBiquadFilter();
-  hp.type = "highpass";
-  hp.frequency.value = 90;
-
-  const g = ac.createGain();
-  g.gain.setValueAtTime(0.0001, ac.currentTime);
-  g.gain.exponentialRampToValueAtTime(0.05, ac.currentTime + 2.5);
-
-  src.connect(hp).connect(lp).connect(g).connect(bus()!);
-  src.start();
-
-  tone = {
-    stop: () => {
-      if (!ctx) return;
-      g.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.4);
-      setTimeout(() => src.stop(), 1200);
-    },
-  };
-}
-
-export function stopRoomTone() {
-  tone?.stop();
-  tone = null;
-}
+/**
+ * Nothing here runs on its own.
+ *
+ * The room tone went the same way as the two music beds: it was a noise loop held open for
+ * the life of a scene, and a loop is exactly what a player means when they say they can
+ * still hear something. What is left in this file is entirely one-shot — a knock when you
+ * walk up to somebody, a tick, a stamp when money goes down — so between actions the game
+ * is silent, with no handle left anywhere that could keep a sound alive.
+ */
 
 // ── interaction ─────────────────────────────────────────────
 
@@ -557,183 +527,13 @@ export function thud() {
   n.stop(ac.currentTime + 0.25);
 }
 
-/**
- * The bed under the title screen.
- *
- * Not a track. A held minor chord, very low and very quiet, with the two upper voices
- * detuned by a few cents so they beat slowly against each other and the pad never sits
- * still. There is no melody and no rhythm on purpose: this is a room you are standing in
- * before anything has happened, and anything with a pulse would start telling you how to
- * feel about it.
- *
- * Browsers will not let this start on a cold visit, because an AudioContext is suspended
- * until a real gesture. It comes up on the first click and on any later return to the
- * title, which is the most that can honestly be done.
- */
-let bed: { stop: () => void } | null = null;
-
-export function startTitleBed() {
-  const ac = audio();
-  if (!ac || bed) return;
-
-  const out = ac.createGain();
-  out.gain.setValueAtTime(0.0001, ac.currentTime);
-  out.gain.exponentialRampToValueAtTime(0.09, ac.currentTime + 4);
-
-  // A slow sweep across the top so the chord opens and closes rather than droning flat.
-  const lp = ac.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 1250;
-  lp.Q.value = 0.6;
-
-  const sweep = ac.createOscillator();
-  sweep.frequency.value = 0.045; // one breath every twenty two seconds
-  const sweepDepth = ac.createGain();
-  sweepDepth.gain.value = 190;
-  sweep.connect(sweepDepth).connect(lp.frequency);
-  sweep.start();
-
-  // D minor, rooted low. The fifth is left out: a bare root, third and octave is emptier,
-  // and empty is the point.
-  const voices = [
-    { hz: 73.4, type: "sine" as const, gain: 0.4 },
-    { hz: 146.8, type: "sine" as const, gain: 0.34, detune: -7 },
-    { hz: 174.6, type: "triangle" as const, gain: 0.17, detune: 6 },
-    { hz: 293.7, type: "triangle" as const, gain: 0.09, detune: -4 },
-  ];
-
-  const oscs = voices.map((v) => {
-    const o = ac.createOscillator();
-    o.type = v.type;
-    o.frequency.value = v.hz;
-    if (v.detune) o.detune.value = v.detune;
-    const g = ac.createGain();
-    g.gain.value = v.gain;
-    o.connect(g).connect(lp);
-    o.start();
-    return o;
-  });
-
-  lp.connect(out);
-  toBus(out, 0.9); // a lot of room on it, so it reads as a space rather than a synth
-
-  bed = {
-    stop: () => {
-      if (!ctx) return;
-      out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.7);
-      setTimeout(() => {
-        oscs.forEach((o) => o.stop());
-        sweep.stop();
-      }, 2600);
-    },
-  };
-}
-
-let roomBed: { stop: () => void; duck: (on: boolean) => void } | null = null;
 
 /**
- * The music the room stands in.
+ * No score, by choice.
  *
- * Deliberately underneath the speech rather than beside it. The suspects are the thing you
- * came to hear, so this sits low and ducks further the moment one of them opens his mouth:
- * background music that has to be talked over is just noise with a key signature.
- *
- * Same D minor as the title so the two rooms belong to one film, but sparser and slower, and
- * with a heartbeat under it that the title does not have.
+ * There were two beds here, one under the title and one under the room, and both are gone
+ * along with the switch that silenced them. A drone a player cannot get away from is a
+ * reason to mute the tab, and muting the tab takes the narration and the room with it. What
+ * is left is what a sound in this game is for: the knock when you walk up to somebody, the
+ * stamp when money goes down, and the air in the room.
  */
-export function startRoomBed() {
-  const ac = audio();
-  if (!ac || roomBed) return;
-
-  const out = ac.createGain();
-  out.gain.setValueAtTime(0.0001, ac.currentTime);
-  out.gain.exponentialRampToValueAtTime(0.075, ac.currentTime + 6);
-
-  // Written for a register a laptop can actually reproduce.
-  //
-  // This bed used to sit on a 36Hz root under a 300Hz lowpass at a gain of 0.032, which is
-  // a correct piece of sound design that nobody could hear: built-in speakers roll off
-  // below about 150Hz, so on the machine most players use there was silence, and the sound
-  // toggle read as a switch with nothing behind it.
-  const lp = ac.createBiquadFilter();
-  lp.type = "lowpass";
-  lp.frequency.value = 1100;
-  lp.Q.value = 0.5;
-
-  // Slower than the title's breath, and shallower. A room does not swell.
-  const sweep = ac.createOscillator();
-  sweep.frequency.value = 0.028; // once every thirty six seconds
-  const depth = ac.createGain();
-  depth.gain.value = 120;
-  sweep.connect(depth).connect(lp.frequency);
-  sweep.start();
-
-  // Root, minor third, and the octave. No fifth, so it never resolves into comfort.
-  const voices = [
-    { hz: 73.4, type: "sine" as const, gain: 0.34 },          // the weight, for headphones
-    { hz: 146.8, type: "sine" as const, gain: 0.3 },          // root
-    { hz: 174.6, type: "triangle" as const, gain: 0.15, detune: -9 }, // minor third
-    { hz: 293.7, type: "triangle" as const, gain: 0.075, detune: 7 }, // the octave above
-  ];
-  const oscs = voices.map((v) => {
-    const o = ac.createOscillator();
-    o.type = v.type;
-    o.frequency.value = v.hz;
-    if (v.detune) o.detune.value = v.detune;
-    const g = ac.createGain();
-    g.gain.value = v.gain;
-    o.connect(g).connect(lp);
-    o.start();
-    return o;
-  });
-
-  // A pulse just under the chord, near a resting heart rate. It is felt more than heard.
-  const pulse = ac.createOscillator();
-  pulse.type = "sine";
-  pulse.frequency.value = 55;
-  const pulseGain = ac.createGain();
-  pulseGain.gain.value = 0.0001;
-  const beat = ac.createOscillator();
-  beat.frequency.value = 0.9; // 54 bpm
-  const beatDepth = ac.createGain();
-  beatDepth.gain.value = 0.16;
-  beat.connect(beatDepth).connect(pulseGain.gain);
-  pulse.connect(pulseGain).connect(lp);
-  pulse.start();
-  beat.start();
-
-  lp.connect(out);
-  toBus(out, 0.85);
-
-  roomBed = {
-    duck: (on: boolean) => {
-      if (!ctx) return;
-      out.gain.setTargetAtTime(on ? 0.026 : 0.075, ctx.currentTime, 0.25);
-    },
-    stop: () => {
-      if (!ctx) return;
-      out.gain.setTargetAtTime(0.0001, ctx.currentTime, 0.6);
-      setTimeout(() => {
-        oscs.forEach((o) => o.stop());
-        sweep.stop();
-        pulse.stop();
-        beat.stop();
-      }, 2400);
-    },
-  };
-}
-
-export function stopRoomBed() {
-  roomBed?.stop();
-  roomBed = null;
-}
-
-/** Pull the music down while somebody is talking, and let it back up when they stop. */
-export function duckRoomBed(on: boolean) {
-  roomBed?.duck(on);
-}
-
-export function stopTitleBed() {
-  bed?.stop();
-  bed = null;
-}
