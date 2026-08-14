@@ -322,7 +322,7 @@ export function Room({
                 left: `${spot.x}%`,
                 bottom: `${spot.bottom}%`,
                 width: `${w * spot.scale}%`,
-                zIndex: spot.z + (s.saying ? 400 : isFocus ? 200 : 0),
+                zIndex: spot.z + (s.saying ? 600 : isFocus ? 200 : 0),
                 transform: `translateX(-50%) rotate(${turn}deg)`,
                 transformOrigin: "50% 100%",
               }}
@@ -370,7 +370,7 @@ export function Room({
                     animate={{ opacity: 1, y: 0, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.9 }}
                     transition={{ type: "spring", stiffness: 420, damping: 24 }}
-                    className="pointer-events-none absolute bottom-full left-1/2 z-[300] mb-2 -translate-x-1/2"
+                    className="pointer-events-none absolute bottom-full left-1/2 z-[500] mb-2 -translate-x-1/2"
                     style={{ width: "260%" }}
                   >
                     <div
