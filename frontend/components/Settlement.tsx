@@ -320,7 +320,7 @@ export function Settlement({
         </>
       ) : (
         <p className="font-body text-[18px] leading-relaxed text-bone sm:text-[21px]">
-          The case is closed. No winning claim was recorded.
+          You missed the killer. Your stake went to the winning claimants.
         </p>
       )}
 

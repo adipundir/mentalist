@@ -1,30 +1,24 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { numberToHex } from "viem";
 import { useAccount, usePublicClient } from "wagmi";
-import { MEGAPOT, MEGAPOT_SCAN_FROM } from "@/lib/contracts";
+import { MEGAPOT } from "@/lib/contracts";
 
 /**
  * How many Megapot tickets this wallet holds.
  *
- * Read from Megapot, not from us. The count used to be a sum of this game's own payout
- * receipts, which was wrong twice over: the receipts live on whichever Mentalist contract
- * bought them, so every redeploy reset a player to zero, and a batch order does not report
- * its ticket ids at call time, so the one field it summed came back empty anyway. Neither
- * had anything to do with what the player owns. The tickets are minted to their address and
- * they stay there, whatever happens to this game afterwards.
- *
- * The jackpot has no balance view — `balanceOf`, `ticketsOf`, `userTicketCount` are all
- * absent, which is why the receipt-counting existed at all — but it emits one log per ticket
- * with the holder indexed, so counting those logs is counting tickets. Verified against a
- * wallet holding 209: 209 logs, all under this topic; against a wallet holding none: zero.
- *
- * A consequence worth knowing: this counts every Megapot ticket the wallet holds from this
- * jackpot, including any bought outside this game. That is the honest reading of the label.
+ * Read from Megapot's ERC-721 ticket contract, not from Mentalist payout receipts. This is the
+ * wallet's actual ticket balance, including tickets bought outside this game.
  */
-const TICKET_MINTED =
-  "0x1171a0297accb0ea82123a0d9bcf24aac48153f56e53e55b55bac3409d37b372" as const;
+const TICKET_NFT_ABI = [
+  {
+    type: "function",
+    name: "balanceOf",
+    stateMutability: "view",
+    inputs: [{ name: "owner", type: "address" }],
+    outputs: [{ name: "result", type: "uint256" }],
+  },
+] as const;
 
 export function TicketBalance() {
   const { address } = useAccount();
@@ -44,22 +38,14 @@ export function TicketBalance() {
     let live = true;
     const read = async () => {
       try {
-        // `eth_getLogs` straight, rather than viem's `getLogs`: that one wants an ABI it can
-        // decode with, and Megapot's event is not in any ABI we hold. The topic hash and the
-        // holder are all this needs, and the node does the filtering.
-        const logs = (await pub.request({
-          method: "eth_getLogs",
-          params: [
-            {
-              address: MEGAPOT.jackpot,
-              topics: [TICKET_MINTED, `0x${address.slice(2).toLowerCase().padStart(64, "0")}`],
-              fromBlock: numberToHex(MEGAPOT_SCAN_FROM),
-              toBlock: "latest",
-            },
-          ],
-        } as never)) as unknown[];
+        const count = await pub.readContract({
+          address: MEGAPOT.ticketNft,
+          abi: TICKET_NFT_ABI,
+          functionName: "balanceOf",
+          args: [address],
+        });
         if (!live) return;
-        setTickets(Array.isArray(logs) ? logs.length : 0);
+        setTickets(Number(count));
         setRead(true);
       } catch {
         /* a cold read leaves the count where it was rather than blanking it */

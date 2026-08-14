@@ -41,18 +41,10 @@ export const txUrl = (hash: string) => `${EXPLORER}/tx/${hash}`;
  * a codeless address there: the balance read would fail silently and the approve would
  * succeed as a no-op, leaving the stake to revert on the transfer.
  */
-/**
- * Where a ticket scan starts.
- *
- * The jackpot is older than this game and scanning it from block zero is a range no public
- * RPC will serve, so this is the block the first Mentalist deployment went live in: no
- * ticket this game ever bought predates it.
- */
-export const MEGAPOT_SCAN_FROM = 45485235n;
-
 export const MEGAPOT = {
   jackpot: "0x465dA3c859f193A3807386387bEE941B2A4c3279",
   ticketBuyer: "0x53c04e7e5044B28Ea8A4F9c4b26E3Ac1aeb63746",
+  ticketNft: "0x45084829ac63f9dc6a3d4981a46fa896f9180ecd",
   usdc:
     NETWORK === "mainnet"
       ? ("0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" as `0x${string}`)
