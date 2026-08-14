@@ -203,6 +203,18 @@ export function Scene({
             <h1 className="font-type text-[22px] leading-tight text-bone drop-shadow sm:text-[28px]">
               {title}
             </h1>
+            {/* The figures are clickable and nothing said so. This lived on the bottom edge
+                once, under the account bar that covers it, which is the same as not being
+                there. It sits under the title until the room has been heard out, then goes:
+                an instruction that outlives its job is just clutter over a crime scene. */}
+            {!g.allSpoken && (
+              <p className="mt-1.5 font-body text-[13px] leading-snug text-bone-dim">
+                Click each person to hear where they were.{" "}
+                <span className="text-brass">
+                  {g.spoken.length} of {g.n} heard
+                </span>
+              </p>
+            )}
           </div>
 
         </div>
