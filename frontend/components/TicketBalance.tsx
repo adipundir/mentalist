@@ -26,6 +26,19 @@ const PAID_OUT = parseAbiItem(
   "event PaidOut(uint16 indexed caseId, address indexed player, uint256 share, uint256[] ticketIds)",
 );
 
+/**
+ * The event that actually records a ticket.
+ *
+ * `PaidOut` carries `ticketIds`, and counting those was wrong for the flow the game
+ * actually uses: Megapot's batch purchase does not hand back ids at call time, so a payout
+ * that ordered 199 tickets emitted `BatchOrdered(…, 199, …)` and then a `PaidOut` whose
+ * `ticketIds` array was empty. The counter read the empty array and told a player who had
+ * just bought two hundred tickets that they held none.
+ */
+const BATCH_ORDERED = parseAbiItem(
+  "event BatchOrdered(uint16 indexed caseId, address indexed player, uint256 tickets, uint256 creditLeft)",
+);
+
 export function TicketBalance() {
   const { address } = useAccount();
   const pub = usePublicClient();
@@ -39,14 +52,28 @@ export function TicketBalance() {
     let live = true;
     const read = async () => {
       try {
-        const logs = await pub.getLogs({
-          address: MENTALIST_ADDRESS,
-          event: PAID_OUT,
-          args: { player: address },
-          fromBlock: DEPLOY_BLOCK,
-          toBlock: "latest",
-        });
-        const n = logs.reduce((sum, l) => sum + ((l.args.ticketIds as bigint[] | undefined)?.length ?? 0), 0);
+        const [paid, ordered] = await Promise.all([
+          pub.getLogs({
+            address: MENTALIST_ADDRESS,
+            event: PAID_OUT,
+            args: { player: address },
+            fromBlock: DEPLOY_BLOCK,
+            toBlock: "latest",
+          }),
+          pub.getLogs({
+            address: MENTALIST_ADDRESS,
+            event: BATCH_ORDERED,
+            args: { player: address },
+            fromBlock: DEPLOY_BLOCK,
+            toBlock: "latest",
+          }),
+        ]);
+        // Both paths, and they do not overlap: a payout that ordered a batch reports its
+        // tickets in `BatchOrdered` and leaves `PaidOut.ticketIds` empty, and a purchase
+        // that did return ids never ordered a batch.
+        const n =
+          paid.reduce((sum, l) => sum + ((l.args.ticketIds as bigint[] | undefined)?.length ?? 0), 0) +
+          ordered.reduce((sum, l) => sum + Number((l.args.tickets as bigint | undefined) ?? 0n), 0);
         if (live) setTickets(n);
       } catch {
         /* a cold read leaves the count where it was rather than blanking it */

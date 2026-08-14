@@ -73,6 +73,16 @@ export function Settlement({
   const [receipts, setReceipts] = useState<{ label: string; hash: string }[]>([]);
   /** Which form the payout took. Both buttons set the same `paid` flag on chain. */
   const tookTickets = receipts.some((r) => r.label === "TICKETS BOUGHT");
+  /**
+   * That this wallet has taken its money, according to this session.
+   *
+   * `refresh` runs the moment a payout confirms, and the node answers it with the state from
+   * before the transaction often enough to matter: `paid` comes back false, the reward
+   * buttons stay live under a receipt that says the tickets are already bought, and the next
+   * click reverts with `AlreadyPaid`. A receipt is better evidence than a read that can lag,
+   * so it is remembered here and the poll is left to catch up.
+   */
+  const [paidHere, setPaidHere] = useState(false);
   const [now, setNow] = useState(0);
   const [graceMs, setGraceMs] = useState(DEFAULT_GRACE_MS);
 
@@ -167,6 +177,7 @@ export function Settlement({
         if (receipt.status !== "success")
           throw Object.assign(new Error("reverted"), { shortMessage: "THE CHAIN REJECTED IT" });
         setReceipts((r) => [...r, { label, hash }]);
+        if (kind === "paying" || kind === "cashing" || kind === "refunding") setPaidHere(true);
         await refresh();
       } catch (e) {
         setError(readable(e));
@@ -251,7 +262,7 @@ export function Settlement({
 
   return (
     <div className="mt-5 border-t border-ink-3 pt-4">
-      <h3 className="mb-2 font-mono text-[10px] tracking-file text-bone-dim">
+      <h3 className="mb-2 font-mono text-[12px] tracking-file text-bone-dim">
         THE RESULT
       </h3>
 
@@ -281,7 +292,7 @@ export function Settlement({
           {/* The keeper does this for the whole room on a schedule, so nobody has to press
               anything. The button stays for the case where it is running late, and for anyone
               who would rather not wait on a machine they do not control. */}
-          <Button tone="dim" onClick={fileVerdict} disabled={busy !== null}>
+          <Button tone="blood" onClick={fileVerdict} disabled={busy !== null}>
             {busy === "resolving" ? "GETTING YOUR RESULT…" : "GET IT NOW"}
           </Button>
         </>
@@ -317,7 +328,7 @@ export function Settlement({
                 : `WAITING ON ${row.entrants - row.filed} MORE IN THE ROOM`}
           </Button>
         </>
-      ) : row.paid ? (
+      ) : row.paid || paidHere ? (
         <p className="font-body text-[15px] leading-relaxed text-bone">
           {/* `refund` and `payout` both set the same paid flag, so this branch has to say
               which one happened or it tells a refunded player they are holding lottery
@@ -328,13 +339,17 @@ export function Settlement({
           {!row.won
             ? "Done. Your stake is back in your wallet."
             : tookTickets
-              ? "Done. Your share is in your wallet: up to a hundred Megapot tickets for the next drawing, and the rest in USDC. Testnet drawings run every 30 minutes."
+              ? "Done. Your share bought Megapot tickets for the next drawing, and any change came back as USDC. The counter at the top of the screen is how many tickets you hold. Testnet drawings run every 30 minutes."
               : "Done. Your share is in your wallet as USDC."}
         </p>
       ) : row.winningStake === 0n ? (
         <>
           <p className="font-body text-[15px] leading-relaxed text-bone">
-            Nobody caught him, so every stake goes back.
+            {/* Written to the player, not to the room. "Nobody caught him" reads as a
+                bulletin about other people and lets this player off the hook; the case is
+                the same either way, and the account that matters is theirs. */}
+            <span className="text-blood-hot">Oops — you didn&rsquo;t find the killer.</span>{" "}
+            He walks. Your stake comes back.
           </p>
           <Button
             tone="brass"
@@ -462,13 +477,13 @@ function Button({
       ? "border-blood-hot bg-blood-hot/15 text-blood-hot hover:bg-blood-hot/25"
       : tone === "brass"
         ? "border-brass text-brass hover:bg-brass/15"
-        : "border-ink-3 text-bone-dim hover:border-bone-dim hover:text-bone";
+        : "border-bone-dim/55 text-bone hover:border-bone hover:bg-bone/10";
   return (
     <button
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`mt-2 cursor-pointer border px-4 py-2 font-mono text-[10px] tracking-file disabled:cursor-not-allowed disabled:border-ink-3 disabled:text-bone-dim/60 ${style}`}
+      className={`mt-2 cursor-pointer border px-5 py-2.5 font-mono text-[12px] tracking-file disabled:cursor-not-allowed disabled:border-ink-3 disabled:text-bone-dim/60 ${style}`}
     >
       {children}
     </button>
