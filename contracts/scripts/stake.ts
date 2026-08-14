@@ -51,7 +51,8 @@ async function main() {
   const wallet = createWalletClient({ account, chain: baseSepolia, transport });
 
   const c = CASEBOOK[CASE_ID];
-  const answer = c.alibis.findIndex((a) => a.impossible);
+  const ids = JSON.parse(process.env.MENTALIST_ANSWER_IDS ?? "[]") as number[];
+  const answer = ids[CASE_ID] ?? -1;
   const pick = process.env.MENTALIST_PICK ? Number(process.env.MENTALIST_PICK) : answer;
 
   const row = (await pub.readContract({ address: addr, abi, functionName: "cases", args: [CASE_ID] })) as
