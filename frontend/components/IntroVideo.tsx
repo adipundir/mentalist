@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { loadVoices, unlockNarrator } from "@/lib/narrator";
-import * as sfx from "@/lib/sound";
 
 /**
  * The loading screen, which is a film.
@@ -37,13 +36,11 @@ export function IntroVideo({ onReady }: { onReady: () => void }) {
     setLeaving(true);
   }, []);
 
-  // The video owns the sound for its whole run, so the title bed steps out of the way.
-  // Everything else here is work the first scene needs done regardless.
+  // Everything here is work the first scene needs done regardless of the film.
   useEffect(() => {
     if (started.current) return;
     started.current = true;
 
-    sfx.stopTitleBed();
     unlockNarrator();
     void loadVoices();
     if (typeof document !== "undefined" && "fonts" in document) {
@@ -115,13 +112,26 @@ export function IntroVideo({ onReady }: { onReady: () => void }) {
         transition={{ duration: leaving ? fade : 0.7, ease: "easeInOut" }}
         onAnimationComplete={() => {
           if (!leaving) return;
-          // A beat of nothing before the board, so the cut does not land on the tail of
-          // the fade. The room comes up under the black.
-          sfx.startRoomTone();
+          // A beat of nothing before the board, so the cut does not land on the tail of the
+          // fade. Nothing is started here: the board is silent, and the room's own air comes
+          // up when the player is actually standing in a room.
           setTimeout(onReady, 320);
         }}
         className="h-full w-full object-cover"
       />
+
+      {/* Something that says the wait is doing work.
+          A film with no caption is a film a player watches wondering whether the button
+          they pressed did anything, so this says what is happening underneath it. It fades
+          with the picture rather than sitting on the empty black at the end. */}
+      <motion.p
+        initial={{ opacity: 0 }}
+        animate={{ opacity: leaving ? 0 : 1 }}
+        transition={{ duration: leaving ? fade : 0.9, ease: "easeInOut" }}
+        className="pointer-events-none absolute bottom-6 right-6 font-mono text-[13px] tracking-file text-bone drop-shadow-[0_2px_6px_rgba(0,0,0,0.9)]"
+      >
+        LOADING CASES<span className="caret" />
+      </motion.p>
     </motion.div>
   );
 }

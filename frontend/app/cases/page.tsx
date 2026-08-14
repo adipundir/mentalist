@@ -12,7 +12,6 @@ import { usdc } from "@/lib/market";
 import { SEASON_START, countdown, nextRelease, schedule } from "@/lib/schedule";
 import { Character } from "@/components/Character";
 import { PoweredBy } from "@/components/PoweredBy";
-import * as sfx from "@/lib/sound";
 import { TicketBalance } from "@/components/TicketBalance";
 
 /**
@@ -54,14 +53,6 @@ export default function Board() {
     setNow(Date.now());
     const id = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(id);
-  }, []);
-
-  // The board used to be the one silent screen in the game: the film brings its own sound
-  // and the room has its own bed, so arriving here dropped the player into nothing. Audio
-  // is already unlocked by the click on BEGIN that got them here.
-  useEffect(() => {
-    sfx.startTitleBed();
-    return () => sfx.stopTitleBed();
   }, []);
 
   useEffect(() => {
@@ -273,6 +264,12 @@ function CaseCard({
           <span className="font-mono text-[9px] tracking-file text-bone-dim">
             OPENS IN {countdown(until)}
           </span>
+        ) : !row || now === SEASON_START ? (
+          // Nothing at all until both halves are in: the case's window comes off the chain
+          // and the clock comes off the browser, and neither is known on the first paint.
+          // Rendering the branch anyway printed "CLOSING" on every card for the moment
+          // before the read landed, which is a lie about a case that has barely opened.
+          <span className="font-mono text-[9px] tracking-file text-bone-dim/40">·</span>
         ) : open ? (
           <span className="font-mono text-[9px] tracking-file text-bone-dim">
             {left > 0 ? `CLOSES IN ${countdown(left)}` : "CLOSING"}

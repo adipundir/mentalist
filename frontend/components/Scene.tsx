@@ -87,22 +87,6 @@ export function Scene({
   // thing at more length, and saying it again in a bar that slides away three seconds later
   // is the same paragraph twice: once in a modal, once underneath it.
 
-  // Room tone and the music both run for the life of the scene.
-  useEffect(() => {
-    sfx.startRoomTone();
-    sfx.startRoomBed();
-    return () => {
-      sfx.stopRoomTone();
-      sfx.stopRoomBed();
-    };
-  }, []);
-
-  // The music gets out of the way while somebody is speaking. The alibis are the whole game,
-  // and a score you have to listen past is worse than no score.
-  useEffect(() => {
-    sfx.duckRoomBed(!!g.saying);
-  }, [g.saying]);
-
   // An account takes over the bar the moment it lands.
   useEffect(() => {
     if (!g.saying) return;
@@ -153,8 +137,13 @@ export function Scene({
 
   return (
     <div className="fixed inset-0 overflow-hidden">
-      {/* ── the room is the page: one background, edge to edge ── */}
-      <div className="absolute inset-0 z-20">
+      {/* ── the room is the page: one background, edge to edge ──
+          `isolate` matters more than it looks. The figures inside carry z-indexes of their
+          own (a speaker lifts to 400 so his bubble clears the lineup), and with this wrapper
+          left at `z-auto` those indexes join the *page's* stacking context rather than
+          staying in the room's — which put a suspect, and the crime-scene svg, on top of the
+          stake bar. The money was in the DOM, on screen, and painted over. */}
+      <div className="isolate absolute inset-0 z-0">
         <Room
           subjects={subjects}
           focused={g.witness ?? chosen}
@@ -168,7 +157,11 @@ export function Scene({
           onFocus={(seat) => {
             // The speaker's own voice, not the one the alphabet happened to hand his seat.
             g.interrogate(seat, suspects[seat]?.character.feminine);
-            if (g.allSpoken && !locked) setChosen(seat);
+            // Anyone, at any point. Naming a man used to require hearing all of them first,
+            // which is a rule the game never had a reason to enforce: the accounts are free
+            // and public, and a player who already knows who they like should not have to
+            // click through five men they do not care about to be allowed to say so.
+            if (!locked) setChosen(seat);
           }}
           // Clicking the room itself steps away from whoever you were standing over. Until
           // now the only way out of a man's face was into another man's, which is not how
@@ -216,18 +209,24 @@ export function Scene({
             and sits above it. Once the panel is up it is what the player came for, so the bar
             gives way: the account is not lost, the speaker still says his piece in a bubble
             over his own head. */}
-        <Dialogue line={g.allSpoken && stakePanel ? null : line} />
+        <Dialogue line={stakePanel ? null : line} />
       </div>
 
-      {/* ── the money, once the room has finished talking ──
+      {/* ── the money, always on screen ──
+          It used to appear only once every account had been heard, which read as a missing
+          feature rather than a locked one: a player who had questioned three of six saw an
+          empty strip of floor where the betting is, and the line that used to explain the
+          wait sat underneath the account bar where nobody could read it. The panel is always
+          here now and says what it is waiting for; the button stays disabled until there is
+          somebody to name.
           There used to be a running instruction here too — "click anyone", then "that's 3 of
           6" — but it sat underneath the account bar that covers this same edge of the screen,
           so most of it was hidden behind whoever was speaking and the visible half read as a
           sentence someone had cut in two. The room already tells the player what to do: the
           figures are clickable and the account appears when one of them talks. */}
-      {g.allSpoken && stakePanel && (
+      {stakePanel && (
         <div
-          className="absolute inset-x-0 bottom-0 px-4 pb-16 pt-14 sm:px-7"
+          className="absolute inset-x-0 bottom-0 z-10 px-4 pb-16 pt-14 sm:px-7"
           // Not a panel: no edges, no box, just the floor going dark under the type. The
           // room reaches the bottom of the frame either way, but a stake row laid over a
           // body and a trail of blood is a stake row nobody can read.
