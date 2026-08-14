@@ -211,6 +211,7 @@ function StoryInner() {
             chapter={`CASE ${index + 1} OF ${CASEBOOK.length}, ${chapter.suspects} SUSPECTS, ${chapter.liars} OF THEM LYING`}
             title={chapter.title}
             body={chapter.opening}
+            voice={`c${index}-open`}
             onContinue={() => setStage("playing")}
             continueLabel="WORK THE ROOM"
             extra={
@@ -251,6 +252,7 @@ function StoryInner() {
                   ? chapter.successText
                   : chapter.failureText
             }
+            voice={verdict === null ? "sealed" : verdict ? `c${index}-win` : `c${index}-lose`}
             onContinue={advance}
             continueLabel="BACK TO THE CASES"
             extra={

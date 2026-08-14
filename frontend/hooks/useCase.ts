@@ -4,6 +4,7 @@ import { useCallback, useState, useRef } from "react";
 import type { Alibi } from "@/lib/casebook";
 import * as sfx from "@/lib/sound";
 import { narrate, stopNarration, toneForSeat, unlockNarrator } from "@/lib/narrator";
+import { playLine, stopVoice } from "@/lib/voice";
 
 /**
  * Working the room: who has spoken, and what they said.
@@ -13,7 +14,7 @@ import { narrate, stopNarration, toneForSeat, unlockNarrator } from "@/lib/narra
  * their mind twice without a wallet, a signature or a gas estimate. The one transaction in
  * this game happens when they put money on a name, and it lives in `Stake`.
  */
-export function useCase({ alibis }: { alibis: Alibi[] }) {
+export function useCase({ alibis, caseId }: { alibis: Alibi[]; caseId: number }) {
   const n = alibis.length;
 
   const [spoken, setSpoken] = useState<number[]>([]);
@@ -50,11 +51,18 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
       // the utterance ends, so that is the moment to put the face back. The token guards
       // against a stale utterance landing after the player has moved on to somebody else.
       const token = ++speechToken.current;
-      void narrate(line, { ...toneForSeat(seat), seat, feminine }).then(() => {
-        if (speechToken.current === token) setSaying(null);
-      });
+      // The recording first, and the browser's own voice only if there is no recording for
+      // this seat. Both resolve when the mouth stops moving, which is what closes it.
+      void playLine(caseId, seat)
+        .then((played) => {
+          if (played || speechToken.current !== token) return played;
+          return narrate(line, { ...toneForSeat(seat), seat, feminine }).then(() => true);
+        })
+        .then(() => {
+          if (speechToken.current === token) setSaying(null);
+        });
     },
-    [alibis],
+    [alibis, caseId],
   );
 
   /**
@@ -67,6 +75,7 @@ export function useCase({ alibis }: { alibis: Alibi[] }) {
   const stepBack = useCallback(() => {
     speechToken.current++;
     stopNarration();
+    stopVoice();
     setWitness(null);
     setSaying(null);
   }, []);

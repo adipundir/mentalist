@@ -79,7 +79,7 @@ export function Scene({
   /** Reports who the player is naming, so the wager can be placed on him. */
   onPick?: (seat: number | null, name: string | null) => void;
 }) {
-  const g = useCase({ alibis });
+  const g = useCase({ alibis, caseId: variant });
   const [chosen, setChosen] = useState<number | null>(null);
   const [line, setLine] = useState<Line | null>(null);
 

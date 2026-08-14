@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { Character, type CharacterSpec } from "./Character";
 import { isNarratorMuted, narrate, setNarratorMuted, stopNarration, unlockNarrator } from "@/lib/narrator";
+import { playCue, stopVoice } from "@/lib/voice";
 
 /**
  * A narrative beat between cases.
@@ -21,6 +22,7 @@ export function StoryCard({
   onContinue,
   continueLabel = "CONTINUE",
   extra,
+  voice,
 }: {
   chapter?: string;
   title: string;
@@ -31,6 +33,8 @@ export function StoryCard({
   continueLabel?: string;
   /** Rendered above the continue row: filing the verdict and collecting the pot. */
   extra?: React.ReactNode;
+  /** Name of a pre-recorded narration in /public/vo, without extension. */
+  voice?: string;
 }) {
   const [shown, setShown] = useState(0);
   const [muted, setMuted] = useState(isNarratorMuted());
@@ -50,9 +54,16 @@ export function StoryCard({
     if (started.current) return;
     started.current = true;
     unlockNarrator();
-    void narrate(body);
-    return () => stopNarration();
-  }, [body]);
+    // The recorded narrator reads if this card has a recording; the browser's voice only
+    // ever covers a card that has none.
+    void (voice ? playCue(voice) : Promise.resolve(false)).then((played) => {
+      if (!played) void narrate(body);
+    });
+    return () => {
+      stopNarration();
+      stopVoice();
+    };
+  }, [body, voice]);
 
   return (
     <motion.div
@@ -94,7 +105,10 @@ export function StoryCard({
               const next = !muted;
               setMuted(next);
               setNarratorMuted(next);
-              if (!next) void narrate(body);
+              if (next) stopVoice();
+              else void (voice ? playCue(voice) : Promise.resolve(false)).then((p) => {
+                if (!p) void narrate(body);
+              });
             }}
             className="shrink-0 cursor-pointer border border-ink-3 px-2 py-1 font-mono text-[9px] tracking-file text-bone-dim hover:border-bone-dim hover:text-bone"
           >
