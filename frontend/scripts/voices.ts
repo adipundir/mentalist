@@ -39,7 +39,7 @@ const FEMININE = [
 ] as const;
 
 const MASCULINE = [
-  "aditya", "rahul", "rohan", "amit", "dev", "ratan", "varun", "manan",
+  "aditya", "rahul", "rohan", "amit", "dev", "varun", "manan",
   "sumit", "kabir", "aayan", "shubh", "advait", "anand", "tarun", "sunny",
   "mani", "gokul", "vijay", "mohit", "rehan", "soham",
 ] as const;
@@ -51,7 +51,7 @@ const MASCULINE = [
  * standing in it, and fixed across all seven cases: the narrator is one person, and a story
  * whose teller changes between chapters has no teller at all.
  */
-const NARRATOR = "ashutosh";
+const NARRATOR = "ratan";
 
 function speakerFor(seat: number, feminine: boolean | undefined): string {
   const pool = feminine ? FEMININE : MASCULINE;
