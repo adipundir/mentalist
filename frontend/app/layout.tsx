@@ -1,6 +1,7 @@
 import "./globals.css";
 import type { Metadata } from "next";
 import { IBM_Plex_Mono, Special_Elite, Crimson_Pro } from "next/font/google";
+import Script from "next/script";
 import { NarrationToggle } from "@/components/NarrationToggle";
 
 /** Data, addresses, the terminal panel. */
@@ -40,6 +41,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         {/* The sounds play on every screen, so the switch for them belongs on every screen. */}
         <NarrationToggle />
+
+        {/* Vercel's analytics, loaded straight from the platform rather than through
+            `@vercel/analytics`. Both are already provisioned on the project; the package
+            only ever injects these two scripts, and adding it would mean resolving the
+            whole workspace, which currently cannot be installed at all — a Safe contracts
+            dependency is pinned to an SSH git URL that fails without keys. */}
+        <Script src="/_vercel/insights/script.js" strategy="afterInteractive" />
+        <Script src="/_vercel/speed-insights/script.js" strategy="afterInteractive" />
       </body>
     </html>
   );
