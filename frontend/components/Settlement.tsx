@@ -53,9 +53,12 @@ const DEFAULT_GRACE_MS = 60 * 60 * 1000;
 
 export function Settlement({
   caseId,
+  optimisticStake,
   onResolved,
 }: {
   caseId: number;
+  /** The just-mined stake, used while a public RPC catches up with the receipt. */
+  optimisticStake?: bigint | null;
   /** Fires with the verdict the keeper filed, so the page can tell the story. */
   onResolved?: (won: boolean | null) => void;
 }) {
@@ -130,6 +133,7 @@ export function Settlement({
             pub.readContract({ address: MENTALIST_ADDRESS, abi: MENTALIST_ABI, functionName: "shareOf", args: [caseId, address] }),
           ])
         : [[0n, false, false, false] as const, 0n];
+      const stake = b[0] > 0n ? b[0] : optimisticStake ?? 0n;
       setRow({
         closesAt: Number(c[0]) * 1000,
         pot: c[2],
@@ -137,7 +141,7 @@ export function Settlement({
         settled: c[6],
         entrants: Number(c[4]),
         filed: Number(c[8]),
-        stake: b[0],
+        stake,
         resolved: b[1],
         won: b[2],
         paid: b[3],
@@ -150,7 +154,7 @@ export function Settlement({
       /* a cold read is not worth a message */
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pub, address, caseId]);
+  }, [pub, address, caseId, optimisticStake]);
 
   useEffect(() => {
     void refresh();

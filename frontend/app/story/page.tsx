@@ -55,6 +55,8 @@ function StoryInner() {
   const [verdict, setVerdict] = useState<boolean | null>(null);
   const [pick, setPick] = useState<{ seat: number; name: string } | null>(null);
   const [row, setRow] = useState<CaseRow | null>(null);
+  /** Keeps the closing panel truthful while the receipt propagates to the read RPC. */
+  const [recentStake, setRecentStake] = useState<bigint | null>(null);
   /** True while the stake is on the wire, so the room cannot re-point a bet already sent. */
   const [locked, setLocked] = useState(false);
 
@@ -77,6 +79,7 @@ function StoryInner() {
     setPick(null);
     setVerdict(null);
     setRow(null);
+    setRecentStake(null);
     // Keyed on the account too. A verdict belongs to one wallet, and leaving it up through a
     // switch showed the new account the old one's outcome, with the killer named underneath.
     // The stage has to be re-decided as well, or the new account keeps the old one's room.
@@ -251,7 +254,10 @@ function StoryInner() {
             entrants={row?.entrants ?? null}
             open={row?.open ?? null}
             onBusy={setLocked}
-            onStaked={() => setStage("closing")}
+            onStaked={(amount) => {
+              setRecentStake(amount);
+              setStage("closing");
+            }}
           />
         }
       />
@@ -314,7 +320,7 @@ function StoryInner() {
                 {resultIsPublic && (
                   <TheTell caseId={index} chapter={chapter} settled={resultIsPublic} />
                 )}
-                <Settlement caseId={index} onResolved={setVerdict} />
+                <Settlement caseId={index} optimisticStake={recentStake} onResolved={setVerdict} />
               </>
             }
           />
